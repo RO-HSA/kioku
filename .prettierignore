@@ -1,0 +1,13 @@
+# Ignore artifacts:
+build
+coverage
+node_modules
+dist
+public
+src/assets/*
+.vscode/*
+src-tauri/capabilities/*
+src-tauri/bundles/*
+src-tauri/target/*
+src-tauri/icons/*
+src-tauri/gen/*
