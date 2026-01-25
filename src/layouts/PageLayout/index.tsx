@@ -4,6 +4,7 @@ import { Menu } from 'lucide-react';
 import Sidebar from '@/components/layout/Sidebar';
 import Button from '@/components/ui/Button';
 import { useSidebarStore } from '@/stores/useSidebarStore';
+import { Divider } from '@mui/material';
 
 interface PageLayoutProps {
   children: ReactNode;
@@ -17,7 +18,7 @@ const PageLayout: FC<PageLayoutProps> = ({ children }) => {
       <Sidebar />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-3 border-b border-divider bg-background-paper px-4 py-3 min-[900px]:hidden">
+        <header className="flex items-center gap-3 bg-background-paper px-4 py-3 min-[900px]:hidden">
           <Button
             variant="ghost"
             size="small"
@@ -30,6 +31,9 @@ const PageLayout: FC<PageLayoutProps> = ({ children }) => {
             <span className="text-xs text-text-secondary">Overview</span>
           </div>
         </header>
+
+        <Divider className="min-[900px]:hidden" />
+
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-6xl p-6">{children}</div>
         </main>

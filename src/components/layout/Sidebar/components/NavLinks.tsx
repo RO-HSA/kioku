@@ -32,17 +32,17 @@ const NavLinks: FC<NavLinksProps> = ({ onNavigate }) => {
             }}
             aria-current={isActive ? 'page' : undefined}
             className={cn(
-              'flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors',
+              'flex w-full items-center justify-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium transition-[colors, gap] duration-200 ease-in-out',
               isActive
                 ? 'bg-primary/10 text-primary'
                 : 'text-text-secondary hover:bg-primary/5 hover:text-text-primary',
-              !isSidebarOpen && 'justify-center'
+              !isSidebarOpen && 'justify-center gap-0'
             )}>
-            <Icon className="size-5 shrink-0" />
+            <Icon className="size-5 shrink-0 justify-self-center" />
             <span
               className={cn(
-                'truncate transition-all',
-                !isSidebarOpen && 'w-0 opacity-0'
+                'truncate w-full opacity-100 transition-opacity duration-300 ease-in-out',
+                !isSidebarOpen && 'opacity-0'
               )}>
               {label}
             </span>

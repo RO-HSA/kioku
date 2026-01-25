@@ -35,6 +35,7 @@ const Button: FC<ButtonProps> = ({
     <MuiButton
       className={className}
       size={size}
+      style={{ minWidth: '32px' }}
       onClick={onClick}
       variant={getVariant()}>
       {children}
