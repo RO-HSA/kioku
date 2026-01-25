@@ -4,8 +4,8 @@ import { SidebarNavigationStep } from '@/types/Navigation';
 
 export const navLinks = [
   {
-    label: 'Home',
-    step: SidebarNavigationStep.HOME,
+    label: 'Anime List',
+    step: SidebarNavigationStep.ANIME_LIST,
     icon: Home
   }
 ];

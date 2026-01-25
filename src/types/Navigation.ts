@@ -1,3 +1,3 @@
 export enum SidebarNavigationStep {
-  HOME = 'home'
+  ANIME_LIST = 'anime_list'
 }

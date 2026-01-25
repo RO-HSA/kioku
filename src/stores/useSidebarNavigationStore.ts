@@ -9,7 +9,7 @@ type SidebarNavigationStore = {
 
 export const useSidebarNavigationStore = create<SidebarNavigationStore>(
   (set) => ({
-    navigationStep: SidebarNavigationStep.HOME,
+    navigationStep: SidebarNavigationStep.ANIME_LIST,
     setNavigationStep: (step: SidebarNavigationStep) =>
       set(() => ({ navigationStep: step }))
   })
