@@ -28,7 +28,7 @@ const Sidebar = () => {
       <aside
         className={cn(
           'sticky left-0 top-0 z-20 h-screen shrink-0 transition-[width] duration-300 ease-in-out',
-          isOpen ? 'w-72' : 'w-14'
+          isOpen ? 'w-60' : 'w-14'
         )}>
         <Content />
       </aside>
