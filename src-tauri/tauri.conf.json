@@ -13,11 +13,12 @@
     "windows": [
       {
         "title": "kioku",
-        "width": 800,
+        "width": 1024,
         "height": 600
       }
     ],
     "security": {
+      "capabilities": ["zustand"],
       "csp": null
     }
   },
