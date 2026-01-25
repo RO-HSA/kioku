@@ -20,7 +20,7 @@ export const Content = () => {
         )}>
         <div
           className={cn(
-            'flex items-center gap-2 overflow-hidden opacity-100 w-full transition-[width, opacity, gap] duration-300 ease-in-out',
+            'flex items-center gap-2 overflow-hidden select-none opacity-100 w-full transition-[width, opacity, gap] duration-300 ease-in-out',
             !isOpen && 'w-0 opacity-0 gap-0'
           )}>
           <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">

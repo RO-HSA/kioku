@@ -32,7 +32,7 @@ const NavLinks: FC<NavLinksProps> = ({ onNavigate }) => {
             }}
             aria-current={isActive ? 'page' : undefined}
             className={cn(
-              'flex w-full items-center justify-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium transition-[colors, gap] duration-200 ease-in-out',
+              'flex w-full items-center justify-center gap-3 cursor-pointer rounded-xl px-3 py-2 text-left text-sm font-medium transition-[colors, gap] duration-200 ease-in-out',
               isActive
                 ? 'bg-primary/10 text-primary'
                 : 'text-text-secondary hover:bg-primary/5 hover:text-text-primary',
