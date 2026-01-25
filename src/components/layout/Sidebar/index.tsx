@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 
 import { cn } from '@/lib/utils';
 import { useSidebarStore } from '@/stores/useSidebarStore';
-import { Content } from './components/Content';
+import Content from './components/Content';
 
 const Sidebar = () => {
   const isOpen = useSidebarStore((state) => state.isOpen);

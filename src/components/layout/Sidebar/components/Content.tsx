@@ -1,12 +1,13 @@
 import { Divider, useMediaQuery } from '@mui/material';
+import { PanelLeftClose, PanelRightClose } from 'lucide-react';
 
 import NavLinks from './NavLinks';
 import { cn } from '@/lib/utils';
 import { useSidebarStore } from '@/stores/useSidebarStore';
 import Button from '@/components/ui/Button';
-import { PanelLeftClose, PanelRightClose } from 'lucide-react';
+import ModeToggle from '@/components/ModeToggle';
 
-export const Content = () => {
+const Content = () => {
   const isDesktop = useMediaQuery('(min-width: 900px)');
   const isOpen = useSidebarStore((state) => state.isOpen);
   const toggle = useSidebarStore((state) => state.toggle);
@@ -45,7 +46,11 @@ export const Content = () => {
 
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-4">
         <NavLinks onNavigate={!isDesktop ? toggle : undefined} />
+
+        <ModeToggle />
       </nav>
     </div>
   );
 };
+
+export default Content;
