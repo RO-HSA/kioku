@@ -1,4 +1,4 @@
-import { Divider, useMediaQuery } from '@mui/material';
+import { Box, Divider, Typography, useMediaQuery } from '@mui/material';
 import { PanelLeftClose, PanelRightClose } from 'lucide-react';
 
 import NavLinks from './NavLinks';
@@ -44,10 +44,12 @@ const Content = () => {
 
       <Divider />
 
-      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-4">
+      <nav className="flex flex-1 flex-col justify-between overflow-y-auto px-2 py-4">
         <NavLinks onNavigate={!isDesktop ? toggle : undefined} />
 
-        <ModeToggle />
+        <Box className="w-full overflow-hidden">
+          <ModeToggle />
+        </Box>
       </nav>
     </div>
   );
