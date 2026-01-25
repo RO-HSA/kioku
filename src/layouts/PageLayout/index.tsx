@@ -17,6 +17,8 @@ const PageLayout: FC<PageLayoutProps> = ({ children }) => {
     <div className="flex h-screen w-full overflow-hidden bg-background-default text-text-primary">
       <Sidebar />
 
+      <Divider orientation="vertical" flexItem />
+
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 bg-background-paper px-4 py-3 min-[900px]:hidden">
           <Button
