@@ -22,7 +22,6 @@ pub fn run() {
         .plugin(tauri_plugin_zustand::init())
         .setup(|app| {
             app.zustand().set_autosave(Duration::from_secs(300));
-            app.zustand().deny_sync("sidebarNavigation");
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![greet])

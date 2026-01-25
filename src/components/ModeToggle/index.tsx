@@ -19,7 +19,11 @@ const ModeToggle = () => {
       <Button
         onClick={() => setMode(mode === 'dark' ? 'light' : 'dark')}
         variant="ghost">
-        {mode === 'dark' ? <MoonStar /> : <Sun />}
+        {mode === 'dark' ? (
+          <MoonStar className="size-5" />
+        ) : (
+          <Sun className="size-5" />
+        )}
       </Button>
     );
   }

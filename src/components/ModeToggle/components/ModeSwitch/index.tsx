@@ -12,7 +12,7 @@ const ModeSwitch = styled(Switch)(({ theme }) => ({
       color: '#fff',
       transform: 'translateX(22px)',
       '& .MuiSwitch-thumb:before': {
-        backgroundImage: `url('public/dark.svg')`
+        backgroundImage: `url('dark.svg')`
       },
       '& + .MuiSwitch-track': {
         opacity: 1,
@@ -36,7 +36,7 @@ const ModeSwitch = styled(Switch)(({ theme }) => ({
       top: 0,
       backgroundRepeat: 'no-repeat',
       backgroundPosition: 'center',
-      backgroundImage: `url('public/light.svg')`
+      backgroundImage: `url('light.svg')`
     },
     ...theme.applyStyles('dark', {
       backgroundColor: '#003892'

@@ -17,4 +17,6 @@ export const useSidebarStore = create<SidebarStore>((set) => ({
   setOpen: (isOpen) => set(() => ({ isOpen }))
 }));
 
-export const tauriHandler = createTauriStore('sidebar', useSidebarStore);
+export const tauriHandler = createTauriStore('sidebar', useSidebarStore, {
+  autoStart: true
+});

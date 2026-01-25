@@ -1,4 +1,4 @@
-import { Box, Divider, Typography, useMediaQuery } from '@mui/material';
+import { Box, Divider, useMediaQuery } from '@mui/material';
 import { PanelLeftClose, PanelRightClose } from 'lucide-react';
 
 import NavLinks from './NavLinks';
