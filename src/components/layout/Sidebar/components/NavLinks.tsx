@@ -2,8 +2,8 @@ import { type FC } from 'react';
 
 import { navLinks } from '../configs';
 import { cn } from '@/lib/utils';
-import { useSidebarNavigationStore } from '@/stores/useSidebarNavigationStore';
-import { useSidebarStore } from '@/stores/useSidebarStore';
+import { useSidebarNavigationStore } from '@/stores/sidebarNavigation';
+import { useSidebarStore } from '@/stores/sidebar';
 
 interface NavLinksProps {
   onNavigate?: () => void;

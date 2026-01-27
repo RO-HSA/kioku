@@ -2,7 +2,7 @@ import { Drawer, useMediaQuery } from '@mui/material';
 import { useEffect } from 'react';
 
 import { cn } from '@/lib/utils';
-import { useSidebarStore } from '@/stores/useSidebarStore';
+import { useSidebarStore } from '@/stores/sidebar';
 import Content from './components/Content';
 
 const Sidebar = () => {

@@ -3,7 +3,7 @@ import { PanelLeftClose, PanelRightClose } from 'lucide-react';
 
 import NavLinks from './NavLinks';
 import { cn } from '@/lib/utils';
-import { useSidebarStore } from '@/stores/useSidebarStore';
+import { useSidebarStore } from '@/stores/sidebar';
 import Button from '@/components/ui/Button';
 import ModeToggle from '@/components/ModeToggle';
 

@@ -2,7 +2,7 @@ import { ChangeEvent } from 'react';
 import { useColorScheme } from '@mui/material';
 
 import ModeSwitch from './components/ModeSwitch';
-import { useSidebarStore } from '@/stores/useSidebarStore';
+import { useSidebarStore } from '@/stores/sidebar';
 import { MoonStar, Sun } from 'lucide-react';
 import Button from '../ui/Button';
 

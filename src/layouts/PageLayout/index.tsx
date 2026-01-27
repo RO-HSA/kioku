@@ -3,7 +3,7 @@ import { Menu } from 'lucide-react';
 
 import Sidebar from '@/components/layout/Sidebar';
 import Button from '@/components/ui/Button';
-import { useSidebarStore } from '@/stores/useSidebarStore';
+import { useSidebarStore } from '@/stores/sidebar';
 import { Divider } from '@mui/material';
 
 interface PageLayoutProps {
