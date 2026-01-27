@@ -31,7 +31,7 @@ pub async fn authorize_provider(
 }
 
 #[tauri::command]
-pub async fn authorize_myanimelist(_username: &str, app: tauri::AppHandle) -> Result<AuthorizePayload, String> {
+pub async fn authorize_myanimelist(app: tauri::AppHandle) -> Result<AuthorizePayload, String> {
     authorize_provider_impl(MAL_PROVIDER_ID, app).await
 }
 
