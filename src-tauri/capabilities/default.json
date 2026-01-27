@@ -6,8 +6,6 @@
     "main"
   ],
   "permissions": [
-    "core:default",
-    "opener:default",
-    "deep-link:default"
+    "core:default"
   ]
 }
