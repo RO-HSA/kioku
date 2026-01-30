@@ -17,11 +17,9 @@ const MyanimelistForm = () => {
   const isAuthenticating = useMyAnimeListStore(
     (state) => state.isAuthenticating
   );
-  const listData = useMyAnimeListStore((state) => state.listData);
   const setIsAuthenticating = useMyAnimeListStore(
     (state) => state.setIsAuthenticating
   );
-  console.log({ listData: JSON.parse(listData) });
 
   const {
     register,
