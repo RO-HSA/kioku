@@ -1,15 +1,16 @@
 import { createTauriStore } from '@tauri-store/zustand';
 import { create } from 'zustand';
+import { SynchronizeMyAnimeListResult } from '@/services/backend/MyAnimeList/type';
 
 type MyAnimeListStore = {
   username: string | null;
   isAuthenticating: boolean;
   isAuthenticated: boolean;
-  listData: any | null;
+  listData: SynchronizeMyAnimeListResult | null;
   setUsername: (username: string | null) => void;
   setIsAuthenticating: (isAuthenticating: boolean) => void;
   setIsAuthenticated: (isAuthenticated: boolean) => void;
-  setListData: (listData: any | null) => void;
+  setListData: (listData: SynchronizeMyAnimeListResult | null) => void;
 };
 
 export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({

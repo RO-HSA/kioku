@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { SynchronizeMyAnimeListResult } from './type';
 
 export class MyAnimeListService {
-  static async authorize(): Promise<SynchronizeMyAnimeListResult | undefined> {
+  static async authorize(): Promise<void> {
     try {
       return invoke('authorize_myanimelist');
     } catch (error) {
@@ -11,7 +11,7 @@ export class MyAnimeListService {
     }
   }
 
-  static async synchronizeList(): Promise<void> {
+  static async synchronizeList(): Promise<SynchronizeMyAnimeListResult> {
     return invoke('synchronize_myanimelist');
   }
 }
