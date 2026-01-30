@@ -1,10 +1,10 @@
-import { ChangeEvent } from 'react';
 import { useColorScheme } from '@mui/material';
+import { ChangeEvent } from 'react';
 
-import ModeSwitch from './components/ModeSwitch';
-import { useSidebarStore } from '@/stores/sidebar';
+import { useSidebarStore } from '@/stores/sidebar/sidebar';
 import { MoonStar, Sun } from 'lucide-react';
 import Button from '../ui/Button';
+import ModeSwitch from './components/ModeSwitch';
 
 const ModeToggle = () => {
   const isSidebarOpen = useSidebarStore((state) => state.isOpen);

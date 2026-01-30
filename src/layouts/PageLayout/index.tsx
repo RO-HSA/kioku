@@ -1,9 +1,10 @@
-import { type FC, ReactNode } from 'react';
 import { Menu } from 'lucide-react';
+import { type FC, ReactNode } from 'react';
 
+import ConfigMenu from '@/components/ConfigMenu';
 import Sidebar from '@/components/layout/Sidebar';
 import Button from '@/components/ui/Button';
-import { useSidebarStore } from '@/stores/sidebar';
+import { useSidebarStore } from '@/stores/sidebar/sidebar';
 import { Divider } from '@mui/material';
 
 interface PageLayoutProps {
@@ -20,7 +21,7 @@ const PageLayout: FC<PageLayoutProps> = ({ children }) => {
       <Divider orientation="vertical" flexItem />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-3 bg-background-paper px-4 py-3 min-[900px]:hidden">
+        <header className="flex items-center gap-3 bg-background-paper px-4 py-3 sm:hidden">
           <Button
             variant="ghost"
             size="small"
@@ -34,12 +35,13 @@ const PageLayout: FC<PageLayoutProps> = ({ children }) => {
           </div>
         </header>
 
-        <Divider className="min-[900px]:hidden" />
+        <Divider className="sm:hidden" />
 
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-6xl p-6">{children}</div>
         </main>
       </div>
+      <ConfigMenu />
     </div>
   );
 };

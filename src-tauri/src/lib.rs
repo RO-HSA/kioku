@@ -4,6 +4,7 @@ use tauri::Manager;
 use tauri_plugin_zustand::ManagerExt;
 
 pub mod auth;
+pub mod services;
 use crate::auth::{
     authorize_myanimelist, authorize_provider, handle_oauth_callback, init_stronghold_key,
     oauth_request, ProviderConfig, StrongholdKeyState, TokenManagerState,
@@ -12,6 +13,7 @@ use crate::auth::mal::{
     AUTHORIZE_URL as MAL_AUTHORIZE_URL, CLIENT_ID as MAL_CLIENT_ID,
     PROVIDER_ID as MAL_PROVIDER_ID, TOKEN_URL as MAL_TOKEN_URL,
 };
+use crate::services::myanimelist::synchronize_myanimelist;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -46,7 +48,10 @@ pub fn run() {
                 return Err(std::io::Error::new(std::io::ErrorKind::Other, err).into());
             }
 
-            let mal_config = ProviderConfig::new(MAL_CLIENT_ID, MAL_AUTHORIZE_URL, MAL_TOKEN_URL);
+            let mal_config = ProviderConfig::new(MAL_CLIENT_ID, MAL_AUTHORIZE_URL, MAL_TOKEN_URL)
+                .with_authorize_param("redirect_uri", "kioku://myanimelist")
+                .with_authorize_param("code_challenge_method", "plain")
+                .with_token_param("redirect_uri", "kioku://myanimelist");
             
             if let Err(err) = app
                 .state::<TokenManagerState>()
@@ -55,16 +60,14 @@ pub fn run() {
                 return Err(std::io::Error::new(std::io::ErrorKind::Other, err).into());
             }
 
-            Ok(())
-        })
-        .setup(|app| {
             app.zustand().set_autosave(Duration::from_secs(300));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             authorize_myanimelist,
             authorize_provider,
-            oauth_request
+            oauth_request,
+            synchronize_myanimelist
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

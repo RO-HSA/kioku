@@ -3,6 +3,7 @@ use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 
 use serde::Deserialize;
+use serde_json;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_http::reqwest;
 
@@ -71,6 +72,7 @@ struct TokenManagerInner {
     providers: HashMap<String, ProviderConfig>,
     tokens: HashMap<String, TokenState>,
     pkce_verifiers: HashMap<String, String>,
+    pkce_states: HashMap<String, (String, String)>,
 }
 
 #[derive(Default)]
@@ -134,6 +136,33 @@ impl TokenManagerState {
             .lock()
             .map_err(|_| "Token manager lock poisoned".to_string())?;
         Ok(guard.pkce_verifiers.remove(provider_id))
+    }
+
+    pub fn set_pkce_state(
+        &self,
+        state: String,
+        provider_id: &str,
+        code_verifier: String,
+    ) -> Result<(), String> {
+        let mut guard = self
+            .0
+            .lock()
+            .map_err(|_| "Token manager lock poisoned".to_string())?;
+        guard
+            .pkce_states
+            .insert(state, (provider_id.to_string(), code_verifier));
+        Ok(())
+    }
+
+    pub fn take_pkce_state(
+        &self,
+        state: &str,
+    ) -> Result<Option<(String, String)>, String> {
+        let mut guard = self
+            .0
+            .lock()
+            .map_err(|_| "Token manager lock poisoned".to_string())?;
+        Ok(guard.pkce_states.remove(state))
     }
 
     fn set_access_token(
@@ -216,6 +245,7 @@ pub fn build_authorize_url(
     app: &AppHandle,
     provider_id: &str,
     code_challenge: Option<&str>,
+    state: Option<&str>,
 ) -> Result<String, String> {
     let ProviderConfig {
         client_id,
@@ -225,7 +255,8 @@ pub fn build_authorize_url(
         ..
     } = app.state::<TokenManagerState>().get_provider(provider_id)?;
 
-    let mut params: Vec<(String, String)> = Vec::with_capacity(2 + authorize_extra_params.len() + 1);
+    let mut params: Vec<(String, String)> =
+        Vec::with_capacity(3 + authorize_extra_params.len() + 1);
     params.push(("response_type".to_string(), "code".to_string()));
     params.push(("client_id".to_string(), client_id));
 
@@ -233,6 +264,10 @@ pub fn build_authorize_url(
         let challenge = code_challenge
             .ok_or_else(|| "Missing PKCE code challenge".to_string())?;
         params.push(("code_challenge".to_string(), challenge.to_string()));
+    }
+
+    if let Some(state) = state {
+        params.push(("state".to_string(), state.to_string()));
     }
 
     params.extend(authorize_extra_params);
@@ -255,6 +290,7 @@ pub async fn exchange_authorization_code(
         token_extra_params,
         ..
     } = app.state::<TokenManagerState>().get_provider(provider_id)?;
+    
 
     if use_pkce && code_verifier.is_none() {
         return Err("Missing PKCE code verifier".to_string());
@@ -275,11 +311,15 @@ pub async fn exchange_authorization_code(
         .send()
         .await
         .map_err(|e| e.to_string())?;
+    let status = response.status();
 
-    let token_response = response
-        .json::<TokenResponse>()
-        .await
-        .map_err(|e| e.to_string())?;
+    let body = response.text().await.map_err(|e| e.to_string())?;
+    if !status.is_success() {
+        return Err(format!("Token exchange failed: {} - {}", status, body));
+    }
+
+    let token_response =
+        serde_json::from_str::<TokenResponse>(&body).map_err(|e| e.to_string())?;
 
     store_tokens(app, provider_id, &token_response)?;
     Ok(token_response)

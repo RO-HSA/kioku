@@ -1,6 +1,4 @@
 use rand::{distributions::Alphanumeric, Rng};
-use sha2::{Digest, Sha256};
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 
 pub struct PkcePair {
     pub code_verifier: String,
@@ -14,12 +12,8 @@ pub fn generate_pkce() -> PkcePair {
         .map(char::from)
         .collect();
 
-    let hash = Sha256::digest(code_verifier.as_bytes());
-
-    let code_challenge = URL_SAFE_NO_PAD.encode(hash);
-
     PkcePair {
-        code_verifier,
-        code_challenge,
+        code_verifier: code_verifier.clone(),
+        code_challenge: code_verifier,
     }
 }
