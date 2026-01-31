@@ -1,16 +1,25 @@
-import { Box, Divider, useMediaQuery } from '@mui/material';
-import { PanelLeftClose, PanelRightClose } from 'lucide-react';
+import { Box, Divider } from '@mui/material';
+import { Bolt, PanelLeftClose, PanelRightClose } from 'lucide-react';
 
-import NavLinks from './NavLinks';
-import { cn } from '@/lib/utils';
-import { useSidebarStore } from '@/stores/useSidebarStore';
-import Button from '@/components/ui/Button';
 import ModeToggle from '@/components/ModeToggle';
+import NavButton from '@/components/NavButton';
+import Button from '@/components/ui/Button';
+import useWindowSize from '@/hooks/useWindowSize';
+import { cn } from '@/lib/utils';
+import { useConfigMenuStore } from '@/stores/config/configMenu';
+import { useSidebarStore } from '@/stores/sidebar/sidebar';
+import { useSidebarNavigationStore } from '@/stores/sidebar/sidebarNavigation';
+import { SidebarNavigationStep } from '@/types/Navigation';
+import NavLinks from '../NavLinks';
 
-const Content = () => {
-  const isDesktop = useMediaQuery('(min-width: 900px)');
+const SidebarContent = () => {
+  const { isMobile } = useWindowSize();
   const isOpen = useSidebarStore((state) => state.isOpen);
   const toggle = useSidebarStore((state) => state.toggle);
+  const navigationStep = useSidebarNavigationStore(
+    (state) => state.navigationStep
+  );
+  const openConfigMenu = useConfigMenuStore((state) => state.openConfigMenu);
 
   return (
     <div className="flex h-full flex-col bg-background-paper text-text-primary w-full">
@@ -45,7 +54,16 @@ const Content = () => {
       <Divider />
 
       <nav className="flex flex-1 flex-col justify-between overflow-y-auto px-2 py-4">
-        <NavLinks onNavigate={!isDesktop ? toggle : undefined} />
+        <div className="flex w-full flex-col gap-1">
+          <NavLinks onNavigate={isMobile ? toggle : undefined} />
+          <NavButton
+            Icon={Bolt}
+            label="Settings"
+            isSidebarOpen={isOpen}
+            isActive={navigationStep === SidebarNavigationStep.SETTINGS}
+            onClick={openConfigMenu}
+          />
+        </div>
 
         <Box className="w-full overflow-hidden">
           <ModeToggle />
@@ -55,4 +73,4 @@ const Content = () => {
   );
 };
 
-export default Content;
+export default SidebarContent;

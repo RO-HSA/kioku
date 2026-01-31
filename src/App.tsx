@@ -1,5 +1,5 @@
-import './styles/global.css';
 import PageLayout from '@/layouts/PageLayout';
+import './styles/global.css';
 
 function App() {
   return <PageLayout>Hello, World!</PageLayout>;
