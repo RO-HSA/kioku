@@ -6,7 +6,7 @@ use crate::auth::mal::PROVIDER_ID as MAL_PROVIDER_ID;
 use crate::auth::token_manager::get_access_token;
 
 const BASE_URL: &str = "https://api.myanimelist.net/v2/users/@me/animelist";
-const FIELDS: &str = "list_status,synopsis,alternative_titles,source,num_episodes,nsfw,start_season,media_type,studios,mean";
+const FIELDS: &str = "list_status,synopsis,alternative_titles,source,num_episodes,nsfw,start_season,media_type,studios,mean,status,genres";
 const LIMIT: u32 = 100;
 const STATUSES: [&str; 5] = ["watching", "completed", "on_hold", "dropped", "plan_to_watch"];
 

@@ -10,6 +10,9 @@ const useMyanimelistCallback = () => {
   const setIsAuthenticated = useMyAnimeListStore(
     (state) => state.setIsAuthenticated
   );
+  const setIsReauthenticating = useMyAnimeListStore(
+    (state) => state.setIsReauthenticating
+  );
   const setListData = useMyAnimeListStore((state) => state.setListData);
 
   useEffect(() => {
@@ -20,8 +23,8 @@ const useMyanimelistCallback = () => {
       unlistenSuccessfull = await listen('myanimelist-auth-callback', () => {
         setIsAuthenticated(true);
         setIsAuthenticating(false);
+        setIsReauthenticating(false);
         MyAnimeListService.synchronizeList().then((response) => {
-          console.log({ response });
           setListData(response);
         });
       });
@@ -29,8 +32,8 @@ const useMyanimelistCallback = () => {
 
     const setupFailedListener = async () => {
       unlistenFailed = await listen('myanimelist-auth-failed', () => {
-        setIsAuthenticated(false);
         setIsAuthenticating(false);
+        setIsReauthenticating(false);
       });
     };
 
@@ -47,6 +50,7 @@ const useMyanimelistCallback = () => {
       }
 
       setIsAuthenticating(false);
+      setIsReauthenticating(false);
     };
   }, [setIsAuthenticated, setIsAuthenticating, setListData]);
 };

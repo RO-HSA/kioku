@@ -11,14 +11,22 @@ type FormData = {
 };
 
 const MyanimelistForm = () => {
+  useMyanimelistCallback();
+
   const username = useMyAnimeListStore((state) => state.username);
   const setUsername = useMyAnimeListStore((state) => state.setUsername);
   const isAuthenticated = useMyAnimeListStore((state) => state.isAuthenticated);
   const isAuthenticating = useMyAnimeListStore(
     (state) => state.isAuthenticating
   );
+  const isReauthenticating = useMyAnimeListStore(
+    (state) => state.isReauthenticating
+  );
   const setIsAuthenticating = useMyAnimeListStore(
     (state) => state.setIsAuthenticating
+  );
+  const setIsReauthenticating = useMyAnimeListStore(
+    (state) => state.setIsReauthenticating
   );
 
   const {
@@ -29,10 +37,12 @@ const MyanimelistForm = () => {
 
   const onSubmit = async () => {
     setIsAuthenticating(true);
+    setIsReauthenticating(true);
     await MyAnimeListService.authorize();
   };
 
-  useMyanimelistCallback();
+  const isDisabled =
+    (isAuthenticating && !isAuthenticated) || isReauthenticating;
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-2">
@@ -57,8 +67,8 @@ const MyanimelistForm = () => {
             variant="primary"
             size="medium"
             type="submit"
-            isDisabled={isAuthenticating && !isAuthenticated}
-            isLoading={isAuthenticating && !isAuthenticated}>
+            isDisabled={isDisabled}
+            isLoading={isDisabled}>
             {!isAuthenticated ? 'Authorize' : 'Re-authorize'}
           </Button>
         </div>
