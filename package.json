@@ -30,6 +30,7 @@
     "@tauri-store/zustand": "^1.1.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.563.0",
+    "material-react-table": "^3.2.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-hook-form": "^7.71.1",

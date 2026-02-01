@@ -1,21 +1,42 @@
-import { GridColDef } from '@mui/x-data-grid';
-import { SquareCheck, SquarePlay, SquareStop } from 'lucide-react';
-import { useMemo } from 'react';
+import { IconButton, Tooltip } from '@mui/material';
+import {
+  LoaderCircle,
+  RefreshCw,
+  SquareCheck,
+  SquarePlay,
+  SquareStop
+} from 'lucide-react';
+import {
+  MRT_ColumnDef,
+  MRT_ShowHideColumnsButton,
+  useMaterialReactTable
+} from 'material-react-table';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { MyAnimeListService } from '@/services/backend/MyAnimeList';
 import {
   AnimeListStatus,
+  IAnimeList,
   SynchronizedAnimeList
 } from '@/services/backend/types';
 import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
-import { Tooltip } from '@mui/material';
+import { useMyAnimeListStore } from '@/stores/config/providers/myanimelist';
+import StatusTabs from '../components/StatusTabs';
 
 interface UseAnimeListDataGridProps {
   listData: SynchronizedAnimeList | null;
 }
 
 const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   const selectedUserStatus = useAnimeListDataGridStore(
     (state) => state.selectedStatus
+  );
+
+  const setAnimeListData = useMyAnimeListStore(
+    (state) => state.setAnimeListData
   );
 
   const getStatusIcon = (status: AnimeListStatus) => {
@@ -31,60 +52,83 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     }
   };
 
-  const columns: GridColDef[] = [
-    {
-      field: 'status',
-      headerName: '',
-      disableColumnMenu: true,
-      width: 50,
-      hideable: false,
-      type: 'custom',
-      getSortComparator(sortDirection) {
-        const modifier = sortDirection === 'desc' ? -1 : 1;
-
-        return (v1, v2) => {
+  const columns = useMemo<MRT_ColumnDef<IAnimeList>[]>(
+    () => [
+      {
+        accessorKey: 'status',
+        header: '',
+        size: 50,
+        enableHiding: false,
+        sortingFn: (rowA, rowB, columnId) => {
           const order = [
             'Currently Airing',
             'Finished Airing',
             'Not Yet Aired'
           ];
 
-          return (
-            (order.indexOf(v1 as AnimeListStatus) -
-              order.indexOf(v2 as AnimeListStatus)) *
-            modifier
-          );
-        };
-      },
-      renderCell: (params) => {
-        return (
-          <div className="flex justify-center items-center h-full w-full">
-            <Tooltip title={params.value as AnimeListStatus}>
-              {getStatusIcon(params.value as AnimeListStatus)}
-            </Tooltip>
-          </div>
-        );
-      }
-    },
-    { field: 'title', headerName: 'Title', width: 250 },
-    { field: 'progress', headerName: 'Progress', width: 150 },
-    {
-      field: 'userScore',
-      headerName: 'Score',
-      type: 'singleSelect',
-      valueOptions: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-      valueFormatter: (value) => value || '-'
-    },
-    { field: 'mediaType', headerName: 'Type' },
-    {
-      field: 'startSeason',
-      headerName: 'Season',
-      valueFormatter: (value: string) =>
-        value.charAt(0).toUpperCase() + value.slice(1)
-    }
-  ];
+          const v1 = rowA.getValue<AnimeListStatus>(columnId);
+          const v2 = rowB.getValue<AnimeListStatus>(columnId);
 
-  const rows = useMemo(() => {
+          return order.indexOf(v1) - order.indexOf(v2);
+        },
+        Cell: ({ cell }) => {
+          return (
+            <div className="flex justify-center items-center h-full w-full">
+              <Tooltip title={cell.getValue<AnimeListStatus>() || ''}>
+                {getStatusIcon(cell.getValue<AnimeListStatus>())}
+              </Tooltip>
+            </div>
+          );
+        }
+      },
+      {
+        accessorKey: 'title',
+        header: 'Title',
+        size: 250,
+        Cell: ({ cell }) => {
+          return (
+            <Tooltip title={cell.getValue<string>() || ''}>
+              <span className="">{cell.getValue<string>()}</span>
+            </Tooltip>
+          );
+        }
+      },
+      {
+        accessorKey: 'userEpisodesWatched',
+        header: 'Progress',
+        size: 150
+      },
+      {
+        accessorKey: 'userScore',
+        header: 'Score',
+
+        Cell: ({ cell }) => {
+          return cell.getValue<number>() || '-';
+        }
+      },
+      {
+        accessorKey: 'mediaType',
+        header: 'Type'
+      },
+      {
+        accessorKey: 'startSeason',
+        header: 'Season',
+        Cell: ({ cell }) => {
+          const value = cell.getValue<string>();
+          const transformedValue =
+            value.charAt(0).toUpperCase() + value.slice(1);
+          return (
+            <Tooltip title={transformedValue}>
+              <span>{transformedValue}</span>
+            </Tooltip>
+          );
+        }
+      }
+    ],
+    []
+  );
+
+  const data = useMemo(() => {
     switch (selectedUserStatus) {
       case 'watching':
         return listData?.watching || [];
@@ -101,7 +145,68 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     }
   }, [listData, selectedUserStatus]);
 
-  return { columns, rows };
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const result = await MyAnimeListService.synchronizeList();
+      setAnimeListData(result);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [setAnimeListData, setIsRefreshing]);
+
+  const table = useMaterialReactTable({
+    columns,
+    data,
+    initialState: {
+      density: 'compact'
+    },
+    renderTopToolbarCustomActions: () => (
+      <StatusTabs
+        watchingCount={listData?.watching.length || 0}
+        completedCount={listData?.completed.length || 0}
+        onHoldCount={listData?.onHold.length || 0}
+        droppedCount={listData?.dropped.length || 0}
+        planToWatchCount={listData?.planToWatch.length || 0}
+      />
+    ),
+    renderToolbarInternalActions: ({ table }) => (
+      <>
+        <Tooltip title="Refresh List">
+          <IconButton disabled={isRefreshing} onClick={handleRefresh}>
+            <span>
+              {!isRefreshing ? (
+                <RefreshCw className="text-primary" />
+              ) : (
+                <LoaderCircle className="text-primary animate-spin" />
+              )}
+            </span>
+          </IconButton>
+        </Tooltip>
+        <MRT_ShowHideColumnsButton table={table} />
+        {/* <MRT_FilterTextField table={table} header="title" /> */}
+      </>
+    ),
+    enableStickyHeader: true,
+    enableDensityToggle: false,
+    enableColumnResizing: true,
+    enableColumnFilters: false,
+    enableGlobalFilter: true,
+    enableFullScreenToggle: false,
+    enablePagination: false,
+    enableBottomToolbar: false,
+    enableRowVirtualization: true,
+    enableColumnActions: false,
+    state: { isLoading }
+  });
+
+  return { table, handleRefresh };
 };
 
 export default useAnimeListDataGrid;

@@ -38,7 +38,7 @@ const PageLayout: FC<PageLayoutProps> = ({ children }) => {
         <Divider className="sm:hidden" />
 
         <main className="flex-1 overflow-y-auto">
-          <div className="h-full w-full px-1 py-1">{children}</div>
+          <div className="h-full w-full">{children}</div>
         </main>
       </div>
       <ConfigMenu />
