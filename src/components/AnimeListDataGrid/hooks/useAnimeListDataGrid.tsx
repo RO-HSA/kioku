@@ -88,7 +88,7 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
         Cell: ({ cell }) => {
           return (
             <Tooltip title={cell.getValue<string>() || ''}>
-              <span className="truncate overflow-ellipsis">
+              <span className="truncate text-ellipsis">
                 {cell.getValue<string>()}
               </span>
             </Tooltip>
@@ -194,7 +194,6 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
           </IconButton>
         </Tooltip>
         <MRT_ShowHideColumnsButton table={table} />
-        {/* <MRT_FilterTextField table={table} header="title" /> */}
       </>
     ),
     enableStickyHeader: true,
@@ -207,7 +206,8 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     enableBottomToolbar: false,
     enableRowVirtualization: true,
     enableColumnActions: false,
-    state: { isLoading }
+    state: { isLoading },
+    rowVirtualizerOptions: { overscan: 5 }
   });
 
   return { table, handleRefresh };

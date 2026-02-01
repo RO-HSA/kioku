@@ -11,6 +11,8 @@ interface StatusTabsProps {
   planToWatchCount?: number;
 }
 
+const tabClassNames = 'text-xs! pt-2! px-2!';
+
 const StatusTabs: FC<StatusTabsProps> = ({
   watchingCount = 0,
   completedCount = 0,
@@ -30,18 +32,36 @@ const StatusTabs: FC<StatusTabsProps> = ({
       <Tabs
         className="justify-self-start"
         value={selectedStatus}
-        variant="fullWidth"
+        variant="scrollable"
         onChange={(_, value) => setSelectedStatus(value)}>
         <Tab
-          className=""
+          className={tabClassNames}
           label={`Watching (${watchingCount})`}
+          aria-label="Watching list"
           value="watching"
         />
-        <Tab label={`Completed (${completedCount})`} value="completed" />
-        <Tab label={`On Hold (${onHoldCount})`} value="onHold" />
-        <Tab label={`Dropped (${droppedCount})`} value="dropped" />
         <Tab
+          className={tabClassNames}
+          label={`Completed (${completedCount})`}
+          aria-label="Completed list"
+          value="completed"
+        />
+        <Tab
+          className={tabClassNames}
+          label={`On Hold (${onHoldCount})`}
+          aria-label="On Hold list"
+          value="onHold"
+        />
+        <Tab
+          className={tabClassNames}
+          label={`Dropped (${droppedCount})`}
+          aria-label="Dropped list"
+          value="dropped"
+        />
+        <Tab
+          className={tabClassNames}
           label={`Plan To Watch (${planToWatchCount})`}
+          aria-label="Plan To Watch list"
           value="planToWatch"
         />
       </Tabs>
