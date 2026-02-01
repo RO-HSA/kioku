@@ -88,7 +88,9 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
         Cell: ({ cell }) => {
           return (
             <Tooltip title={cell.getValue<string>() || ''}>
-              <span className="">{cell.getValue<string>()}</span>
+              <span className="truncate overflow-ellipsis">
+                {cell.getValue<string>()}
+              </span>
             </Tooltip>
           );
         }
@@ -101,18 +103,20 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
       {
         accessorKey: 'userScore',
         header: 'Score',
-
+        size: 100,
         Cell: ({ cell }) => {
           return cell.getValue<number>() || '-';
         }
       },
       {
         accessorKey: 'mediaType',
-        header: 'Type'
+        header: 'Type',
+        size: 70
       },
       {
         accessorKey: 'startSeason',
         header: 'Season',
+        size: 100,
         Cell: ({ cell }) => {
           const value = cell.getValue<string>();
           const transformedValue =
