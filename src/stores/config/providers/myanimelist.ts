@@ -7,12 +7,12 @@ type MyAnimeListStore = {
   isAuthenticating: boolean;
   isAuthenticated: boolean;
   isReauthenticating: boolean;
-  listData: SynchronizedAnimeList | null;
+  animeListData: SynchronizedAnimeList | null;
   setUsername: (username: string | null) => void;
   setIsAuthenticating: (isAuthenticating: boolean) => void;
   setIsAuthenticated: (isAuthenticated: boolean) => void;
   setIsReauthenticating: (isReauthenticating: boolean) => void;
-  setListData: (listData: SynchronizedAnimeList | null) => void;
+  setAnimeListData: (animeListData: SynchronizedAnimeList | null) => void;
 };
 
 export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
@@ -20,13 +20,13 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
   isAuthenticating: false,
   isAuthenticated: false,
   isReauthenticating: false,
-  listData: null,
+  animeListData: null,
   setIsAuthenticated: (isAuthenticated) => set(() => ({ isAuthenticated })),
   setUsername: (username) => set(() => ({ username })),
   setIsAuthenticating: (isAuthenticating) => set(() => ({ isAuthenticating })),
   setIsReauthenticating: (isReauthenticating) =>
     set(() => ({ isReauthenticating })),
-  setListData: (listData) => set(() => ({ listData }))
+  setAnimeListData: (animeListData) => set(() => ({ animeListData }))
 }));
 
 export const tauriHandler = createTauriStore(

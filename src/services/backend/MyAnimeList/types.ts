@@ -39,6 +39,25 @@ export enum MyAnimeListStatusEnum {
   'currently_airing' = 'Currently Airing'
 }
 
+export type MyAnimeListMediaType =
+  | 'tv'
+  | 'tv_special'
+  | 'movie'
+  | 'special'
+  | 'ona'
+  | 'ova'
+  | 'unknown';
+
+export enum MyAnimeListMediaTypeEnum {
+  'tv' = 'TV',
+  'tv_special' = 'Special',
+  'movie' = 'Movie',
+  'special' = 'Special',
+  'ona' = 'ONA',
+  'ova' = 'OVA',
+  'unknown' = 'Unknown'
+}
+
 export interface MyAnimeListListEntry {
   node: {
     id: number;
@@ -57,7 +76,7 @@ export interface MyAnimeListListEntry {
     genres: { id: number; name: string }[];
     nsfw?: string;
     start_season?: { year: number; season: string };
-    media_type?: string;
+    media_type?: MyAnimeListMediaType;
     studios?: { id: number; name: string }[];
   };
   list_status: {

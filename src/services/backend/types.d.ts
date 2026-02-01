@@ -1,3 +1,8 @@
+export type AnimeListStatus =
+  | 'Finished Airing'
+  | 'Not Yet Aired'
+  | 'Currently Airing';
+
 export type AnimeListUserStatus =
   | 'watching'
   | 'completed'
@@ -6,6 +11,7 @@ export type AnimeListUserStatus =
   | 'planToWatch';
 
 export interface IAnimeList {
+  // Anime-specific fields
   id: number;
   title: string;
   imageUrl: string;
@@ -13,21 +19,20 @@ export interface IAnimeList {
   alternativeTitles: string;
   score: number;
   source: string;
-  status: string;
+  status: AnimeListStatus;
   totalEpisodes: number;
   genres: string;
   startSeason: string;
   studios: string;
   mediaType: string;
-  userStatus: {
-    status: AnimeListUserStatus;
-    score: number;
-    episodesWatched: number;
-    isRewatching: boolean;
-    startDate?: string;
-    finishDate?: string;
-    updatedAt?: string;
-  };
+  // User-specific fields
+  userStatus: AnimeListUserStatus;
+  userScore: number;
+  userEpisodesWatched: number;
+  isRewatching: boolean;
+  userStartDate?: string;
+  userFinishDate?: string;
+  updatedAt?: string;
 }
 
 export type SynchronizedAnimeList = Record<AnimeListUserStatus, IAnimeList[]>;

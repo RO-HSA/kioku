@@ -1,6 +1,7 @@
 import { IAnimeList } from '../../types';
 import {
   MyAnimeListListEntry,
+  MyAnimeListMediaTypeEnum,
   MyAnimeListSourceEnum,
   MyAnimeListStatusEnum,
   MyAnimeListUserStatusEnum
@@ -47,18 +48,18 @@ class MyAnimeListMapper {
           : startSeason + startYear,
       studios:
         node.studios?.map((studio) => studio.name).join(', ') || 'Unknown',
-      mediaType: node.media_type || 'Unknown',
-      userStatus: {
-        status: list_status.status
-          ? MyAnimeListUserStatusEnum[list_status.status]
-          : 'planToWatch',
-        score: list_status.score || 0,
-        episodesWatched: list_status.num_episodes_watched || 0,
-        isRewatching: list_status.is_rewatching || false,
-        startDate: list_status.start_date,
-        finishDate: list_status.finish_date,
-        updatedAt: list_status.updated_at
-      }
+      mediaType: node.media_type
+        ? MyAnimeListMediaTypeEnum[node.media_type]
+        : 'Unknown',
+      userStatus: list_status.status
+        ? MyAnimeListUserStatusEnum[list_status.status]
+        : 'planToWatch',
+      userScore: list_status.score || 0,
+      userEpisodesWatched: list_status.num_episodes_watched || 0,
+      isRewatching: list_status.is_rewatching || false,
+      userStartDate: list_status.start_date,
+      userFinishDate: list_status.finish_date,
+      updatedAt: list_status.updated_at
     };
   }
 }
