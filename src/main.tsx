@@ -14,7 +14,7 @@ const theme = createTheme({
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <ThemeProvider theme={theme} forceThemeRerender>
+    <ThemeProvider theme={theme}>
       <GlobalStyles styles="@layer theme, base, mui, components, utilities;" />
       <App />
     </ThemeProvider>

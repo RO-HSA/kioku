@@ -43,7 +43,7 @@ class MyAnimeListMapper {
       totalEpisodes: node.num_episodes || 0,
       genres: node.genres.map((genre) => genre.name).join(', ') || 'Unknown',
       startSeason:
-        !node.start_season?.season && node.start_season?.year
+        !node.start_season?.season && !node.start_season?.year
           ? 'Unknown'
           : startSeason + startYear,
       studios:

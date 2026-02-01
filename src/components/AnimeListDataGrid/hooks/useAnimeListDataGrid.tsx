@@ -22,6 +22,7 @@ import {
 import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
 import { useMyAnimeListStore } from '@/stores/config/providers/myanimelist';
 import StatusTabs from '../components/StatusTabs';
+import useMaterialTableTheme from './useMaterialTableTheme';
 
 interface UseAnimeListDataGridProps {
   listData: SynchronizedAnimeList | null;
@@ -38,6 +39,16 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
   const setAnimeListData = useMyAnimeListStore(
     (state) => state.setAnimeListData
   );
+
+  const {
+    mrtTheme,
+    muiTablePaperProps,
+    muiTableContainerProps,
+    muiTableHeadCellProps,
+    muiTableBodyCellProps,
+    muiTableBodyRowProps,
+    muiTopToolbarProps
+  } = useMaterialTableTheme();
 
   const getStatusIcon = (status: AnimeListStatus) => {
     switch (status) {
@@ -171,6 +182,13 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     initialState: {
       density: 'compact'
     },
+    mrtTheme,
+    muiTablePaperProps,
+    muiTableContainerProps,
+    muiTableHeadCellProps,
+    muiTableBodyCellProps,
+    muiTableBodyRowProps,
+    muiTopToolbarProps,
     renderTopToolbarCustomActions: () => (
       <StatusTabs
         watchingCount={listData?.watching.length || 0}
