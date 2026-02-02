@@ -1,3 +1,5 @@
+import type { SynchronizedAnimeList } from '../types';
+
 export type MyAnimeListUserStatus =
   | 'watching'
   | 'completed'
@@ -90,7 +92,4 @@ export interface MyAnimeListListEntry {
   };
 }
 
-export type SynchronizeMyAnimeListResult = Record<
-  MyAnimeListUserStatus,
-  MyAnimeListListEntry[]
->;
+export type SynchronizeMyAnimeListResult = SynchronizedAnimeList;
