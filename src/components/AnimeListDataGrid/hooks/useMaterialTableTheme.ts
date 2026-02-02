@@ -58,7 +58,23 @@ const useMaterialTableTheme = () => {
       sx: {
         backgroundColor: palette.background.default,
         color: palette.text.primary,
-        borderColor: palette.divider
+        borderColor: palette.divider,
+        '&& .MuiTableSortLabel-root': {
+          color: palette.text.primary,
+          '&:hover': {
+            color: palette.text.primary
+          }
+        },
+        '&& .MuiTableSortLabel-root.Mui-active': {
+          color: palette.text.primary
+        },
+        '&& .MuiTableSortLabel-icon': {
+          color: `${palette.text.secondary} !important`,
+          opacity: 1
+        },
+        '&& .MuiTableSortLabel-root.Mui-active .MuiTableSortLabel-icon': {
+          color: `${palette.text.primary} !important`
+        }
       }
     }),
     [palette]
