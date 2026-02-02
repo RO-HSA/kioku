@@ -41,7 +41,6 @@ const Sidebar = () => {
       variant="temporary"
       open={isOpen}
       onClose={toggle}
-      ModalProps={{ keepMounted: true }}
       hideBackdrop
       sx={{
         flexShrink: 0,

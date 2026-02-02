@@ -30,8 +30,8 @@ const PageLayout: FC<PageLayoutProps> = ({ children }) => {
             <Menu className="size-5" />
           </Button>
           <div className="flex flex-col">
-            <span className="text-sm font-semibold">Dashboard</span>
-            <span className="text-xs text-text-secondary">Overview</span>
+            <span className="text-sm font-semibold">kioku</span>
+            <span className="text-xs text-text-secondary">Anime list</span>
           </div>
         </header>
 
