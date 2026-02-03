@@ -30,6 +30,7 @@ keyring = "2"
 rand = "0.8"
 sha2 = "0.10"
 base64 = "0.22"
+tokio = { version = "1", features = ["sync", "time"] }
 
 [profile.dev]
 incremental = true # Compile your binary in smaller steps.

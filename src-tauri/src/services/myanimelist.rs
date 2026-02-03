@@ -4,8 +4,10 @@ use tauri_plugin_zustand::ManagerExt;
 
 use crate::auth::mal::PROVIDER_ID as MAL_PROVIDER_ID;
 use crate::auth::token_manager::get_access_token;
+use crate::services::anime_list_updates::AnimeListUpdateRequest;
 
 const BASE_URL: &str = "https://api.myanimelist.net/v2/users/";
+const UPDATE_BASE_URL: &str = "https://api.myanimelist.net/v2/anime/";
 const FIELDS: &str = "list_status,synopsis,alternative_titles,source,num_episodes,nsfw,start_season,media_type,studios,mean,status,genres";
 const LIMIT: u32 = 1000;
 
@@ -231,6 +233,17 @@ fn map_media_type(media_type: Option<String>) -> String {
     }
 }
 
+fn map_user_status_to_mal(status: &str) -> Option<&'static str> {
+    match status {
+        "watching" => Some("watching"),
+        "completed" => Some("completed"),
+        "onHold" | "on_hold" => Some("on_hold"),
+        "dropped" => Some("dropped"),
+        "planToWatch" | "plan_to_watch" => Some("plan_to_watch"),
+        _ => None,
+    }
+}
+
 fn join_names<T, F>(items: Vec<T>, mut f: F) -> String
 where
     F: FnMut(T) -> String,
@@ -390,6 +403,72 @@ async fn fetch_all_into(
         let next = parsed.paging.and_then(|p| p.next);
         let Some(next_url) = next else { break };
         offset = parse_next_offset(&next_url).unwrap_or(offset + LIMIT);
+    }
+
+    Ok(())
+}
+
+pub async fn update_myanimelist_list_entry(
+    app: &tauri::AppHandle,
+    client: &reqwest::Client,
+    update: &AnimeListUpdateRequest,
+) -> Result<(), String> {
+    let token = get_access_token(app, MAL_PROVIDER_ID).await?;
+
+    let mut params: Vec<(String, String)> = Vec::new();
+
+    if let Some(status) = update.user_status.as_deref() {
+        let mapped = map_user_status_to_mal(status)
+            .ok_or_else(|| format!("Invalid MyAnimeList status: {status}"))?;
+        params.push(("status".to_string(), mapped.to_string()));
+    }
+
+    if let Some(score) = update.user_score {
+        params.push(("score".to_string(), score.to_string()));
+    }
+
+    if let Some(episodes) = update.user_episodes_watched {
+        params.push(("num_watched_episodes".to_string(), episodes.to_string()));
+    }
+
+    if let Some(is_rewatching) = update.is_rewatching {
+        params.push(("is_rewatching".to_string(), is_rewatching.to_string()));
+    }
+
+    if let Some(start_date) = update.user_start_date.as_ref() {
+        let trimmed = start_date.trim();
+        if !trimmed.is_empty() {
+            params.push(("start_date".to_string(), trimmed.to_string()));
+        }
+    }
+
+    if let Some(finish_date) = update.user_finish_date.as_ref() {
+        let trimmed = finish_date.trim();
+        if !trimmed.is_empty() {
+            params.push(("finish_date".to_string(), trimmed.to_string()));
+        }
+    }
+
+    if params.is_empty() {
+        return Err("No update fields provided".to_string());
+    }
+
+    let url = format!("{}{}/my_list_status", UPDATE_BASE_URL, update.entry_id);
+    let response = client
+        .put(url)
+        .bearer_auth(token)
+        .form(&params)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.map_err(|e| e.to_string())?;
+        return Err(format!(
+            "MyAnimeList update failed: {} - {}",
+            status, body
+        ));
     }
 
     Ok(())
