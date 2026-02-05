@@ -8,7 +8,7 @@ use crate::services::anime_list_updates::AnimeListUpdateRequest;
 
 const BASE_URL: &str = "https://api.myanimelist.net/v2/users/";
 const UPDATE_BASE_URL: &str = "https://api.myanimelist.net/v2/anime/";
-const FIELDS: &str = "list_status,synopsis,alternative_titles,source,num_episodes,nsfw,start_season,media_type,studios,mean,status,genres";
+const FIELDS: &str = "list_status,synopsis,alternative_titles,source,num_episodes,nsfw,start_season,media_type,studios,mean,status,genres,broadcast,start_date";
 const LIMIT: u32 = 1000;
 
 #[derive(Deserialize)]
@@ -43,6 +43,8 @@ struct MalNode {
     #[serde(default)]
     genres: Vec<MalGenre>,
     start_season: Option<MalStartSeason>,
+    broadcast: Option<MalBroadcast>,
+    start_date: Option<String>,
     media_type: Option<String>,
     #[serde(default)]
     studios: Vec<MalStudio>,
@@ -77,6 +79,19 @@ struct MalStartSeason {
     year: Option<u32>,
 }
 
+#[derive(Deserialize)]
+struct MalBroadcast {
+    day_of_the_week: Option<String>,
+    start_time: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AnimeListBroadcast {
+    day_of_the_week: String,
+    start_time: String,
+}
+
 #[derive(Deserialize, Default)]
 struct MalListStatus {
     status: Option<String>,
@@ -102,6 +117,8 @@ pub struct AnimeListItem {
     total_episodes: u32,
     genres: String,
     start_season: String,
+    start_date: String,
+    broadcast: AnimeListBroadcast,
     studios: String,
     media_type: String,
     user_status: String,
@@ -340,6 +357,11 @@ fn map_entry_to_domain(entry: MalListEntry, status_key: UserStatusKey) -> AnimeL
     let studios = join_names(node.studios, |studio| studio.name);
     let start_season = format_start_season(node.start_season);
 
+    let broadcast = node.broadcast.unwrap_or(MalBroadcast {
+        day_of_the_week: None,
+        start_time: None,
+    });
+
     AnimeListItem {
         id: node.id,
         title: node.title,
@@ -352,7 +374,12 @@ fn map_entry_to_domain(entry: MalListEntry, status_key: UserStatusKey) -> AnimeL
         total_episodes: node.num_episodes.unwrap_or(0),
         genres,
         start_season,
+        start_date: node.start_date.unwrap_or_default(),
         studios,
+        broadcast: AnimeListBroadcast {
+            day_of_the_week: broadcast.day_of_the_week.unwrap_or_default(),
+            start_time: broadcast.start_time.unwrap_or_default(),
+        },
         media_type: map_media_type(node.media_type),
         user_status: status_key.as_user_status_str().to_string(),
         user_score: list_status.score.unwrap_or(0),

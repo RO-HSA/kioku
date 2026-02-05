@@ -13,6 +13,7 @@ import {
 } from 'material-react-table';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import ProgressStatus from '@/components/ProgressStatus';
 import { MyAnimeListService } from '@/services/backend/MyAnimeList';
 import {
   AnimeListStatus,
@@ -68,7 +69,8 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
       {
         accessorKey: 'status',
         header: '',
-        size: 50,
+        size: 40,
+        enableResizing: false,
         enableHiding: false,
         sortingFn: (rowA, rowB, columnId) => {
           const order = [
@@ -109,7 +111,18 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
       {
         accessorKey: 'userEpisodesWatched',
         header: 'Progress',
-        size: 150
+        size: 150,
+        Cell: ({ cell, row }) => {
+          const watched = cell.getValue<number>();
+          return (
+            <ProgressStatus
+              progress={watched}
+              total={row.original.totalEpisodes}
+              startDate={row.original.startDate}
+              broadcast={row.original.broadcast}
+            />
+          );
+        }
       },
       {
         accessorKey: 'userScore',

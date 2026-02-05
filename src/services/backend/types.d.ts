@@ -10,6 +10,11 @@ export type AnimeListUserStatus =
   | 'dropped'
   | 'planToWatch';
 
+export type AnimeListBroadcast = {
+  dayOfTheWeek: string | null;
+  startTime: string | null;
+};
+
 export interface IAnimeList {
   // Anime-specific fields
   id: number;
@@ -23,6 +28,8 @@ export interface IAnimeList {
   totalEpisodes: number;
   genres: string;
   startSeason: string;
+  startDate: string | null;
+  broadcast: AnimeListBroadcast;
   studios: string;
   mediaType: string;
   // User-specific fields
