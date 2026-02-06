@@ -1,4 +1,8 @@
-import { SynchronizedAnimeList } from '@/services/backend/types';
+import { MyAnimeListService } from '@/services/backend/MyAnimeList';
+import {
+  AnimeListUserStatus,
+  SynchronizedAnimeList
+} from '@/services/backend/types';
 import { createTauriStore } from '@tauri-store/zustand';
 import { create } from 'zustand';
 
@@ -13,6 +17,11 @@ type MyAnimeListStore = {
   setIsAuthenticated: (isAuthenticated: boolean) => void;
   setIsReauthenticating: (isReauthenticating: boolean) => void;
   setAnimeListData: (animeListData: SynchronizedAnimeList | null) => void;
+  setProgress: (
+    animeId: number,
+    status: AnimeListUserStatus,
+    newProgress: number
+  ) => void;
 };
 
 export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
@@ -26,7 +35,29 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
   setIsAuthenticating: (isAuthenticating) => set(() => ({ isAuthenticating })),
   setIsReauthenticating: (isReauthenticating) =>
     set(() => ({ isReauthenticating })),
-  setAnimeListData: (animeListData) => set(() => ({ animeListData }))
+  setAnimeListData: (animeListData) => set(() => ({ animeListData })),
+  setProgress: (animeId, status, newProgress) =>
+    set((state) => {
+      if (!state.animeListData) return {};
+
+      const updatedAnimeListData = {
+        ...state.animeListData,
+        [status]: state.animeListData[status].map((anime) => {
+          if (anime.id === animeId) {
+            return { ...anime, userEpisodesWatched: newProgress };
+          }
+          return anime;
+        })
+      };
+
+      MyAnimeListService.enqueueListUpdate({
+        providerId: 'myanimelist',
+        entryId: animeId,
+        userEpisodesWatched: newProgress
+      });
+
+      return { animeListData: updatedAnimeListData };
+    })
 }));
 
 export const tauriHandler = createTauriStore(

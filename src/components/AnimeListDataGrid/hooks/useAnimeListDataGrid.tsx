@@ -17,6 +17,7 @@ import ProgressStatus from '@/components/ProgressStatus';
 import { MyAnimeListService } from '@/services/backend/MyAnimeList';
 import {
   AnimeListStatus,
+  AnimeListUserStatus,
   IAnimeList,
   SynchronizedAnimeList
 } from '@/services/backend/types';
@@ -27,9 +28,17 @@ import useMaterialTableTheme from './useMaterialTableTheme';
 
 interface UseAnimeListDataGridProps {
   listData: SynchronizedAnimeList | null;
+  onProgressChange: (
+    animeId: number,
+    status: AnimeListUserStatus,
+    newProgress: number
+  ) => void;
 }
 
-const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
+const useAnimeListDataGrid = ({
+  listData,
+  onProgressChange
+}: UseAnimeListDataGridProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -120,6 +129,13 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
               total={row.original.totalEpisodes}
               startDate={row.original.startDate}
               broadcast={row.original.broadcast}
+              onProgressChange={(newProgress) => {
+                onProgressChange(
+                  row.original.id,
+                  row.original.userStatus,
+                  newProgress
+                );
+              }}
             />
           );
         }
@@ -153,7 +169,7 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
         }
       }
     ],
-    []
+    [onProgressChange]
   );
 
   const data = useMemo(() => {
