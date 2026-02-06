@@ -13,7 +13,7 @@ import {
 } from 'material-react-table';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import ProgressStatus from '@/components/ProgressStatus';
+import ProgressStatus from '@/components/AnimeListDataGrid/components/ProgressStatus';
 import { MyAnimeListService } from '@/services/backend/MyAnimeList';
 import {
   AnimeListStatus,
@@ -22,7 +22,8 @@ import {
   SynchronizedAnimeList
 } from '@/services/backend/types';
 import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
-import { useMyAnimeListStore } from '@/stores/config/providers/myanimelist';
+import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
+import ScoreSelect from '../components/ScoreSelect';
 import StatusTabs from '../components/StatusTabs';
 import useMaterialTableTheme from './useMaterialTableTheme';
 
@@ -106,7 +107,7 @@ const useAnimeListDataGrid = ({
       {
         accessorKey: 'title',
         header: 'Title',
-        size: 250,
+        size: 270,
         Cell: ({ cell }) => {
           return (
             <Tooltip title={cell.getValue<string>() || ''}>
@@ -120,7 +121,7 @@ const useAnimeListDataGrid = ({
       {
         accessorKey: 'userEpisodesWatched',
         header: 'Progress',
-        size: 150,
+        size: 200,
         Cell: ({ cell, row }) => {
           const watched = cell.getValue<number>();
           return (
@@ -143,9 +144,17 @@ const useAnimeListDataGrid = ({
       {
         accessorKey: 'userScore',
         header: 'Score',
-        size: 100,
-        Cell: ({ cell }) => {
-          return cell.getValue<number>() || '-';
+        size: 85,
+        Cell: ({ cell, row }) => {
+          const score = cell.getValue<number>();
+
+          return (
+            <ScoreSelect
+              score={score}
+              animeId={row.original.id}
+              status={row.original.userStatus}
+            />
+          );
         }
       },
       {

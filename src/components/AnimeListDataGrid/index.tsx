@@ -5,7 +5,7 @@ import {
   AnimeListUserStatus,
   SynchronizedAnimeList
 } from '@/services/backend/types';
-import { useMyAnimeListStore } from '@/stores/config/providers/myanimelist';
+import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import useAnimeListDataGrid from './hooks/useAnimeListDataGrid';
 
 interface AnimeListDataGridProps {

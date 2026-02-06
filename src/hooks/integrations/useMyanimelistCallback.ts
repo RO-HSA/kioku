@@ -1,5 +1,5 @@
 import { MyAnimeListService } from '@/services/backend/MyAnimeList';
-import { useMyAnimeListStore } from '@/stores/config/providers/myanimelist';
+import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
 

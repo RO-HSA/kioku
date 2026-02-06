@@ -1,6 +1,6 @@
 import PageLayout from '@/layouts/PageLayout';
 import AnimeListDataGrid from './components/AnimeListDataGrid';
-import { useMyAnimeListStore } from './stores/config/providers/myanimelist';
+import { useMyAnimeListStore } from './stores/providers/myanimelist';
 import './styles/global.css';
 
 function App() {

@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import Button from '@/components/ui/Button';
 import useMyanimelistCallback from '@/hooks/integrations/useMyanimelistCallback';
 import { MyAnimeListService } from '@/services/backend/MyAnimeList';
-import { useMyAnimeListStore } from '@/stores/config/providers/myanimelist';
+import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 
 type FormData = {
   username: string;
