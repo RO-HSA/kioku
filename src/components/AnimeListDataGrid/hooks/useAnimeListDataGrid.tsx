@@ -23,6 +23,7 @@ import {
 } from '@/services/backend/types';
 import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
+import MediaType from '../components/MediaType';
 import ScoreSelect from '../components/ScoreSelect';
 import StatusTabs from '../components/StatusTabs';
 import useMaterialTableTheme from './useMaterialTableTheme';
@@ -160,7 +161,11 @@ const useAnimeListDataGrid = ({
       {
         accessorKey: 'mediaType',
         header: 'Type',
-        size: 70
+        size: 70,
+        Cell: ({ cell }) => {
+          const value = cell.getValue<string>();
+          return <MediaType mediaType={value} />;
+        }
       },
       {
         accessorKey: 'startSeason',
@@ -170,6 +175,7 @@ const useAnimeListDataGrid = ({
           const value = cell.getValue<string>();
           const transformedValue =
             value.charAt(0).toUpperCase() + value.slice(1);
+
           return (
             <Tooltip title={transformedValue}>
               <span>{transformedValue}</span>
