@@ -25,6 +25,7 @@ import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import MediaType from '../components/MediaType';
 import ScoreSelect from '../components/ScoreSelect';
+import StartSeason from '../components/StartSeason';
 import StatusTabs from '../components/StatusTabs';
 import useMaterialTableTheme from './useMaterialTableTheme';
 
@@ -173,14 +174,8 @@ const useAnimeListDataGrid = ({
         size: 100,
         Cell: ({ cell }) => {
           const value = cell.getValue<string>();
-          const transformedValue =
-            value.charAt(0).toUpperCase() + value.slice(1);
 
-          return (
-            <Tooltip title={transformedValue}>
-              <span>{transformedValue}</span>
-            </Tooltip>
-          );
+          return <StartSeason startSeason={value} />;
         }
       }
     ],
