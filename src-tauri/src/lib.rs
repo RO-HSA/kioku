@@ -18,17 +18,22 @@ use crate::services::myanimelist::synchronize_myanimelist;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut builder = tauri::Builder::default()
-        .manage(StrongholdKeyState::default())
-        .manage(TokenManagerState::default());
+    let mut builder = tauri::Builder::default();
 
     #[cfg(desktop)]
     {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app: &tauri::AppHandle<_>, args: Vec<String>, _cwd: String| {
             let _ = app.get_webview_window("main")
-                .expect("no main window")
-                .set_focus();
-            
+                       .expect("no main window")
+                       .set_focus();
+        }));
+    }
+    
+    builder
+        .manage(StrongholdKeyState::default())
+        .manage(TokenManagerState::default())
+        .plugin(tauri_plugin_single_instance::init(
+            |app: &tauri::AppHandle<_>, args: Vec<String>, _cwd: String| {
             let oauth_callback = args
                 .iter()
                 .find(|arg| arg.starts_with("kioku://"))
@@ -40,10 +45,8 @@ pub fn run() {
                     handle_oauth_callback(app, oauth_callback).await
                 });
             }
-        }));
-    }
-    
-    builder
+        },
+        ))
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
