@@ -23,6 +23,10 @@ pub fn run() {
         .manage(TokenManagerState::default())
         .plugin(tauri_plugin_single_instance::init(
             |app: &tauri::AppHandle<_>, args: Vec<String>, _cwd: String| {
+            let _ = app.get_webview_window("main")
+                    .expect("no main window")
+                    .set_focus();
+
             let oauth_callback = args
                 .iter()
                 .find(|arg| arg.starts_with("kioku://"))
