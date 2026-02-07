@@ -1,3 +1,4 @@
+import { AnimeListUserStatus } from '@/services/backend/types';
 import { Box } from '@mui/material';
 import { Minus, Plus } from 'lucide-react';
 import { FC } from 'react';
@@ -5,16 +6,19 @@ import { FC } from 'react';
 export interface ProgressControlsProps {
   progress: number;
   total: number;
+  status: AnimeListUserStatus;
   onProgressChange: (newProgress: number) => void;
 }
 
 const ProgressControls: FC<ProgressControlsProps> = ({
   progress,
   total,
+  status,
   onProgressChange
 }) => {
-  const shouldShowMinus = progress > 0;
-  const shouldShowPlus = progress < total || total === 0;
+  const shouldShowMinus = progress > 0 && status !== 'completed';
+  const shouldShowPlus =
+    (progress < total || total === 0) && status !== 'completed';
 
   return (
     <Box

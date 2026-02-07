@@ -1,7 +1,10 @@
 import { Box, LinearProgress } from '@mui/material';
 import { FC, useState } from 'react';
 
-import { AnimeListBroadcast } from '@/services/backend/types';
+import {
+  AnimeListBroadcast,
+  AnimeListUserStatus
+} from '@/services/backend/types';
 import ProgressControls from './components/ProgressControls';
 import ProgressNumber from './components/ProgressNumber';
 import { getProgressValues } from './utils';
@@ -9,6 +12,7 @@ import { getProgressValues } from './utils';
 interface ProgressStatusProps {
   progress: number;
   total: number;
+  status: AnimeListUserStatus;
   startDate: string | null;
   broadcast: AnimeListBroadcast;
   onProgressChange: (newProgress: number) => void;
@@ -17,6 +21,7 @@ interface ProgressStatusProps {
 const ProgressStatus: FC<ProgressStatusProps> = ({
   progress,
   total,
+  status,
   startDate,
   broadcast,
   onProgressChange
@@ -56,6 +61,7 @@ const ProgressStatus: FC<ProgressStatusProps> = ({
           <ProgressControls
             progress={progress}
             total={total}
+            status={status}
             onProgressChange={onProgressChange}
           />
         )}

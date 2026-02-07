@@ -14,7 +14,9 @@ const Sidebar = () => {
 
   useEffect(() => {
     const handleResize = () => {
-      close();
+      if (isMobile) {
+        close();
+      }
     };
 
     window.addEventListener('resize', handleResize);
@@ -22,7 +24,7 @@ const Sidebar = () => {
     return () => {
       window.removeEventListener('resize', handleResize);
     };
-  }, [close]);
+  }, [close, isMobile]);
 
   if (!isMobile) {
     return (

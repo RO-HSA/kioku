@@ -116,6 +116,7 @@ const useAnimeListDataGrid = ({
               total={row.original.totalEpisodes}
               startDate={row.original.startDate}
               broadcast={row.original.broadcast}
+              status={row.original.userStatus}
               onProgressChange={(newProgress) => {
                 onProgressChange(
                   row.original.id,
