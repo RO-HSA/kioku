@@ -23,6 +23,7 @@ pub fn run() {
         .manage(TokenManagerState::default())
         .plugin(tauri_plugin_single_instance::init(
             |app: &tauri::AppHandle<_>, args: Vec<String>, _cwd: String| {
+            #[cfg(desktop)]
             let _ = app.get_webview_window("main")
                     .expect("no main window")
                     .set_focus();
