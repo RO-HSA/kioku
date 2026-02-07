@@ -21,7 +21,8 @@ pub fn run() {
     tauri::Builder::default()
         .manage(StrongholdKeyState::default())
         .manage(TokenManagerState::default())
-        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(
+            |app: &tauri::AppHandle<_>, args: Vec<String>, _cwd: String| {
             let oauth_callback = args
                 .iter()
                 .find(|arg| arg.starts_with("kioku://"))
@@ -33,12 +34,13 @@ pub fn run() {
                     handle_oauth_callback(app, oauth_callback).await
                 });
             }
-        }))
+        },
+        ))
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_zustand::init())
-        .setup(|app| {
+        .setup(|app: &mut tauri::App<_>| {
             #[cfg(any(windows, target_os = "linux"))]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
