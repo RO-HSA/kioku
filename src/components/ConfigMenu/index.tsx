@@ -20,6 +20,11 @@ const ConfigMenu = () => {
   const closeMenu = useConfigMenuStore((state) => state.closeConfigMenu);
   const { isMobile } = useWindowSize();
 
+  const handleCloseMenu = () => {
+    setDrawerOpen(false);
+    closeMenu();
+  };
+
   useEffect(() => {
     const handleResize = () => {
       setDrawerOpen(false);
@@ -39,7 +44,7 @@ const ConfigMenu = () => {
       fullWidth
       maxWidth="md"
       className="relative"
-      onClose={closeMenu}>
+      onClose={handleCloseMenu}>
       <DialogTitle className="flex justify-between items-center">
         <div className="flex gap-1.5 items-center">
           <Menu
@@ -49,7 +54,7 @@ const ConfigMenu = () => {
           />
           <Typography variant="h6">Settings</Typography>
         </div>
-        <IconButton onClick={closeMenu}>
+        <IconButton onClick={handleCloseMenu}>
           <X />
         </IconButton>
       </DialogTitle>

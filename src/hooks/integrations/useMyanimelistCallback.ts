@@ -1,5 +1,5 @@
 import { MyAnimeListService } from '@/services/backend/MyAnimeList';
-import { useMyAnimeListStore } from '@/stores/config/providers/myanimelist';
+import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
 
@@ -13,7 +13,9 @@ const useMyanimelistCallback = () => {
   const setIsReauthenticating = useMyAnimeListStore(
     (state) => state.setIsReauthenticating
   );
-  const setListData = useMyAnimeListStore((state) => state.setListData);
+  const setAnimeListData = useMyAnimeListStore(
+    (state) => state.setAnimeListData
+  );
 
   useEffect(() => {
     let unlistenSuccessfull: UnlistenFn | null = null;
@@ -25,7 +27,7 @@ const useMyanimelistCallback = () => {
         setIsAuthenticating(false);
         setIsReauthenticating(false);
         MyAnimeListService.synchronizeList().then((response) => {
-          setListData(response);
+          setAnimeListData(response);
         });
       });
     };
@@ -52,7 +54,7 @@ const useMyanimelistCallback = () => {
       setIsAuthenticating(false);
       setIsReauthenticating(false);
     };
-  }, [setIsAuthenticated, setIsAuthenticating, setListData]);
+  }, [setIsAuthenticated, setIsAuthenticating, setAnimeListData]);
 };
 
 export default useMyanimelistCallback;

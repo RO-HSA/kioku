@@ -1,6 +1,8 @@
 @layer theme, base, mui, components, utilities;
 @import 'tailwindcss';
 
+@tailwind utilities;
+
 @layer base {
   * {
     font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;

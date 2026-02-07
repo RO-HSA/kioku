@@ -13,36 +13,61 @@ use crate::auth::mal::{
     AUTHORIZE_URL as MAL_AUTHORIZE_URL, CLIENT_ID as MAL_CLIENT_ID,
     PROVIDER_ID as MAL_PROVIDER_ID, TOKEN_URL as MAL_TOKEN_URL,
 };
+use crate::services::anime_list_updates::{enqueue_anime_list_update, AnimeListUpdateQueue};
 use crate::services::myanimelist::synchronize_myanimelist;
+
+fn process_oauth_callback(app: tauri::AppHandle, url: String) {
+    tauri::async_runtime::spawn(async move {
+        handle_oauth_callback(app, url).await;
+    });
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        .manage(StrongholdKeyState::default())
-        .manage(TokenManagerState::default())
-        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+    let mut builder = tauri::Builder::default();
+
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app: &tauri::AppHandle<_>, args: Vec<String>, _cwd: String| {
+            let _ = app.get_webview_window("main")
+                       .expect("no main window")
+                       .set_focus();
+
             let oauth_callback = args
                 .iter()
                 .find(|arg| arg.starts_with("kioku://"))
                 .cloned();
 
             if let Some(oauth_callback) = oauth_callback {
-                let app = app.clone();
-                tauri::async_runtime::spawn(async move {
-                    handle_oauth_callback(app, oauth_callback).await
-                });
+                process_oauth_callback(app.clone(), oauth_callback);
             }
-        }))
+        }));
+    }
+    
+    builder
+        .manage(StrongholdKeyState::default())
+        .manage(TokenManagerState::default())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_zustand::init())
-        .setup(|app| {
+        .setup(|app: &mut tauri::App<_>| {
             #[cfg(any(windows, target_os = "linux"))]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
                 app.deep_link().register("kioku")?;
             }
+
+            use tauri_plugin_deep_link::DeepLinkExt;
+
+            let app_handle = app.handle().clone();
+            app.deep_link().on_open_url(move |event| {
+                for url in event.urls() {
+                    if url.as_str().starts_with("kioku://") {
+                        process_oauth_callback(app_handle.clone(), url.to_string());
+                    }
+                }
+            });
 
             if let Err(err) = init_stronghold_key(&app.handle()) {
                 return Err(std::io::Error::new(std::io::ErrorKind::Other, err).into());
@@ -60,6 +85,7 @@ pub fn run() {
                 return Err(std::io::Error::new(std::io::ErrorKind::Other, err).into());
             }
 
+            app.manage(AnimeListUpdateQueue::new(app.handle().clone()));
             app.zustand().set_autosave(Duration::from_secs(300));
             Ok(())
         })
@@ -67,7 +93,8 @@ pub fn run() {
             authorize_myanimelist,
             authorize_provider,
             oauth_request,
-            synchronize_myanimelist
+            synchronize_myanimelist,
+            enqueue_anime_list_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
