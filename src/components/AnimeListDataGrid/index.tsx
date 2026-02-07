@@ -29,7 +29,7 @@ const AnimeListDataGrid = ({ listData }: AnimeListDataGridProps) => {
   });
 
   return (
-    <Box sx={{ height: '100%', width: '100%' }}>
+    <Box sx={{ height: '100%', width: '100%', minHeight: 0 }}>
       <MaterialReactTable table={table} />
     </Box>
   );

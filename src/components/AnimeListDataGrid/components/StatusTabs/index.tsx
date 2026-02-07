@@ -2,6 +2,7 @@ import { Tab, Tabs } from '@mui/material';
 import { FC } from 'react';
 
 import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
+import useStatusTabs from './useStatusTabs';
 
 interface StatusTabsProps {
   watchingCount?: number;
@@ -27,12 +28,36 @@ const StatusTabs: FC<StatusTabsProps> = ({
     (state) => state.setSelectedStatus
   );
 
+  const { tabsRootRef } = useStatusTabs();
+
   return (
-    <div className="w-full overflow-hidden">
+    <div className="w-full overflow-x-hidden">
       <Tabs
-        className="justify-self-start"
+        ref={tabsRootRef}
+        className="w-full min-w-0"
         value={selectedStatus}
         variant="scrollable"
+        scrollButtons={false}
+        sx={{
+          width: '100%',
+          minWidth: 0,
+          '& .MuiTabs-scroller': {
+            cursor: 'grab',
+            width: '100%',
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
+            touchAction: 'pan-x pan-y',
+            WebkitOverflowScrolling: 'touch',
+            '&::-webkit-scrollbar': { display: 'none' }
+          },
+          '& .MuiTabs-flexContainer': {
+            flexWrap: 'nowrap'
+          },
+          '& .MuiTabs-scroller[data-dragging="true"]': {
+            cursor: 'grabbing',
+            userSelect: 'none'
+          }
+        }}
         onChange={(_, value) => setSelectedStatus(value)}>
         <Tab
           className={tabClassNames}

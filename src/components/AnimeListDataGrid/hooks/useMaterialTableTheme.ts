@@ -38,7 +38,11 @@ const useMaterialTableTheme = () => {
       elevation: 0,
       sx: {
         backgroundColor: palette.background.paper,
-        color: palette.text.primary
+        color: palette.text.primary,
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        minHeight: 0
       }
     }),
     [palette]
@@ -47,7 +51,11 @@ const useMaterialTableTheme = () => {
   const muiTableContainerProps = useMemo(
     () => ({
       sx: {
-        backgroundColor: palette.background.paper
+        backgroundColor: palette.background.paper,
+        flex: 1,
+        minHeight: 0,
+        overflowX: 'auto',
+        overflowY: 'auto'
       }
     }),
     [palette]

@@ -1,20 +1,9 @@
-import { IconButton, Tooltip } from '@mui/material';
-import {
-  LoaderCircle,
-  RefreshCw,
-  SquareCheck,
-  SquarePlay,
-  SquareStop
-} from 'lucide-react';
-import {
-  MRT_ColumnDef,
-  MRT_ShowHideColumnsButton,
-  useMaterialReactTable
-} from 'material-react-table';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Tooltip } from '@mui/material';
+import { SquareCheck, SquarePlay, SquareStop } from 'lucide-react';
+import { MRT_ColumnDef, useMaterialReactTable } from 'material-react-table';
+import { useEffect, useMemo, useState } from 'react';
 
 import ProgressStatus from '@/components/AnimeListDataGrid/components/ProgressStatus';
-import { MyAnimeListService } from '@/services/backend/MyAnimeList';
 import {
   AnimeListStatus,
   AnimeListUserStatus,
@@ -22,11 +11,10 @@ import {
   SynchronizedAnimeList
 } from '@/services/backend/types';
 import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
-import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
+import CustomTopToolbar from '../components/CustomTopToolbar';
 import MediaType from '../components/MediaType';
 import ScoreSelect from '../components/ScoreSelect';
 import StartSeason from '../components/StartSeason';
-import StatusTabs from '../components/StatusTabs';
 import useMaterialTableTheme from './useMaterialTableTheme';
 
 interface UseAnimeListDataGridProps {
@@ -43,15 +31,11 @@ const useAnimeListDataGrid = ({
   onProgressChange
 }: UseAnimeListDataGridProps) => {
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const selectedUserStatus = useAnimeListDataGridStore(
     (state) => state.selectedStatus
   );
-
-  const setAnimeListData = useMyAnimeListStore(
-    (state) => state.setAnimeListData
-  );
+  const searchValue = useAnimeListDataGridStore((state) => state.searchValue);
 
   const {
     mrtTheme,
@@ -205,16 +189,6 @@ const useAnimeListDataGrid = ({
     }
   }, []);
 
-  const handleRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    try {
-      const result = await MyAnimeListService.synchronizeList();
-      setAnimeListData(result);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [setAnimeListData, setIsRefreshing]);
-
   const table = useMaterialReactTable({
     columns,
     data,
@@ -228,30 +202,8 @@ const useAnimeListDataGrid = ({
     muiTableBodyCellProps,
     muiTableBodyRowProps,
     muiTopToolbarProps,
-    renderTopToolbarCustomActions: () => (
-      <StatusTabs
-        watchingCount={listData?.watching.length || 0}
-        completedCount={listData?.completed.length || 0}
-        onHoldCount={listData?.onHold.length || 0}
-        droppedCount={listData?.dropped.length || 0}
-        planToWatchCount={listData?.planToWatch.length || 0}
-      />
-    ),
-    renderToolbarInternalActions: ({ table }) => (
-      <>
-        <Tooltip title="Refresh List">
-          <IconButton disabled={isRefreshing} onClick={handleRefresh}>
-            <span>
-              {!isRefreshing ? (
-                <RefreshCw className="text-primary" />
-              ) : (
-                <LoaderCircle className="text-primary animate-spin" />
-              )}
-            </span>
-          </IconButton>
-        </Tooltip>
-        <MRT_ShowHideColumnsButton table={table} />
-      </>
+    renderTopToolbar: () => (
+      <CustomTopToolbar listData={listData} table={table} />
     ),
     enableStickyHeader: true,
     enableDensityToggle: false,
@@ -263,11 +215,11 @@ const useAnimeListDataGrid = ({
     enableBottomToolbar: false,
     enableRowVirtualization: true,
     enableColumnActions: false,
-    state: { isLoading },
+    state: { isLoading, globalFilter: searchValue },
     rowVirtualizerOptions: { overscan: 5 }
   });
 
-  return { table, handleRefresh };
+  return { table };
 };
 
 export default useAnimeListDataGrid;
