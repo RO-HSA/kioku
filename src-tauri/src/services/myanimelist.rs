@@ -293,28 +293,35 @@ fn build_alternative_titles(alt: Option<MalAlternativeTitles>) -> String {
         return "Unknown".to_string();
     };
 
-    let mut result = String::new();
+    let mut parts: Vec<String> = Vec::new();
 
     if let Some(en) = alt.en {
-        result.push_str(&en);
-        result.push_str(", ");
-    }
-
-    if let Some(ja) = alt.ja {
-        result.push_str(&ja);
-        result.push_str(", ");
-    }
-
-    if let Some(synonyms) = alt.synonyms {
-        if !synonyms.is_empty() {
-            result.push_str(&synonyms.join(", "));
+        let trimmed = en.trim();
+        if !trimmed.is_empty() {
+            parts.push(trimmed.to_string());
         }
     }
 
-    if result.is_empty() {
+    if let Some(ja) = alt.ja {
+        let trimmed = ja.trim();
+        if !trimmed.is_empty() {
+            parts.push(trimmed.to_string());
+        }
+    }
+
+    if let Some(synonyms) = alt.synonyms {
+        for synonym in synonyms {
+            let trimmed = synonym.trim();
+            if !trimmed.is_empty() {
+                parts.push(trimmed.to_string());
+            }
+        }
+    }
+
+    if parts.is_empty() {
         "Unknown".to_string()
     } else {
-        result
+        parts.join(", ")
     }
 }
 
