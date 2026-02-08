@@ -1,6 +1,7 @@
 import { Box, Divider } from '@mui/material';
 import { Bolt, PanelLeftClose, PanelRightClose } from 'lucide-react';
 
+import appIcon from '@/assets/app-icon.png';
 import ModeToggle from '@/components/ModeToggle';
 import NavButton from '@/components/NavButton';
 import Button from '@/components/ui/Button';
@@ -33,11 +34,10 @@ const SidebarContent = () => {
             'flex items-center gap-2 overflow-hidden select-none opacity-100 w-full transition-[width, opacity, gap] duration-300 ease-in-out',
             !isOpen && 'w-0 opacity-0 gap-0'
           )}>
-          <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <span className="text-xs font-semibold tracking-wide">K</span>
-          </div>
+          <img className="rounded-xl size-8" src={appIcon} alt="App Icon" />
           <span className="text-sm font-semibold">Kioku</span>
         </div>
+
         <Button
           variant="ghost"
           className="max-w-6"
