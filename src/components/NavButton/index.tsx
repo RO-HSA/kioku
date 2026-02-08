@@ -2,6 +2,7 @@ import { LucideProps } from 'lucide-react';
 import { FC, ForwardRefExoticComponent, RefAttributes } from 'react';
 
 import { cn } from '@/lib/utils';
+import { Tooltip } from '@mui/material';
 
 interface NavButtonProps {
   isSidebarOpen?: boolean;
@@ -23,28 +24,33 @@ const NavButton: FC<NavButtonProps> = ({
   onClick
 }) => {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-current={isActive ? 'page' : undefined}
-      className={cn(
-        'flex w-full items-center justify-center gap-3 cursor-pointer rounded-xl px-3 py-2 text-left text-sm font-medium transition-[colors, gap] duration-200 ease-in-out',
-        className,
-        isActive
-          ? 'bg-primary/10 text-primary'
-          : 'text-text-secondary hover:bg-primary/5 hover:text-text-primary',
-        !isSidebarOpen && 'justify-center gap-0'
-      )}>
-      <Icon className="size-5 shrink-0 justify-self-center" />
-
-      <span
+    <Tooltip
+      title={label}
+      placement="right"
+      disableHoverListener={isSidebarOpen}>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-current={isActive ? 'page' : undefined}
         className={cn(
-          'truncate w-full opacity-100 transition-opacity duration-300 ease-in-out',
-          !isSidebarOpen && 'opacity-0'
+          'flex w-full items-center justify-center gap-3 cursor-pointer rounded-xl px-3 py-2 text-left text-sm font-medium transition-[colors, gap] duration-200 ease-in-out',
+          className,
+          isActive
+            ? 'bg-primary/10 text-primary'
+            : 'text-text-secondary hover:bg-primary/5 hover:text-text-primary',
+          !isSidebarOpen && 'justify-center gap-0'
         )}>
-        {label}
-      </span>
-    </button>
+        <Icon className="size-5 shrink-0 justify-self-center" />
+
+        <span
+          className={cn(
+            'truncate w-full opacity-100 transition-opacity duration-300 ease-in-out',
+            !isSidebarOpen && 'opacity-0'
+          )}>
+          {label}
+        </span>
+      </button>
+    </Tooltip>
   );
 };
 
