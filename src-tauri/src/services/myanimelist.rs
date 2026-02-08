@@ -8,7 +8,7 @@ use crate::services::anime_list_updates::AnimeListUpdateRequest;
 
 const BASE_URL: &str = "https://api.myanimelist.net/v2/users/";
 const UPDATE_BASE_URL: &str = "https://api.myanimelist.net/v2/anime/";
-const FIELDS: &str = "list_status,synopsis,alternative_titles,source,num_episodes,nsfw,start_season,media_type,studios,mean,status,genres,broadcast,start_date";
+const FIELDS: &str = "list_status{comments,num_times_rewatched},synopsis,alternative_titles,source,num_episodes,nsfw,start_season,media_type,studios,mean,status,genres,broadcast,start_date";
 const LIMIT: u32 = 1000;
 
 #[derive(Deserialize)]
@@ -98,6 +98,8 @@ struct MalListStatus {
     score: Option<u32>,
     num_episodes_watched: Option<u32>,
     is_rewatching: Option<bool>,
+    comments: Option<String>,
+    num_times_rewatched: Option<u32>,
     updated_at: Option<String>,
     start_date: Option<String>,
     finish_date: Option<String>,
@@ -125,6 +127,8 @@ pub struct AnimeListItem {
     user_score: u32,
     user_episodes_watched: u32,
     is_rewatching: bool,
+    user_comments: String,
+    user_num_times_rewatched: u32,
     user_start_date: Option<String>,
     user_finish_date: Option<String>,
     updated_at: Option<String>,
@@ -392,6 +396,8 @@ fn map_entry_to_domain(entry: MalListEntry, status_key: UserStatusKey) -> AnimeL
         user_score: list_status.score.unwrap_or(0),
         user_episodes_watched: list_status.num_episodes_watched.unwrap_or(0),
         is_rewatching: list_status.is_rewatching.unwrap_or(false),
+        user_comments: list_status.comments.unwrap_or_default(),
+        user_num_times_rewatched: list_status.num_times_rewatched.unwrap_or(0),
         user_start_date: list_status.start_date,
         user_finish_date: list_status.finish_date,
         updated_at: list_status.updated_at,
@@ -513,6 +519,7 @@ pub async fn synchronize_myanimelist(
     app: tauri::AppHandle,
 ) -> Result<SynchronizedAnimeList, String> {
     let token = get_access_token(&app, MAL_PROVIDER_ID).await?;
+    println!("Token: {}", token);
     let username: Option<String> = app
         .zustand()
         .get_or_default("myanimelist", "username");
