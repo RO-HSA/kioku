@@ -1,7 +1,7 @@
 import { Tooltip } from '@mui/material';
 import { SquareCheck, SquarePlay, SquareStop } from 'lucide-react';
 import { MRT_ColumnDef, useMaterialReactTable } from 'material-react-table';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import ProgressStatus from '@/components/AnimeListDataGrid/components/ProgressStatus';
 import {
@@ -10,6 +10,7 @@ import {
   IAnimeList,
   SynchronizedAnimeList
 } from '@/services/backend/types';
+import { useAnimeDetailsStore } from '@/stores/animeDetails';
 import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
 import CustomTopToolbar from '../components/CustomTopToolbar';
 import MediaType from '../components/MediaType';
@@ -36,6 +37,10 @@ const useAnimeListDataGrid = ({
     (state) => state.selectedStatus
   );
   const searchValue = useAnimeListDataGridStore((state) => state.searchValue);
+  const openAnimeDetails = useAnimeDetailsStore((state) => state.setIsOpen);
+  const setSelectedAnime = useAnimeDetailsStore(
+    (state) => state.setSelectedAnime
+  );
 
   const {
     mrtTheme,
@@ -184,6 +189,14 @@ const useAnimeListDataGrid = ({
     }
   }, [listData, selectedUserStatus]);
 
+  const handleOpenAnimeDetails = useCallback(
+    (anime: IAnimeList) => {
+      setSelectedAnime(anime);
+      openAnimeDetails(true);
+    },
+    [openAnimeDetails, setSelectedAnime]
+  );
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setIsLoading(false);
@@ -200,7 +213,10 @@ const useAnimeListDataGrid = ({
     muiTablePaperProps,
     muiTableContainerProps,
     muiTableHeadCellProps,
-    muiTableBodyCellProps,
+    muiTableBodyCellProps: ({ cell }) => ({
+      ...muiTableBodyCellProps,
+      onDoubleClick: () => handleOpenAnimeDetails(cell.row.original)
+    }),
     muiTableBodyRowProps,
     muiTopToolbarProps,
     renderTopToolbar: () => (
