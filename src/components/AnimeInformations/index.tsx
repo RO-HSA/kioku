@@ -12,6 +12,7 @@ import { X } from 'lucide-react';
 
 import { useAnimeDetailsStore } from '@/stores/animeDetails';
 import { useState } from 'react';
+import AnimeListForm from './components/AnimeListForm';
 import Details from './components/Details';
 import InfoHeader from './components/InfoHeader';
 
@@ -51,7 +52,7 @@ const AnimeInformations = () => {
   return (
     <Dialog open={isOpen} onClose={handleClose} fullWidth maxWidth="md">
       <DialogTitle className="flex justify-between items-center">
-        <Typography variant="body1">Anime Details</Typography>
+        <Typography variant="body1">Anime Informations</Typography>
 
         <IconButton onClick={handleClose}>
           <X />
@@ -103,7 +104,7 @@ const AnimeInformations = () => {
                   <div>
                     <InfoHeader label="Alternative titles" />
 
-                    <Typography className="pt-1!" variant="body2">
+                    <Typography className="py-2!" variant="body2">
                       {alternativeTitles}
                     </Typography>
 
@@ -122,7 +123,7 @@ const AnimeInformations = () => {
                     <InfoHeader label="Synopsis" />
 
                     <Typography
-                      className="pt-1!"
+                      className="py-2!"
                       variant="body2"
                       sx={{ whiteSpace: 'pre-line' }}>
                       {synopsis}
@@ -130,7 +131,11 @@ const AnimeInformations = () => {
                   </div>
                 )}
 
-                {selectedTab === 1 && <div>{null}</div>}
+                {selectedTab === 1 && (
+                  <div className="pt-2">
+                    <AnimeListForm />
+                  </div>
+                )}
               </div>
             </div>
           </Grid>

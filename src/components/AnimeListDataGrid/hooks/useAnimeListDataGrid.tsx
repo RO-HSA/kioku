@@ -1,4 +1,4 @@
-import { Tooltip } from '@mui/material';
+import { Box, SelectChangeEvent, Tooltip } from '@mui/material';
 import { SquareCheck, SquarePlay, SquareStop } from 'lucide-react';
 import { MRT_ColumnDef, useMaterialReactTable } from 'material-react-table';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -12,9 +12,10 @@ import {
 } from '@/services/backend/types';
 import { useAnimeDetailsStore } from '@/stores/animeDetails';
 import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
+import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
+import ScoreSelect from '../../ScoreSelect';
 import CustomTopToolbar from '../components/CustomTopToolbar';
 import MediaType from '../components/MediaType';
-import ScoreSelect from '../components/ScoreSelect';
 import StartSeason from '../components/StartSeason';
 import useMaterialTableTheme from './useMaterialTableTheme';
 
@@ -41,6 +42,8 @@ const useAnimeListDataGrid = ({
   const setSelectedAnime = useAnimeDetailsStore(
     (state) => state.setSelectedAnime
   );
+
+  const setScore = useMyAnimeListStore((state) => state.setScore);
 
   const {
     mrtTheme,
@@ -140,12 +143,16 @@ const useAnimeListDataGrid = ({
         Cell: ({ cell, row }) => {
           const score = cell.getValue<number>();
 
+          const handleChange = (event: SelectChangeEvent<number>) => {
+            const { value } = event.target;
+
+            setScore(row.original.id, row.original.userStatus, value);
+          };
+
           return (
-            <ScoreSelect
-              score={score}
-              animeId={row.original.id}
-              status={row.original.userStatus}
-            />
+            <Box width="100%">
+              <ScoreSelect fullWidth score={score} onChange={handleChange} />
+            </Box>
           );
         }
       },
