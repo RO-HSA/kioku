@@ -1,6 +1,7 @@
-import { IAnimeList } from '@/services/backend/types';
 import { createTauriStore } from '@tauri-store/zustand';
 import { create } from 'zustand';
+
+import { IAnimeList } from '@/types/AnimeList';
 
 type AnimeDetailsStore = {
   isOpen: boolean;

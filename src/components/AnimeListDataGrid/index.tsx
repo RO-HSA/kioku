@@ -1,11 +1,9 @@
 import { Box } from '@mui/material';
 import { MaterialReactTable } from 'material-react-table';
 
-import {
-  AnimeListUserStatus,
-  SynchronizedAnimeList
-} from '@/services/backend/types';
+import { SynchronizedAnimeList } from '@/services/backend/types';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
+import { AnimeListUserStatus } from '@/types/AnimeList';
 import useAnimeListDataGrid from './hooks/useAnimeListDataGrid';
 
 interface AnimeListDataGridProps {

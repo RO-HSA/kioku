@@ -1,10 +1,7 @@
 import { Box, LinearProgress } from '@mui/material';
 import { FC, useState } from 'react';
 
-import {
-  AnimeListBroadcast,
-  AnimeListUserStatus
-} from '@/services/backend/types';
+import { AnimeListBroadcast, AnimeListUserStatus } from '@/types/AnimeList';
 import ProgressControls from './components/ProgressControls';
 import ProgressNumber from './components/ProgressNumber';
 import { getProgressValues } from './utils';

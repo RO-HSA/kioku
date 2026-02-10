@@ -1,8 +1,6 @@
 import { MyAnimeListService } from '@/services/backend/MyAnimeList';
-import {
-  AnimeListUserStatus,
-  SynchronizedAnimeList
-} from '@/services/backend/types';
+import { SynchronizedAnimeList } from '@/services/backend/types';
+import { AnimeListUserStatus } from '@/types/AnimeList';
 import { createTauriStore } from '@tauri-store/zustand';
 import { create } from 'zustand';
 import { updateAnimeListData } from './utils';

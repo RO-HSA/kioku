@@ -1,8 +1,5 @@
-import {
-  AnimeListUserStatus,
-  IAnimeList,
-  SynchronizedAnimeList
-} from '@/services/backend/types';
+import { SynchronizedAnimeList } from '@/services/backend/types';
+import { AnimeListUserStatus, IAnimeList } from '@/types/AnimeList';
 
 export const updateAnimeListData = (
   state: SynchronizedAnimeList | null,

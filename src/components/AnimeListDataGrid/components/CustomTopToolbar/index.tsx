@@ -1,11 +1,12 @@
+import { Box } from '@mui/material';
 import {
   MRT_ShowHideColumnsButton,
   MRT_TableInstance
 } from 'material-react-table';
 import { FC } from 'react';
 
-import { IAnimeList, SynchronizedAnimeList } from '@/services/backend/types';
-import { Box } from '@mui/material';
+import { SynchronizedAnimeList } from '@/services/backend/types';
+import { IAnimeList } from '@/types/AnimeList';
 import RefreshListButton from '../RefreshListButton';
 import SearchButton from '../SearchButton';
 import StatusTabs from '../StatusTabs';

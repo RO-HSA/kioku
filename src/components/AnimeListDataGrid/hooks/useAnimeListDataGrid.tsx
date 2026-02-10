@@ -4,15 +4,15 @@ import { MRT_ColumnDef, useMaterialReactTable } from 'material-react-table';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import ProgressStatus from '@/components/AnimeListDataGrid/components/ProgressStatus';
-import {
-  AnimeListStatus,
-  AnimeListUserStatus,
-  IAnimeList,
-  SynchronizedAnimeList
-} from '@/services/backend/types';
+import { SynchronizedAnimeList } from '@/services/backend/types';
 import { useAnimeDetailsStore } from '@/stores/animeDetails';
 import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
+import {
+  AnimeListStatus,
+  AnimeListUserStatus,
+  IAnimeList
+} from '@/types/AnimeList';
 import ScoreSelect from '../../ScoreSelect';
 import CustomTopToolbar from '../components/CustomTopToolbar';
 import MediaType from '../components/MediaType';
