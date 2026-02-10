@@ -1,5 +1,6 @@
 import {
   Dialog,
+  DialogActions,
   DialogContent,
   DialogTitle,
   Grid,
@@ -11,7 +12,8 @@ import {
 import { X } from 'lucide-react';
 
 import { useAnimeDetailsStore } from '@/stores/animeDetails';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import Button from '../ui/Button';
 import AnimeListForm from './components/AnimeListForm';
 import Details from './components/Details';
 import InfoHeader from './components/InfoHeader';
@@ -23,10 +25,17 @@ const AnimeInformations = () => {
 
   const selectedAnime = useAnimeDetailsStore((state) => state.selectedAnime);
   const isOpen = useAnimeDetailsStore((state) => state.isOpen);
+  const formRef = useAnimeDetailsStore((state) => state.formRef);
   const setIsOpen = useAnimeDetailsStore((state) => state.setIsOpen);
   const setSelectedAnime = useAnimeDetailsStore(
     (state) => state.setSelectedAnime
   );
+
+  const handleSubmit = useCallback(() => {
+    if (!formRef?.current) return;
+
+    formRef.current.requestSubmit();
+  }, [formRef]);
 
   if (!selectedAnime) return null;
 
@@ -141,6 +150,16 @@ const AnimeInformations = () => {
           </Grid>
         </Grid>
       </DialogContent>
+
+      <DialogActions>
+        <Button type="submit" variant="primary" onClick={handleSubmit}>
+          Confirm
+        </Button>
+
+        <Button onClick={handleClose} variant="secondary">
+          Close
+        </Button>
+      </DialogActions>
     </Dialog>
   );
 };

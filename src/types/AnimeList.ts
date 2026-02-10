@@ -15,8 +15,7 @@ export type AnimeListBroadcast = {
   startTime: string | null;
 };
 
-export interface IAnimeList {
-  // Anime-specific fields
+export interface IAnime {
   id: number;
   title: string;
   imageUrl: string;
@@ -32,7 +31,9 @@ export interface IAnimeList {
   broadcast: AnimeListBroadcast;
   studios: string;
   mediaType: string;
-  // User-specific fields
+}
+
+export interface IAnimeUserList {
   userStatus: AnimeListUserStatus;
   userScore: number;
   userEpisodesWatched: number;
@@ -43,3 +44,5 @@ export interface IAnimeList {
   userFinishDate?: string;
   updatedAt?: string;
 }
+
+export interface IAnimeList extends IAnime, IAnimeUserList {}

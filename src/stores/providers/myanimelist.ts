@@ -1,6 +1,7 @@
 import { MyAnimeListService } from '@/services/backend/MyAnimeList';
 import { SynchronizedAnimeList } from '@/services/backend/types';
-import { AnimeListUserStatus } from '@/types/AnimeList';
+import { AnimeListUserStatus, IAnimeList } from '@/types/AnimeList';
+import { Provider } from '@/types/List';
 import { createTauriStore } from '@tauri-store/zustand';
 import { create } from 'zustand';
 import { updateAnimeListData } from './utils';
@@ -25,6 +26,11 @@ type MyAnimeListStore = {
     animeId: number,
     status: AnimeListUserStatus,
     newScore: number
+  ) => void;
+  updateAnimeList: (
+    animeId: number,
+    status: AnimeListUserStatus,
+    data: Partial<IAnimeList>
   ) => void;
 };
 
@@ -52,7 +58,7 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
       );
 
       MyAnimeListService.enqueueListUpdate({
-        providerId: 'myanimelist',
+        providerId: Provider.MY_ANIME_LIST,
         entryId: animeId,
         userEpisodesWatched: newProgress
       });
@@ -71,9 +77,32 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
       );
 
       MyAnimeListService.enqueueListUpdate({
-        providerId: 'myanimelist',
+        providerId: Provider.MY_ANIME_LIST,
         entryId: animeId,
         userScore: newScore
+      });
+
+      return { animeListData: updatedAnimeListData };
+    }),
+  updateAnimeList: (
+    animeId: number,
+    currentStatus: AnimeListUserStatus,
+    data: Partial<IAnimeList>
+  ) =>
+    set((state) => {
+      if (!state.animeListData) return {};
+
+      const updatedAnimeListData = updateAnimeListData(
+        state.animeListData,
+        animeId,
+        currentStatus,
+        data
+      );
+
+      MyAnimeListService.enqueueListUpdate({
+        providerId: Provider.MY_ANIME_LIST,
+        entryId: animeId,
+        ...data
       });
 
       return { animeListData: updatedAnimeListData };

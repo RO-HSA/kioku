@@ -5,6 +5,8 @@ export type AnimeListFormData = {
   userScore: number;
   userEpisodesWatched: number;
   isRewatching: boolean;
+  userComments: string;
+  userNumTimesRewatched: number;
   userStartDate?: string;
   userFinishDate?: string;
 };

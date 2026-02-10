@@ -1,14 +1,13 @@
-import { AnimeListUserStatus, IAnimeList } from '@/types/AnimeList';
+import {
+  AnimeListUserStatus,
+  IAnimeList,
+  IAnimeUserList
+} from '@/types/AnimeList';
+import { Provider } from '@/types/List';
 
 export type SynchronizedAnimeList = Record<AnimeListUserStatus, IAnimeList[]>;
 
-export interface AnimeListUpdateRequest {
-  providerId: string;
+export interface AnimeListUpdateRequest extends Partial<IAnimeUserList> {
+  providerId: Provider;
   entryId: number;
-  userStatus?: AnimeListUserStatus;
-  userScore?: number;
-  userEpisodesWatched?: number;
-  isRewatching?: boolean;
-  userStartDate?: string;
-  userFinishDate?: string;
 }
