@@ -56,6 +56,7 @@ const AnimeInformations = () => {
   const handleClose = () => {
     setIsOpen(false);
     setSelectedAnime(null);
+    setSelectedTab(0);
   };
 
   return (
@@ -103,7 +104,7 @@ const AnimeInformations = () => {
                       className="p-1! text-sm!"
                       sx={{
                         textTransform: 'none',
-                        '&:hover': { color: 'ActiveText' }
+                        '&:hover': { color: 'GrayText' }
                       }}
                     />
                   ))}
