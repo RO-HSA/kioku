@@ -21,6 +21,8 @@ pub struct AnimeListUpdateRequest {
     pub user_score: Option<u32>,
     pub user_episodes_watched: Option<u32>,
     pub is_rewatching: Option<bool>,
+    pub user_comments: Option<String>,
+    pub user_num_times_rewatched: Option<u32>,
     pub user_start_date: Option<String>,
     pub user_finish_date: Option<String>,
 }

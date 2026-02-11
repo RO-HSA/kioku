@@ -475,6 +475,18 @@ pub async fn update_myanimelist_list_entry(
         params.push(("is_rewatching".to_string(), is_rewatching.to_string()));
     }
 
+    if let Some(comments) = update.user_comments.as_ref() {
+        params.push(("comments".to_string(), comments.to_string()));
+    }
+
+    if let Some(num_times_rewatched) = update.user_num_times_rewatched {
+        let clamped = num_times_rewatched.min(5);
+        params.push((
+            "num_times_rewatched".to_string(),
+            clamped.to_string(),
+        ));
+    }
+
     if let Some(start_date) = update.user_start_date.as_ref() {
         let trimmed = start_date.trim();
         if !trimmed.is_empty() {
