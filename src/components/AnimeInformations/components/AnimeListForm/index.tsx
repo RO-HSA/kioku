@@ -1,19 +1,15 @@
-import {
-  FormControl,
-  FormControlLabel,
-  FormGroup,
-  InputLabel,
-  Switch
-} from '@mui/material';
 import { useWatch } from 'react-hook-form';
 
-import ScoreSelect from '@/components/ScoreSelect';
-import NumberField from '@/components/ui/NumberField';
 import { useAnimeDetailsStore } from '@/stores/animeDetails';
 import { formatDateValue, parseDateValue } from '@/utils/date';
 import DatePicker from './DatePIcker';
-import StatusSelect from './StatusSelect';
+import EpisodesWatched from './EpisodesWatched';
 import useAnimeListForm from './hooks/useAnimeListForm';
+import Rewatching from './Rewatching';
+import ScoreSelector from './ScoreSelector';
+import StatusSelector from './StatusSelector';
+import TimesWatched from './TimesWatched';
+import UserNote from './UserNote';
 
 const AnimeListForm = () => {
   const formRef = useAnimeDetailsStore((state) => state.formRef);
@@ -25,44 +21,14 @@ const AnimeListForm = () => {
     selectedAnime
   });
 
-  const totalEpisodes = useWatch({
-    name: 'userEpisodesWatched',
-    control: control
-  });
-
-  const userNumTimesRewatched = useWatch({
-    name: 'userNumTimesRewatched',
-    control: control
-  });
-
-  const isRewatching = useWatch({
-    name: 'isRewatching',
-    control: control
-  });
-
-  const userEpisodes = useWatch({
-    name: 'userEpisodesWatched',
-    control: control
-  });
-
-  const score = useWatch({
-    name: 'userScore',
-    control: control
-  });
-
   const startDate = useWatch({
     name: 'userStartDate',
-    control: control
+    control
   });
 
   const finishDate = useWatch({
     name: 'userFinishDate',
-    control: control
-  });
-
-  const userStatus = useWatch({
-    name: 'userStatus',
-    control: control
+    control
   });
 
   return (
@@ -71,64 +37,45 @@ const AnimeListForm = () => {
       className="flex flex-col gap-5"
       onSubmit={handleSubmit(onSubmit)}>
       <div className="flex flex-wrap gap-3">
-        <NumberField
-          label="Episodes watched"
-          min={0}
-          value={userEpisodes}
-          defaultValue={totalEpisodes}
-          onValueChange={(value) =>
-            setValue('userEpisodesWatched', value || 0, { shouldDirty: true })
+        <EpisodesWatched
+          control={control}
+          totalEpisodes={selectedAnime.totalEpisodes}
+          onChange={(value) =>
+            setValue('userEpisodesWatched', value, { shouldDirty: true })
           }
         />
 
-        <NumberField
-          label="Times watched"
-          min={0}
-          max={5}
-          value={userNumTimesRewatched}
-          onValueChange={(value) =>
-            setValue('userNumTimesRewatched', value || 0, { shouldDirty: true })
+        <TimesWatched
+          control={control}
+          onChange={(value) =>
+            setValue('userNumTimesRewatched', value, { shouldDirty: true })
           }
         />
 
-        <FormGroup>
-          <FormControlLabel
-            control={
-              <Switch
-                value={isRewatching}
-                onChange={(event) =>
-                  setValue('isRewatching', event.target.checked)
-                }
-              />
-            }
-            label="Rewatching"
-          />
-        </FormGroup>
+        <Rewatching
+          control={control}
+          onChange={(value) =>
+            setValue('isRewatching', value, { shouldDirty: true })
+          }
+        />
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <StatusSelect
-          status={userStatus}
+        <StatusSelector
+          control={control}
           onChange={(value) =>
             setValue('userStatus', value, { shouldDirty: true })
           }
         />
 
-        <FormControl className="max-w-56.75 w-full">
-          <InputLabel id="score-label">Score</InputLabel>
-
-          <ScoreSelect
-            labelId="score-label"
-            label="Score"
-            score={score}
-            shouldNotOverrideRenderValue
-            onChange={(event) =>
-              setValue('userScore', event.target.value || 0, {
-                shouldDirty: true
-              })
-            }
-          />
-        </FormControl>
+        <ScoreSelector
+          control={control}
+          onChange={(value) =>
+            setValue('userScore', value || 0, {
+              shouldDirty: true
+            })
+          }
+        />
 
         <div className="flex flex-wrap gap-3 min-w-0">
           <DatePicker
@@ -151,6 +98,13 @@ const AnimeListForm = () => {
             }
           />
         </div>
+
+        <UserNote
+          control={control}
+          onChange={(value) =>
+            setValue('userComments', value, { shouldDirty: true })
+          }
+        />
       </div>
     </form>
   );
