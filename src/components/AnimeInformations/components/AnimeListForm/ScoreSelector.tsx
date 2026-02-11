@@ -1,8 +1,8 @@
 import { FormControl, InputLabel } from '@mui/material';
+import { FC } from 'react';
 import { Control, useWatch } from 'react-hook-form';
 
 import ScoreSelect from '@/components/ScoreSelect';
-import { FC } from 'react';
 import { AnimeListFormData } from './hooks/types';
 
 interface ScoreSelectorProps {

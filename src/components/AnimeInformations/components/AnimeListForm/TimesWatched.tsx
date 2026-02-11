@@ -1,7 +1,7 @@
+import { FC } from 'react';
 import { Control, useWatch } from 'react-hook-form';
 
 import NumberField from '@/components/ui/NumberField';
-import { FC } from 'react';
 import { AnimeListFormData } from './hooks/types';
 
 interface TimesWatchedProps {
