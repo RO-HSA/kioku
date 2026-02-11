@@ -32,7 +32,6 @@
     "@tauri-store/zustand": "^1.1.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
-    "debounce": "^3.0.0",
     "lucide-react": "^0.563.0",
     "material-react-table": "^3.2.1",
     "react": "^19.1.0",

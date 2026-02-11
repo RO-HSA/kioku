@@ -68,8 +68,36 @@ const useAnimeListDataGrid = ({
     }
   };
 
+  const getUserStatusLabel = (status: AnimeListUserStatus) => {
+    switch (status) {
+      case 'watching':
+        return 'Watching';
+      case 'completed':
+        return 'Completed';
+      case 'onHold':
+        return 'On Hold';
+      case 'dropped':
+        return 'Dropped';
+      case 'planToWatch':
+        return 'Plan To Watch';
+      default:
+        return status;
+    }
+  };
+
   const columns = useMemo<MRT_ColumnDef<IAnimeList>[]>(
     () => [
+      {
+        accessorKey: 'userStatus',
+        header: 'List',
+        size: 60,
+        enableSorting: false,
+        getGroupingValue: (row) => getUserStatusLabel(row.userStatus),
+        Cell: ({ cell }) => {
+          const value = cell.getValue<AnimeListUserStatus>();
+          return value ? getUserStatusLabel(value) : '';
+        }
+      },
       {
         accessorKey: 'status',
         header: '',
@@ -179,7 +207,27 @@ const useAnimeListDataGrid = ({
     [onProgressChange]
   );
 
+  const allData = useMemo(() => {
+    if (!listData) {
+      return [];
+    }
+
+    return [
+      ...listData.watching,
+      ...listData.completed,
+      ...listData.onHold,
+      ...listData.dropped,
+      ...listData.planToWatch
+    ];
+  }, [listData]);
+
+  const shouldGroupByStatus = searchValue.trim().length > 0;
+
   const data = useMemo(() => {
+    if (shouldGroupByStatus) {
+      return allData;
+    }
+
     switch (selectedUserStatus) {
       case 'watching':
         return listData?.watching || [];
@@ -194,7 +242,12 @@ const useAnimeListDataGrid = ({
       default:
         return [];
     }
-  }, [listData, selectedUserStatus]);
+  }, [allData, listData, selectedUserStatus, shouldGroupByStatus]);
+
+  const grouping = useMemo(
+    () => (shouldGroupByStatus ? ['userStatus'] : []),
+    [shouldGroupByStatus]
+  );
 
   const handleOpenAnimeDetails = useCallback(
     (anime: IAnimeList) => {
@@ -214,18 +267,28 @@ const useAnimeListDataGrid = ({
     columns,
     data,
     initialState: {
-      density: 'compact'
+      density: 'compact',
+      columnVisibility: {
+        userStatus: false
+      },
+      expanded: true
     },
     mrtTheme,
     muiTablePaperProps,
     muiTableContainerProps,
     muiTableHeadCellProps,
-    muiTableBodyCellProps: ({ cell }) => ({
-      ...muiTableBodyCellProps,
-      onDoubleClick: () => handleOpenAnimeDetails(cell.row.original)
-    }),
     muiTableBodyRowProps,
     muiTopToolbarProps,
+    muiTableBodyCellProps: ({ cell }) => ({
+      ...muiTableBodyCellProps,
+      onDoubleClick: () => {
+        if (cell.row.getIsGrouped()) {
+          return;
+        }
+
+        handleOpenAnimeDetails(cell.row.original);
+      }
+    }),
     renderTopToolbar: () => (
       <CustomTopToolbar listData={listData} table={table} />
     ),
@@ -239,7 +302,15 @@ const useAnimeListDataGrid = ({
     enableBottomToolbar: false,
     enableRowVirtualization: true,
     enableColumnActions: false,
-    state: { isLoading, globalFilter: searchValue },
+    enableGrouping: true,
+    enableColumnOrdering: false,
+    enableColumnPinning: false,
+    groupedColumnMode: 'remove',
+    state: {
+      isLoading,
+      globalFilter: searchValue,
+      grouping
+    },
     rowVirtualizerOptions: { overscan: 5 }
   });
 

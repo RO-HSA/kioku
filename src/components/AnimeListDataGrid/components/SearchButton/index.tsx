@@ -6,6 +6,8 @@ import { type MouseEvent, useState } from 'react';
 
 const SearchButton = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+
+  const searchValue = useAnimeListDataGridStore((state) => state.searchValue);
   const setSearchValue = useAnimeListDataGridStore(
     (state) => state.setSearchValue
   );
@@ -30,7 +32,7 @@ const SearchButton = () => {
 
       <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
         <div className="px-2">
-          <SearchInput onDebounceEnd={setSearchValue} />
+          <SearchInput value={searchValue} onChange={setSearchValue} />
         </div>
       </Menu>
     </>
