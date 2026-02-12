@@ -1,4 +1,5 @@
-import { TextField } from '@mui/material';
+import { InputAdornment, TextField } from '@mui/material';
+import { X } from 'lucide-react';
 import { ChangeEvent, FC, KeyboardEvent } from 'react';
 
 interface SearchInputProps {
@@ -28,6 +29,20 @@ const SearchInput: FC<SearchInputProps> = ({ value, onChange }) => {
       onKeyDown={handleKeyDown}
       fullWidth
       size="small"
+      sx={{
+        '& .MuiInputAdornment-root': {
+          visibility: value.length > 0 ? 'visible' : 'hidden'
+        }
+      }}
+      slotProps={{
+        input: {
+          endAdornment: (
+            <InputAdornment position="end" sx={{}}>
+              <X size={14} cursor="pointer" />
+            </InputAdornment>
+          )
+        }
+      }}
     />
   );
 };
