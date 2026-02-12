@@ -1,5 +1,5 @@
 import { TextField } from '@mui/material';
-import { ChangeEvent, FC } from 'react';
+import { ChangeEvent, FC, KeyboardEvent } from 'react';
 
 interface SearchInputProps {
   value: string;
@@ -13,12 +13,19 @@ const SearchInput: FC<SearchInputProps> = ({ value, onChange }) => {
     onChange(value);
   };
 
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Escape') {
+      event.stopPropagation();
+    }
+  };
+
   return (
     <TextField
       label="Search"
       variant="outlined"
       value={value}
       onChange={handleChange}
+      onKeyDown={handleKeyDown}
       fullWidth
       size="small"
     />
