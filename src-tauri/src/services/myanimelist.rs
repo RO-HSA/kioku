@@ -531,7 +531,6 @@ pub async fn synchronize_myanimelist(
     app: tauri::AppHandle,
 ) -> Result<SynchronizedAnimeList, String> {
     let token = get_access_token(&app, MAL_PROVIDER_ID).await?;
-    println!("Token: {}", token);
     let username: Option<String> = app
         .zustand()
         .get_or_default("myanimelist", "username");

@@ -50,12 +50,12 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
     set((state) => {
       if (!state.animeListData) return {};
 
-      const updatedAnimeListData = updateAnimeListData(
-        state.animeListData,
+      const updatedAnimeListData = updateAnimeListData({
         animeId,
         status,
-        { userEpisodesWatched: newProgress }
-      );
+        state: state.animeListData,
+        data: { userEpisodesWatched: newProgress }
+      });
 
       MyAnimeListService.enqueueListUpdate({
         providerId: Provider.MY_ANIME_LIST,
@@ -69,12 +69,12 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
     set((state) => {
       if (!state.animeListData) return {};
 
-      const updatedAnimeListData = updateAnimeListData(
-        state.animeListData,
+      const updatedAnimeListData = updateAnimeListData({
         animeId,
         status,
-        { userScore: newScore }
-      );
+        state: state.animeListData,
+        data: { userScore: newScore }
+      });
 
       MyAnimeListService.enqueueListUpdate({
         providerId: Provider.MY_ANIME_LIST,
@@ -92,12 +92,13 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
     set((state) => {
       if (!state.animeListData) return {};
 
-      const updatedAnimeListData = updateAnimeListData(
-        state.animeListData,
+      const updatedAnimeListData = updateAnimeListData({
         animeId,
-        currentStatus,
-        data
-      );
+        state: state.animeListData,
+        status: currentStatus,
+        data,
+        isSingleUpdate: false
+      });
 
       MyAnimeListService.enqueueListUpdate({
         providerId: Provider.MY_ANIME_LIST,
