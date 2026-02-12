@@ -37,8 +37,8 @@ const SearchInput: FC<SearchInputProps> = ({ value, onChange }) => {
       slotProps={{
         input: {
           endAdornment: (
-            <InputAdornment position="end" sx={{}}>
-              <X size={14} cursor="pointer" />
+            <InputAdornment position="end">
+              <X size={14} cursor="pointer" onClick={() => onChange('')} />
             </InputAdornment>
           )
         }
