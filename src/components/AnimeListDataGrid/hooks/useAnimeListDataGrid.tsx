@@ -92,6 +92,7 @@ const useAnimeListDataGrid = ({
         header: 'List',
         size: 60,
         enableSorting: false,
+        enableGlobalFilter: false,
         getGroupingValue: (row) => getUserStatusLabel(row.userStatus),
         Cell: ({ cell }) => {
           const value = cell.getValue<AnimeListUserStatus>();
@@ -144,6 +145,7 @@ const useAnimeListDataGrid = ({
         accessorKey: 'userEpisodesWatched',
         header: 'Progress',
         size: 200,
+        enableGlobalFilter: false,
         Cell: ({ cell, row }) => {
           const watched = cell.getValue<number>();
           return (
@@ -168,6 +170,7 @@ const useAnimeListDataGrid = ({
         accessorKey: 'userScore',
         header: 'Score',
         size: 85,
+        enableGlobalFilter: false,
         Cell: ({ cell, row }) => {
           const score = cell.getValue<number>();
 
@@ -305,6 +308,8 @@ const useAnimeListDataGrid = ({
     enableGrouping: true,
     enableColumnOrdering: false,
     enableColumnPinning: false,
+    enableColumnDragging: false,
+    globalFilterFn: 'includesString',
     groupedColumnMode: 'remove',
     state: {
       isLoading,
