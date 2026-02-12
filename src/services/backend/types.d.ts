@@ -1,56 +1,13 @@
-export type AnimeListStatus =
-  | 'Finished Airing'
-  | 'Not Yet Aired'
-  | 'Currently Airing';
-
-export type AnimeListUserStatus =
-  | 'watching'
-  | 'completed'
-  | 'onHold'
-  | 'dropped'
-  | 'planToWatch';
-
-export type AnimeListBroadcast = {
-  dayOfTheWeek: string | null;
-  startTime: string | null;
-};
-
-export interface IAnimeList {
-  // Anime-specific fields
-  id: number;
-  title: string;
-  imageUrl: string;
-  synopsis: string;
-  alternativeTitles: string;
-  score: number;
-  source: string;
-  status: AnimeListStatus;
-  totalEpisodes: number;
-  genres: string;
-  startSeason: string;
-  startDate: string | null;
-  broadcast: AnimeListBroadcast;
-  studios: string;
-  mediaType: string;
-  // User-specific fields
-  userStatus: AnimeListUserStatus;
-  userScore: number;
-  userEpisodesWatched: number;
-  isRewatching: boolean;
-  userStartDate?: string;
-  userFinishDate?: string;
-  updatedAt?: string;
-}
+import {
+  AnimeListUserStatus,
+  IAnimeList,
+  IAnimeUserList
+} from '@/types/AnimeList';
+import { Provider } from '@/types/List';
 
 export type SynchronizedAnimeList = Record<AnimeListUserStatus, IAnimeList[]>;
 
-export interface AnimeListUpdateRequest {
-  providerId: string;
+export interface AnimeListUpdateRequest extends Partial<IAnimeUserList> {
+  providerId: Provider;
   entryId: number;
-  userStatus?: AnimeListUserStatus;
-  userScore?: number;
-  userEpisodesWatched?: number;
-  isRewatching?: boolean;
-  userStartDate?: string;
-  userFinishDate?: string;
 }

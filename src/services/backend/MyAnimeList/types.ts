@@ -86,6 +86,8 @@ export interface MyAnimeListListEntry {
     score?: number;
     num_episodes_watched?: number;
     is_rewatching?: boolean;
+    comments?: string;
+    num_times_rewatched?: number;
     updated_at?: string;
     start_date?: string;
     finish_date?: string;

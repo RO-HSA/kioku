@@ -1,7 +1,7 @@
 import { TZDate } from '@date-fns/tz';
 import { differenceInWeeks } from 'date-fns';
 
-import { AnimeListBroadcast } from '@/services/backend/types';
+import { AnimeListBroadcast } from '@/types/AnimeList';
 
 export const estimateBroadcastedEpisodes = (
   total: number,

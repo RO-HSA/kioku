@@ -1,19 +1,21 @@
-import { Tooltip } from '@mui/material';
+import { Box, SelectChangeEvent, Tooltip } from '@mui/material';
 import { SquareCheck, SquarePlay, SquareStop } from 'lucide-react';
 import { MRT_ColumnDef, useMaterialReactTable } from 'material-react-table';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import ProgressStatus from '@/components/AnimeListDataGrid/components/ProgressStatus';
+import { SynchronizedAnimeList } from '@/services/backend/types';
+import { useAnimeDetailsStore } from '@/stores/animeDetails';
+import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
+import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import {
   AnimeListStatus,
   AnimeListUserStatus,
-  IAnimeList,
-  SynchronizedAnimeList
-} from '@/services/backend/types';
-import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
+  IAnimeList
+} from '@/types/AnimeList';
+import ScoreSelect from '../../ScoreSelect';
 import CustomTopToolbar from '../components/CustomTopToolbar';
 import MediaType from '../components/MediaType';
-import ScoreSelect from '../components/ScoreSelect';
 import StartSeason from '../components/StartSeason';
 import useMaterialTableTheme from './useMaterialTableTheme';
 
@@ -36,6 +38,12 @@ const useAnimeListDataGrid = ({
     (state) => state.selectedStatus
   );
   const searchValue = useAnimeListDataGridStore((state) => state.searchValue);
+  const openAnimeDetails = useAnimeDetailsStore((state) => state.setIsOpen);
+  const setSelectedAnime = useAnimeDetailsStore(
+    (state) => state.setSelectedAnime
+  );
+
+  const setScore = useMyAnimeListStore((state) => state.setScore);
 
   const {
     mrtTheme,
@@ -60,8 +68,37 @@ const useAnimeListDataGrid = ({
     }
   };
 
+  const getUserStatusLabel = (status: AnimeListUserStatus) => {
+    switch (status) {
+      case 'watching':
+        return 'Watching';
+      case 'completed':
+        return 'Completed';
+      case 'onHold':
+        return 'On Hold';
+      case 'dropped':
+        return 'Dropped';
+      case 'planToWatch':
+        return 'Plan To Watch';
+      default:
+        return status;
+    }
+  };
+
   const columns = useMemo<MRT_ColumnDef<IAnimeList>[]>(
     () => [
+      {
+        accessorKey: 'userStatus',
+        header: 'List',
+        size: 60,
+        enableSorting: false,
+        enableGlobalFilter: false,
+        getGroupingValue: (row) => getUserStatusLabel(row.userStatus),
+        Cell: ({ cell }) => {
+          const value = cell.getValue<AnimeListUserStatus>();
+          return value ? getUserStatusLabel(value) : '';
+        }
+      },
       {
         accessorKey: 'status',
         header: '',
@@ -108,6 +145,7 @@ const useAnimeListDataGrid = ({
         accessorKey: 'userEpisodesWatched',
         header: 'Progress',
         size: 200,
+        enableGlobalFilter: false,
         Cell: ({ cell, row }) => {
           const watched = cell.getValue<number>();
           return (
@@ -132,15 +170,20 @@ const useAnimeListDataGrid = ({
         accessorKey: 'userScore',
         header: 'Score',
         size: 85,
+        enableGlobalFilter: false,
         Cell: ({ cell, row }) => {
           const score = cell.getValue<number>();
 
+          const handleChange = (event: SelectChangeEvent<number>) => {
+            const { value } = event.target;
+
+            setScore(row.original.id, row.original.userStatus, value);
+          };
+
           return (
-            <ScoreSelect
-              score={score}
-              animeId={row.original.id}
-              status={row.original.userStatus}
-            />
+            <Box width="100%">
+              <ScoreSelect fullWidth score={score} onChange={handleChange} />
+            </Box>
           );
         }
       },
@@ -167,7 +210,27 @@ const useAnimeListDataGrid = ({
     [onProgressChange]
   );
 
+  const allData = useMemo(() => {
+    if (!listData) {
+      return [];
+    }
+
+    return [
+      ...listData.watching,
+      ...listData.completed,
+      ...listData.onHold,
+      ...listData.dropped,
+      ...listData.planToWatch
+    ];
+  }, [listData]);
+
+  const shouldGroupByStatus = searchValue.trim().length > 0;
+
   const data = useMemo(() => {
+    if (shouldGroupByStatus) {
+      return allData;
+    }
+
     switch (selectedUserStatus) {
       case 'watching':
         return listData?.watching || [];
@@ -182,7 +245,20 @@ const useAnimeListDataGrid = ({
       default:
         return [];
     }
-  }, [listData, selectedUserStatus]);
+  }, [allData, listData, selectedUserStatus, shouldGroupByStatus]);
+
+  const grouping = useMemo(
+    () => (shouldGroupByStatus ? ['userStatus'] : []),
+    [shouldGroupByStatus]
+  );
+
+  const handleOpenAnimeDetails = useCallback(
+    (anime: IAnimeList) => {
+      setSelectedAnime(anime);
+      openAnimeDetails(true);
+    },
+    [openAnimeDetails, setSelectedAnime]
+  );
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -194,15 +270,28 @@ const useAnimeListDataGrid = ({
     columns,
     data,
     initialState: {
-      density: 'compact'
+      density: 'compact',
+      columnVisibility: {
+        userStatus: false
+      },
+      expanded: true
     },
     mrtTheme,
     muiTablePaperProps,
     muiTableContainerProps,
     muiTableHeadCellProps,
-    muiTableBodyCellProps,
     muiTableBodyRowProps,
     muiTopToolbarProps,
+    muiTableBodyCellProps: ({ cell }) => ({
+      ...muiTableBodyCellProps,
+      onDoubleClick: () => {
+        if (cell.row.getIsGrouped()) {
+          return;
+        }
+
+        handleOpenAnimeDetails(cell.row.original);
+      }
+    }),
     renderTopToolbar: () => (
       <CustomTopToolbar listData={listData} table={table} />
     ),
@@ -216,7 +305,17 @@ const useAnimeListDataGrid = ({
     enableBottomToolbar: false,
     enableRowVirtualization: true,
     enableColumnActions: false,
-    state: { isLoading, globalFilter: searchValue },
+    enableGrouping: true,
+    enableColumnOrdering: false,
+    enableColumnPinning: false,
+    enableColumnDragging: false,
+    globalFilterFn: 'includesString',
+    groupedColumnMode: 'remove',
+    state: {
+      isLoading,
+      globalFilter: searchValue,
+      grouping
+    },
     rowVirtualizerOptions: { overscan: 5 }
   });
 

@@ -1,6 +1,7 @@
-import { AnimeListUserStatus } from '@/services/backend/types';
 import { createTauriStore } from '@tauri-store/zustand';
 import { create } from 'zustand';
+
+import { AnimeListUserStatus } from '@/types/AnimeList';
 
 type AnimeListDataGridStore = {
   searchValue: string;

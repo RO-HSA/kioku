@@ -1,7 +1,8 @@
-import { AnimeListUserStatus } from '@/services/backend/types';
 import { Box } from '@mui/material';
 import { Minus, Plus } from 'lucide-react';
 import { FC } from 'react';
+
+import { AnimeListUserStatus } from '@/types/AnimeList';
 
 export interface ProgressControlsProps {
   progress: number;

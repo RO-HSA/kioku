@@ -8,7 +8,7 @@ use crate::services::anime_list_updates::AnimeListUpdateRequest;
 
 const BASE_URL: &str = "https://api.myanimelist.net/v2/users/";
 const UPDATE_BASE_URL: &str = "https://api.myanimelist.net/v2/anime/";
-const FIELDS: &str = "list_status,synopsis,alternative_titles,source,num_episodes,nsfw,start_season,media_type,studios,mean,status,genres,broadcast,start_date";
+const FIELDS: &str = "list_status{comments,num_times_rewatched},synopsis,alternative_titles,source,num_episodes,nsfw,start_season,media_type,studios,mean,status,genres,broadcast,start_date";
 const LIMIT: u32 = 1000;
 
 #[derive(Deserialize)]
@@ -98,6 +98,8 @@ struct MalListStatus {
     score: Option<u32>,
     num_episodes_watched: Option<u32>,
     is_rewatching: Option<bool>,
+    comments: Option<String>,
+    num_times_rewatched: Option<u32>,
     updated_at: Option<String>,
     start_date: Option<String>,
     finish_date: Option<String>,
@@ -125,6 +127,8 @@ pub struct AnimeListItem {
     user_score: u32,
     user_episodes_watched: u32,
     is_rewatching: bool,
+    user_comments: String,
+    user_num_times_rewatched: u32,
     user_start_date: Option<String>,
     user_finish_date: Option<String>,
     updated_at: Option<String>,
@@ -293,28 +297,35 @@ fn build_alternative_titles(alt: Option<MalAlternativeTitles>) -> String {
         return "Unknown".to_string();
     };
 
-    let mut result = String::new();
+    let mut parts: Vec<String> = Vec::new();
 
     if let Some(en) = alt.en {
-        result.push_str(&en);
-        result.push_str(", ");
-    }
-
-    if let Some(ja) = alt.ja {
-        result.push_str(&ja);
-        result.push_str(", ");
-    }
-
-    if let Some(synonyms) = alt.synonyms {
-        if !synonyms.is_empty() {
-            result.push_str(&synonyms.join(", "));
+        let trimmed = en.trim();
+        if !trimmed.is_empty() {
+            parts.push(trimmed.to_string());
         }
     }
 
-    if result.is_empty() {
+    if let Some(ja) = alt.ja {
+        let trimmed = ja.trim();
+        if !trimmed.is_empty() {
+            parts.push(trimmed.to_string());
+        }
+    }
+
+    if let Some(synonyms) = alt.synonyms {
+        for synonym in synonyms {
+            let trimmed = synonym.trim();
+            if !trimmed.is_empty() {
+                parts.push(trimmed.to_string());
+            }
+        }
+    }
+
+    if parts.is_empty() {
         "Unknown".to_string()
     } else {
-        result
+        parts.join(", ")
     }
 }
 
@@ -385,6 +396,8 @@ fn map_entry_to_domain(entry: MalListEntry, status_key: UserStatusKey) -> AnimeL
         user_score: list_status.score.unwrap_or(0),
         user_episodes_watched: list_status.num_episodes_watched.unwrap_or(0),
         is_rewatching: list_status.is_rewatching.unwrap_or(false),
+        user_comments: list_status.comments.unwrap_or_default(),
+        user_num_times_rewatched: list_status.num_times_rewatched.unwrap_or(0),
         user_start_date: list_status.start_date,
         user_finish_date: list_status.finish_date,
         updated_at: list_status.updated_at,
@@ -460,6 +473,18 @@ pub async fn update_myanimelist_list_entry(
 
     if let Some(is_rewatching) = update.is_rewatching {
         params.push(("is_rewatching".to_string(), is_rewatching.to_string()));
+    }
+
+    if let Some(comments) = update.user_comments.as_ref() {
+        params.push(("comments".to_string(), comments.to_string()));
+    }
+
+    if let Some(num_times_rewatched) = update.user_num_times_rewatched {
+        let clamped = num_times_rewatched.min(5);
+        params.push((
+            "num_times_rewatched".to_string(),
+            clamped.to_string(),
+        ));
     }
 
     if let Some(start_date) = update.user_start_date.as_ref() {

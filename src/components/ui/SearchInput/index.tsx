@@ -1,38 +1,48 @@
-import { TextField } from '@mui/material';
-import debounce from 'debounce';
-import { ChangeEvent, FC, useEffect, useMemo, useState } from 'react';
+import { InputAdornment, TextField } from '@mui/material';
+import { X } from 'lucide-react';
+import { ChangeEvent, FC, KeyboardEvent } from 'react';
 
 interface SearchInputProps {
-  onDebounceEnd: (value: string) => void;
+  value: string;
+  onChange: (value: string) => void;
 }
 
-const SearchInput: FC<SearchInputProps> = ({ onDebounceEnd }) => {
-  const [internalValue, setInternalValue] = useState('');
-
-  const debouncedOnChange = useMemo(
-    () => debounce((value: string) => onDebounceEnd(value), 200),
-    [onDebounceEnd]
-  );
-
-  useEffect(() => {
-    return () => debouncedOnChange.clear();
-  }, [debouncedOnChange]);
-
+const SearchInput: FC<SearchInputProps> = ({ value, onChange }) => {
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
 
-    setInternalValue(value);
-    debouncedOnChange(value);
+    onChange(value);
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Escape') {
+      event.stopPropagation();
+    }
   };
 
   return (
     <TextField
       label="Search"
       variant="outlined"
-      value={internalValue}
+      value={value}
       onChange={handleChange}
+      onKeyDown={handleKeyDown}
       fullWidth
       size="small"
+      sx={{
+        '& .MuiInputAdornment-root': {
+          visibility: value.length > 0 ? 'visible' : 'hidden'
+        }
+      }}
+      slotProps={{
+        input: {
+          endAdornment: (
+            <InputAdornment position="end">
+              <X size={14} cursor="pointer" onClick={() => onChange('')} />
+            </InputAdornment>
+          )
+        }
+      }}
     />
   );
 };
