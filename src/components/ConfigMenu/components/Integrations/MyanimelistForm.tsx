@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button';
 import useMyanimelistCallback from '@/hooks/integrations/useMyanimelistCallback';
 import { MyAnimeListService } from '@/services/backend/MyAnimeList';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
+import { openUrl } from '@tauri-apps/plugin-opener';
 
 type FormData = {
   username: string;
@@ -68,6 +69,14 @@ const MyanimelistForm = () => {
           isDisabled={isDisabled}
           isLoading={isDisabled}>
           {!isAuthenticated ? 'Authorize' : 'Re-authorize'}
+        </Button>
+      </div>
+
+      <div>
+        <Button
+          variant="ghost"
+          onClick={() => openUrl('https://myanimelist.net/register.php')}>
+          Create a new MyAnimeList account{' '}
         </Button>
       </div>
     </form>
