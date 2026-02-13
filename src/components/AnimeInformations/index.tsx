@@ -9,10 +9,13 @@ import {
   Tabs,
   Typography
 } from '@mui/material';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { X } from 'lucide-react';
+import { useCallback, useState } from 'react';
 
 import { useAnimeDetailsStore } from '@/stores/animeDetails';
-import { useCallback, useState } from 'react';
+import { Provider } from '@/types/List';
+import { buildUrl } from '@/utils/url';
 import Button from '../ui/Button';
 import AnimeListForm from './components/AnimeListForm';
 import Details from './components/Details';
@@ -59,6 +62,10 @@ const AnimeInformations = () => {
     setSelectedTab(0);
   };
 
+  const handleOpenInBrowser = async () => {
+    await openUrl(buildUrl(Provider.MY_ANIME_LIST, 'anime', selectedAnime.id));
+  };
+
   return (
     <Dialog open={isOpen} onClose={handleClose} fullWidth maxWidth="md">
       <DialogTitle className="flex justify-between items-center">
@@ -80,18 +87,23 @@ const AnimeInformations = () => {
             }}>
             <div className="p-0.5 border border-dashed border-primary rounded-md inline-block">
               <img
-                className="w-36 h-52 object-fill rounded-md"
+                className="w-36 h-52 object-fill rounded-md cursor-pointer"
                 src={imageUrl}
                 alt={title}
+                onClick={handleOpenInBrowser}
               />
             </div>
           </Grid>
 
           <Grid size={{ xs: 12, sm: 'grow' }} className="min-w-0">
             <div className="flex flex-col gap-1">
-              <Typography variant="body1" color="primary">
-                {title}
-              </Typography>
+              <div className="flex">
+                <span className="cursor-pointer" onClick={handleOpenInBrowser}>
+                  <Typography variant="body1" color="primary">
+                    {title}
+                  </Typography>
+                </span>
+              </div>
 
               <div className="flex flex-col gap-2 self-start w-full">
                 <Tabs
