@@ -1,4 +1,4 @@
-import { TextField, Typography } from '@mui/material';
+import { TextField } from '@mui/material';
 import { useForm } from 'react-hook-form';
 
 import Button from '@/components/ui/Button';
@@ -46,10 +46,9 @@ const MyanimelistForm = () => {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-2">
-      <Typography variant="h6">MyAnimeList</Typography>
-
       <div className="flex gap-1">
         <TextField
+          className="max-w-xs w-full"
           error={!!errors.username}
           helperText={errors.username ? errors.username.message : ''}
           {...register('username', {
@@ -62,16 +61,14 @@ const MyanimelistForm = () => {
           onChange={(e) => setUsername(e.target.value)}
         />
 
-        <div>
-          <Button
-            variant="primary"
-            size="medium"
-            type="submit"
-            isDisabled={isDisabled}
-            isLoading={isDisabled}>
-            {!isAuthenticated ? 'Authorize' : 'Re-authorize'}
-          </Button>
-        </div>
+        <Button
+          variant="primary"
+          size="small"
+          type="submit"
+          isDisabled={isDisabled}
+          isLoading={isDisabled}>
+          {!isAuthenticated ? 'Authorize' : 'Re-authorize'}
+        </Button>
       </div>
     </form>
   );
