@@ -31,11 +31,13 @@ const InternalButton: FC<InternalButtonProps> = ({
       disabled={isDisabled}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
-        'flex w-full items-center justify-center gap-3 cursor-pointer rounded-xl px-3 py-2 text-left text-sm font-medium transition-[colors, gap] duration-200 ease-in-out',
+        'flex w-full items-center justify-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium transition-[colors, gap] duration-200 ease-in-out cursor-pointer',
         className,
-        isActive
-          ? 'bg-primary/10 text-primary'
-          : 'text-text-secondary hover:bg-primary/5 hover:text-text-primary',
+        isDisabled
+          ? 'cursor-not-allowed opacity-45 text-text-disabled'
+          : isActive
+            ? 'bg-primary/10 text-primary'
+            : 'text-text-secondary hover:bg-primary/5 hover:text-text-primary',
         !isSidebarOpen && 'justify-center gap-0'
       )}>
       <Icon className="size-5 shrink-0 justify-self-center" />
