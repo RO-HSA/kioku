@@ -77,20 +77,22 @@ const PlayerDetectionForm = () => {
 
       <div className="border border-primary/25 p-2 rounded-sm max-h-86.5 overflow-hidden">
         <FormControl className="w-full">
-          <FormControlLabel
-            label="Enable all"
-            control={
-              <Checkbox
-                size="small"
-                checked={enabledPlayers.length === PLAYER_OPTIONS.length}
-                indeterminate={
-                  enabledPlayers.length > 0 &&
-                  enabledPlayers.length < PLAYER_OPTIONS.length
-                }
-                onChange={(_, checked) => toggleAllPlayers(checked)}
-              />
-            }
-          />
+          <div>
+            <FormControlLabel
+              label="Enable all"
+              control={
+                <Checkbox
+                  size="small"
+                  checked={enabledPlayers.length === PLAYER_OPTIONS.length}
+                  indeterminate={
+                    enabledPlayers.length > 0 &&
+                    enabledPlayers.length < PLAYER_OPTIONS.length
+                  }
+                  onChange={(_, checked) => toggleAllPlayers(checked)}
+                />
+              }
+            />
+          </div>
 
           <Typography variant="caption" className="text-text-disabled">
             Select only the players you actually use, disable the others.

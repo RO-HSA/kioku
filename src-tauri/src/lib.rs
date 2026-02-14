@@ -1,5 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use std::time::Duration;
+use serde::Deserialize;
 use tauri::Manager;
 use tauri_plugin_zustand::ManagerExt;
 
@@ -17,8 +18,33 @@ use crate::services::anime_list_updates::{enqueue_anime_list_update, AnimeListUp
 use crate::services::myanimelist::synchronize_myanimelist;
 use crate::services::player_detection::{
     configure_playback_observer, detect_playing_anime, get_playback_observer_state,
-    start_playback_observer, PlaybackObserverState,
+    start_playback_observer, PlaybackObserverState, SupportedPlayer,
 };
+
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct StoredConfigurationState {
+    #[serde(default)]
+    detection: StoredDetectionConfig,
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct StoredDetectionConfig {
+    #[serde(default)]
+    player_detection_enabled: bool,
+    #[serde(default)]
+    enabled_players: Vec<SupportedPlayer>,
+}
+
+fn read_playback_observer_bootstrap_config(app: &tauri::AppHandle) -> StoredDetectionConfig {
+    let stored_configuration: Option<StoredConfigurationState> =
+        app.zustand().get_or_default("configMenu", "configuration");
+
+    stored_configuration
+        .map(|configuration| configuration.detection)
+        .unwrap_or_default()
+}
 
 fn process_oauth_callback(app: tauri::AppHandle, url: String) {
     tauri::async_runtime::spawn(async move {
@@ -90,8 +116,16 @@ pub fn run() {
             }
 
             app.manage(AnimeListUpdateQueue::new(app.handle().clone()));
-            app.manage(PlaybackObserverState::new());
-            start_playback_observer(app.handle().clone());
+            let observer_config = read_playback_observer_bootstrap_config(&app.handle());
+            app.manage(PlaybackObserverState::new(
+                observer_config.player_detection_enabled,
+                observer_config.enabled_players,
+            ));
+
+            if observer_config.player_detection_enabled {
+                start_playback_observer(app.handle().clone());
+            }
+
             app.zustand().set_autosave(Duration::from_secs(300));
             Ok(())
         })

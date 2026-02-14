@@ -1,3 +1,4 @@
+import { PlayerDetectionService } from '@/services/backend/PlayerDetection';
 import { ConfigurationState } from '@/types/Configuration';
 import { ConfigMenuStep } from '@/types/Navigation';
 import { createTauriStore } from '@tauri-store/zustand';
@@ -32,7 +33,18 @@ export const useConfigMenuStore = create<ConfigMenuStore>((set) => ({
   setStep: (step: ConfigMenuStep) => set(() => ({ step })),
   setSelectedTab: (selectedTab: number) => set(() => ({ selectedTab })),
   setConfiguration: (configuration: ConfigurationState) =>
-    set(() => ({ configuration }))
+    set(() => {
+      PlayerDetectionService.configurePlaybackObserver({
+        enabled: configuration.detection.playerDetectionEnabled,
+        players: configuration.detection.enabledPlayers
+      });
+      return { configuration };
+    })
 }));
 
-export const tauriHandler = createTauriStore('configMenu', useConfigMenuStore);
+export const tauriHandler = createTauriStore('configMenu', useConfigMenuStore, {
+  autoStart: true,
+  saveOnChange: true,
+  filterKeys: ['configuration'],
+  filterKeysStrategy: 'pick'
+});

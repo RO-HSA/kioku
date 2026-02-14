@@ -55,6 +55,7 @@ pub struct PlaybackObserverSnapshot {
     pub observed_process_id: Option<u32>,
     pub observed_player: Option<SupportedPlayer>,
     pub selected_players: Vec<SupportedPlayer>,
+    pub enabled: bool,
     pub poll_interval_ms: u64,
     pub last_error: Option<String>,
 }
@@ -62,6 +63,7 @@ pub struct PlaybackObserverSnapshot {
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfigurePlaybackObserverRequest {
+    pub enabled: Option<bool>,
     pub players: Option<Vec<SupportedPlayer>>,
     pub poll_interval_ms: Option<u64>,
 }

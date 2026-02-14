@@ -25,3 +25,20 @@ export interface AnimePlaybackDetection {
   animeTitle: string;
   episode: number | null;
 }
+
+export interface ConfigurePlaybackObserverRequest {
+  enabled?: boolean;
+  players?: SupportedPlayer[];
+  pollIntervalMs?: number;
+}
+
+export interface PlaybackObserverSnapshot {
+  active: AnimePlaybackDetection | null;
+  lastObserved: AnimePlaybackDetection | null;
+  observedProcessId: number | null;
+  observedPlayer: SupportedPlayer | null;
+  selectedPlayers: SupportedPlayer[];
+  enabled: boolean;
+  pollIntervalMs: number;
+  lastError: string | null;
+}
