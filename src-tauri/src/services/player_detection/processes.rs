@@ -1,6 +1,8 @@
 use serde::Deserialize;
 #[cfg(any(windows, target_os = "macos"))]
 use std::process::Command;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 
 use super::util::split_command_line;
 
@@ -22,13 +24,16 @@ struct WindowsProcess {
 }
 
 #[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+#[cfg(windows)]
 pub(crate) fn list_processes() -> Result<Vec<ProcessSnapshot>, String> {
     let script = r#"
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     $targets = @('mpv.exe','mpvnet.exe','mpc-hc.exe','mpc-hc64.exe','mpc-be.exe','mpc-be64.exe')
-    $processes = Get-CimInstance Win32_Process |
-    Where-Object { $targets -contains $_.Name.ToLower() } |
-    Select-Object ProcessId, Name, CommandLine
+    $nameFilter = ($targets | ForEach-Object { "Name='$_'" }) -join ' OR '
+    $query = "SELECT ProcessId, Name, CommandLine FROM Win32_Process WHERE $nameFilter"
+    $processes = Get-CimInstance -Query $query
 
     if ($null -eq $processes) {
       '[]'
@@ -37,8 +42,18 @@ pub(crate) fn list_processes() -> Result<Vec<ProcessSnapshot>, String> {
     }
     "#;
 
-    let output = Command::new("powershell")
-        .args(["-NoProfile", "-Command", script])
+    let mut command = Command::new("powershell");
+    let output = command
+        .args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            script,
+        ])
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map_err(|error| format!("Failed to list running processes: {error}"))?;
 
