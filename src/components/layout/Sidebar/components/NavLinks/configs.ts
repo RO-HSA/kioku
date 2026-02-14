@@ -1,11 +1,16 @@
-import { List } from 'lucide-react';
+import { Film, List } from 'lucide-react';
 
-import { SidebarNavigationStep } from '@/types/Navigation';
+import { INavLink } from '@/types/Navigation';
 
-export const navLinks = [
+export const navLinks: INavLink[] = [
+  {
+    label: 'Now Playing',
+    icon: Film,
+    link: '/now-playing'
+  },
   {
     label: 'Anime List',
-    step: SidebarNavigationStep.ANIME_LIST,
-    icon: List
+    icon: List,
+    link: '/'
   }
 ];

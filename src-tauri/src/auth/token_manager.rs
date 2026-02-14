@@ -154,10 +154,7 @@ impl TokenManagerState {
         Ok(())
     }
 
-    pub fn take_pkce_state(
-        &self,
-        state: &str,
-    ) -> Result<Option<(String, String)>, String> {
+    pub fn take_pkce_state(&self, state: &str) -> Result<Option<(String, String)>, String> {
         let mut guard = self
             .0
             .lock()
@@ -220,8 +217,11 @@ pub fn store_tokens(
     provider_id: &str,
     response: &TokenResponse,
 ) -> Result<(), String> {
-    app.state::<TokenManagerState>()
-        .set_access_token(provider_id, response.access_token.clone(), response.expires_in)?;
+    app.state::<TokenManagerState>().set_access_token(
+        provider_id,
+        response.access_token.clone(),
+        response.expires_in,
+    )?;
 
     if let Some(refresh_token) = response.refresh_token.as_ref() {
         save_refresh_token(app, provider_id, refresh_token)?;
@@ -261,8 +261,7 @@ pub fn build_authorize_url(
     params.push(("client_id".to_string(), client_id));
 
     if use_pkce {
-        let challenge = code_challenge
-            .ok_or_else(|| "Missing PKCE code challenge".to_string())?;
+        let challenge = code_challenge.ok_or_else(|| "Missing PKCE code challenge".to_string())?;
         params.push(("code_challenge".to_string(), challenge.to_string()));
     }
 
@@ -290,7 +289,6 @@ pub async fn exchange_authorization_code(
         token_extra_params,
         ..
     } = app.state::<TokenManagerState>().get_provider(provider_id)?;
-    
 
     if use_pkce && code_verifier.is_none() {
         return Err("Missing PKCE code verifier".to_string());
@@ -318,8 +316,7 @@ pub async fn exchange_authorization_code(
         return Err(format!("Token exchange failed: {} - {}", status, body));
     }
 
-    let token_response =
-        serde_json::from_str::<TokenResponse>(&body).map_err(|e| e.to_string())?;
+    let token_response = serde_json::from_str::<TokenResponse>(&body).map_err(|e| e.to_string())?;
 
     store_tokens(app, provider_id, &token_response)?;
     Ok(token_response)
@@ -337,12 +334,9 @@ async fn refresh_access_token(app: &AppHandle, provider_id: &str) -> Result<Stri
         authorize_extra_params: _,
         token_extra_params: _,
         refresh_extra_params,
-    } = app
-        .state::<TokenManagerState>()
-        .get_provider(provider_id)?;
+    } = app.state::<TokenManagerState>().get_provider(provider_id)?;
 
-    let mut params: Vec<(String, String)> =
-        Vec::with_capacity(3 + refresh_extra_params.len());
+    let mut params: Vec<(String, String)> = Vec::with_capacity(3 + refresh_extra_params.len());
     params.push(("client_id".to_string(), client_id));
     params.push(("grant_type".to_string(), "refresh_token".to_string()));
     params.push(("refresh_token".to_string(), refresh_token));

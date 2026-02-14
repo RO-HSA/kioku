@@ -334,7 +334,11 @@ fn format_start_season(start: Option<MalStartSeason>) -> String {
         return "Unknown".to_string();
     };
 
-    let season_missing = start.season.as_deref().map(|s| s.is_empty()).unwrap_or(true);
+    let season_missing = start
+        .season
+        .as_deref()
+        .map(|s| s.is_empty())
+        .unwrap_or(true);
     let year_missing = start.year.is_none();
 
     if season_missing && year_missing {
@@ -431,8 +435,7 @@ async fn fetch_all_into(
             ));
         }
 
-        let parsed: MalListResponse =
-            response.json().await.map_err(|e| e.to_string())?;
+        let parsed: MalListResponse = response.json().await.map_err(|e| e.to_string())?;
 
         for entry in parsed.data {
             let status_key = UserStatusKey::from_mal(entry.list_status.status.as_deref());
@@ -481,10 +484,7 @@ pub async fn update_myanimelist_list_entry(
 
     if let Some(num_times_rewatched) = update.user_num_times_rewatched {
         let clamped = num_times_rewatched.min(5);
-        params.push((
-            "num_times_rewatched".to_string(),
-            clamped.to_string(),
-        ));
+        params.push(("num_times_rewatched".to_string(), clamped.to_string()));
     }
 
     if let Some(start_date) = update.user_start_date.as_ref() {
@@ -517,10 +517,7 @@ pub async fn update_myanimelist_list_entry(
     let status = response.status();
     if !status.is_success() {
         let body = response.text().await.map_err(|e| e.to_string())?;
-        return Err(format!(
-            "MyAnimeList update failed: {} - {}",
-            status, body
-        ));
+        return Err(format!("MyAnimeList update failed: {} - {}", status, body));
     }
 
     Ok(())
@@ -531,9 +528,7 @@ pub async fn synchronize_myanimelist(
     app: tauri::AppHandle,
 ) -> Result<SynchronizedAnimeList, String> {
     let token = get_access_token(&app, MAL_PROVIDER_ID).await?;
-    let username: Option<String> = app
-        .zustand()
-        .get_or_default("myanimelist", "username");
+    let username: Option<String> = app.zustand().get_or_default("myanimelist", "username");
     let username = username
         .and_then(|value| {
             let trimmed = value.trim();

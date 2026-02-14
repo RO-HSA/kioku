@@ -39,10 +39,7 @@ impl StrongholdKeyState {
 }
 
 fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    let dir = app
-        .path()
-        .app_local_data_dir()
-        .map_err(|e| e.to_string())?;
+    let dir = app.path().app_local_data_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
 }
@@ -78,9 +75,7 @@ fn load_or_create_master_key(app: &AppHandle) -> Result<Vec<u8>, String> {
             if matches!(err, keyring::Error::NoEntry) {
                 let key = generate_master_key();
                 let encoded = general_purpose::STANDARD.encode(&key);
-                entry
-                    .set_password(&encoded)
-                    .map_err(|e| e.to_string())?;
+                entry.set_password(&encoded).map_err(|e| e.to_string())?;
                 Ok(key)
             } else {
                 Err(err.to_string())

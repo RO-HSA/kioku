@@ -1,5 +1,6 @@
 import { useConfigMenuStore } from '@/stores/config/configMenu';
 import { ConfigMenuStep } from '@/types/Navigation';
+import Detection from '../Detection';
 import Integrations from '../Integrations';
 
 const MenuContent = () => {
@@ -9,12 +10,14 @@ const MenuContent = () => {
     switch (step) {
       case ConfigMenuStep.INTEGRATIONS:
         return <Integrations />;
+      case ConfigMenuStep.DETECTION:
+        return <Detection />;
       default:
         return null;
     }
   };
 
-  return <div className="px-3 pt-2 sm:pt-0">{getStepContent(step)}</div>;
+  return <div className="px-3 pt-2 sm:pt-0 w-full">{getStepContent(step)}</div>;
 };
 
 export default MenuContent;

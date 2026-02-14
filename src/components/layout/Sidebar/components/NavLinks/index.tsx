@@ -1,8 +1,10 @@
-import { type FC } from 'react';
+import { Divider } from '@mui/material';
+import { Fragment, type FC } from 'react';
+import { useLocation } from 'react-router';
 
 import NavButton from '@/components/NavButton';
+import { usePlayerDetectionStore } from '@/stores/playerDetection';
 import { useSidebarStore } from '@/stores/sidebar/sidebar';
-import { useSidebarNavigationStore } from '@/stores/sidebar/sidebarNavigation';
 import { navLinks } from './configs';
 
 interface NavLinksProps {
@@ -10,28 +12,28 @@ interface NavLinksProps {
 }
 
 const NavLinks: FC<NavLinksProps> = ({ onNavigate }) => {
+  const location = useLocation();
+
   const isSidebarOpen = useSidebarStore((state) => state.isOpen);
-  const navigationStep = useSidebarNavigationStore(
-    (state) => state.navigationStep
-  );
-  const setNavigationStep = useSidebarNavigationStore(
-    (state) => state.setNavigationStep
-  );
+  const activeEpisode = usePlayerDetectionStore((state) => state.activeEpisode);
 
   return (
     <div className="flex w-full flex-col gap-1">
-      {navLinks.map(({ step, icon, label }) => (
-        <NavButton
-          key={step}
-          isSidebarOpen={isSidebarOpen}
-          isActive={step === navigationStep}
-          Icon={icon}
-          label={label}
-          onClick={() => {
-            setNavigationStep(step);
-            onNavigate?.();
-          }}
-        />
+      {navLinks.map(({ icon, label, link }) => (
+        <Fragment key={label}>
+          <NavButton
+            isSidebarOpen={isSidebarOpen}
+            Icon={icon}
+            label={label}
+            link={link}
+            isActive={location.pathname === link}
+            isDisabled={label === 'Now Playing' && !activeEpisode}
+            onClick={() => {
+              onNavigate?.();
+            }}
+          />
+          {link === '/now-playing' && <Divider />}
+        </Fragment>
       ))}
     </div>
   );

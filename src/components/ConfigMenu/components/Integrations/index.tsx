@@ -1,10 +1,21 @@
-import MyanimelistForm from './Myanimelist';
+import { useConfigMenuStore } from '@/stores/config/configMenu';
+import MenuItem from '../MenuItem';
+import Section from '../Section';
+import MyanimelistForm from './MyanimelistForm';
+
+const tabs = ['MyAnimeList'];
 
 const Integrations = () => {
+  const selectedTab = useConfigMenuStore((state) => state.selectedTab);
+
   return (
-    <div className="flex flex-col gap-3">
-      <MyanimelistForm />
-    </div>
+    <MenuItem tabs={tabs}>
+      {selectedTab === 0 && (
+        <Section title="Account">
+          <MyanimelistForm />
+        </Section>
+      )}
+    </MenuItem>
   );
 };
 
