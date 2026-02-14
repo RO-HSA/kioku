@@ -68,81 +68,83 @@ const NowPlaying = () => {
   };
 
   return (
-    <Container>
+    <Container className="h-full min-h-0 flex flex-col py-4">
       <Typography variant="h6" component="h1" color="primary" gutterBottom>
         Now Playing
       </Typography>
 
-      {!animePlaying && (
-        <Typography variant="body2" color="textSecondary">
-          No episode detected right now.
-        </Typography>
-      )}
+      <Box className="flex-1 min-h-0 overflow-y-auto pr-1">
+        {!animePlaying && (
+          <Typography variant="body2" color="textSecondary">
+            No episode detected right now.
+          </Typography>
+        )}
 
-      {exactAnimeMatch && (
-        <Grid container spacing={2} width="100%!important" size="auto">
-          <Grid
-            size={{ xs: 12, sm: 'auto' }}
-            sx={{
-              width: { sm: 150 },
-              flexBasis: { sm: 150 },
-              maxWidth: { sm: 150 }
-            }}>
-            <AnimeCover
-              title={exactAnimeMatch.title}
-              imageUrl={exactAnimeMatch.imageUrl}
-              url={buildUrl(
-                Provider.MY_ANIME_LIST,
-                'anime',
-                exactAnimeMatch.id
-              )}
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, sm: 'grow' }} className="min-w-0">
-            <div className="flex flex-col gap-1">
-              <AnimeTitle
+        {exactAnimeMatch && (
+          <Grid container spacing={2} width="100%!important" size="auto">
+            <Grid
+              size={{ xs: 12, sm: 'auto' }}
+              sx={{
+                width: { sm: 150 },
+                flexBasis: { sm: 150 },
+                maxWidth: { sm: 150 }
+              }}>
+              <AnimeCover
+                title={exactAnimeMatch.title}
+                imageUrl={exactAnimeMatch.imageUrl}
                 url={buildUrl(
                   Provider.MY_ANIME_LIST,
                   'anime',
                   exactAnimeMatch.id
-                )}>
-                {exactAnimeMatch.title}
-              </AnimeTitle>
-            </div>
+                )}
+              />
+            </Grid>
 
-            <div className="flex flex-col gap-2 self-start w-full">
-              <MainInformation anime={exactAnimeMatch} />
-            </div>
+            <Grid size={{ xs: 12, sm: 'grow' }} className="min-w-0">
+              <div className="flex flex-col gap-1 pb-2.5">
+                <AnimeTitle
+                  url={buildUrl(
+                    Provider.MY_ANIME_LIST,
+                    'anime',
+                    exactAnimeMatch.id
+                  )}>
+                  {exactAnimeMatch.title}
+                </AnimeTitle>
+              </div>
+
+              <div className="flex flex-col gap-2 self-start w-full">
+                <MainInformation anime={exactAnimeMatch} />
+              </div>
+            </Grid>
           </Grid>
-        </Grid>
-      )}
+        )}
 
-      {animePlaying && !exactAnimeMatch && suggestedMatches.length > 0 && (
-        <Box className="flex flex-col gap-2">
-          <Typography variant="subtitle2">
-            We could not find an exact match. Select the correct anime:
-          </Typography>
+        {animePlaying && !exactAnimeMatch && suggestedMatches.length > 0 && (
+          <Box className="flex flex-col gap-2">
+            <Typography variant="subtitle2">
+              We could not find an exact match. Select the correct anime:
+            </Typography>
 
-          <Box className="flex flex-wrap gap-2">
-            {suggestedMatches.map((anime) => (
-              <Button
-                key={anime.id}
-                variant="secondary"
-                size="small"
-                onClick={() => handleSuggestionClick(anime.id)}>
-                {anime.title}
-              </Button>
-            ))}
+            <Box className="flex flex-wrap gap-2">
+              {suggestedMatches.map((anime) => (
+                <Button
+                  key={anime.id}
+                  variant="secondary"
+                  size="small"
+                  onClick={() => handleSuggestionClick(anime.id)}>
+                  {anime.title}
+                </Button>
+              ))}
+            </Box>
           </Box>
-        </Box>
-      )}
+        )}
 
-      {animePlaying && !exactAnimeMatch && suggestedMatches.length === 0 && (
-        <Typography variant="body2" color="textSecondary">
-          No close matches found in your list for this detected title.
-        </Typography>
-      )}
+        {animePlaying && !exactAnimeMatch && suggestedMatches.length === 0 && (
+          <Typography variant="body2" color="textSecondary">
+            No close matches found in your list for this detected title.
+          </Typography>
+        )}
+      </Box>
     </Container>
   );
 };
