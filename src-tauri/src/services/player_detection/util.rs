@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use super::types::SupportedPlayer;
 
 pub(crate) const DEFAULT_OBSERVER_POLL_INTERVAL_MS: u64 = 2_000;
@@ -5,14 +7,11 @@ pub(crate) const MIN_OBSERVER_POLL_INTERVAL_MS: u64 = 500;
 pub(crate) const MAX_OBSERVER_POLL_INTERVAL_MS: u64 = 60_000;
 
 pub(crate) fn dedup_players(players: Vec<SupportedPlayer>) -> Vec<SupportedPlayer> {
-    let mut unique_players = Vec::new();
-    for player in players {
-        if !unique_players.contains(&player) {
-            unique_players.push(player);
-        }
-    }
-
-    unique_players
+    let mut seen = HashSet::new();
+    players
+        .into_iter()
+        .filter(|player| seen.insert(*player))
+        .collect()
 }
 
 pub(crate) fn normalize_poll_interval_ms(value: u64) -> u64 {
