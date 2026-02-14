@@ -42,6 +42,7 @@ const NavContent: FC<NavContentProps> = ({ onClickCloseButton }) => {
             className="rounded-sm"
             label={label}
             isActive={step === menuStep}
+            isDisabled={false}
             isSidebarOpen
             Icon={icon}
             onClick={() => handleMenuItemClick(step)}

@@ -1,17 +1,13 @@
+import { Divider } from '@mui/material';
 import { Menu } from 'lucide-react';
-import { type FC, ReactNode } from 'react';
+import { Outlet } from 'react-router';
 
 import ConfigMenu from '@/components/ConfigMenu';
 import Sidebar from '@/components/layout/Sidebar';
 import Button from '@/components/ui/Button';
 import { useSidebarStore } from '@/stores/sidebar/sidebar';
-import { Divider } from '@mui/material';
 
-interface PageLayoutProps {
-  children: ReactNode;
-}
-
-const PageLayout: FC<PageLayoutProps> = ({ children }) => {
+const PageLayout = () => {
   const toggle = useSidebarStore((state) => state.toggle);
 
   return (
@@ -39,7 +35,9 @@ const PageLayout: FC<PageLayoutProps> = ({ children }) => {
         <Divider className="sm:hidden" />
 
         <main className="flex-1 min-h-0 min-w-0 overflow-hidden">
-          <div className="w-full h-full min-h-0">{children}</div>
+          <div className="w-full h-full min-h-0">
+            <Outlet />
+          </div>
         </main>
       </div>
 

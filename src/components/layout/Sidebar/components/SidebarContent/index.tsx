@@ -9,17 +9,15 @@ import useWindowSize from '@/hooks/useWindowSize';
 import { cn } from '@/lib/utils';
 import { useConfigMenuStore } from '@/stores/config/configMenu';
 import { useSidebarStore } from '@/stores/sidebar/sidebar';
-import { useSidebarNavigationStore } from '@/stores/sidebar/sidebarNavigation';
-import { SidebarNavigationStep } from '@/types/Navigation';
 import NavLinks from '../NavLinks';
 
 const SidebarContent = () => {
   const { isMobile } = useWindowSize();
+
   const isOpen = useSidebarStore((state) => state.isOpen);
   const toggle = useSidebarStore((state) => state.toggle);
-  const navigationStep = useSidebarNavigationStore(
-    (state) => state.navigationStep
-  );
+
+  const isConfigMenuOpen = useConfigMenuStore((state) => state.isOpen);
   const openConfigMenu = useConfigMenuStore((state) => state.openConfigMenu);
 
   return (
@@ -60,7 +58,8 @@ const SidebarContent = () => {
             Icon={Bolt}
             label="Settings"
             isSidebarOpen={isOpen}
-            isActive={navigationStep === SidebarNavigationStep.SETTINGS}
+            isActive={isConfigMenuOpen}
+            isDisabled={false}
             onClick={openConfigMenu}
           />
         </div>

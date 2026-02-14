@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tokio::sync::{Mutex, RwLock};
 
 use super::detector::{collect_detection_cycle_result, DetectionCycleResult};
@@ -9,6 +9,9 @@ use super::types::{
     SupportedPlayer,
 };
 use super::util::{dedup_players, normalize_poll_interval_ms, DEFAULT_OBSERVER_POLL_INTERVAL_MS};
+
+pub const PLAYBACK_EPISODE_DETECTED_EVENT: &str = "player-detection:episode-detected";
+pub const PLAYBACK_EPISODE_CLOSED_EVENT: &str = "player-detection:episode-closed";
 
 struct PlaybackObserverStateData {
     active: Option<AnimePlaybackDetection>,
@@ -96,8 +99,9 @@ impl PlaybackObserverState {
         app: tauri::AppHandle,
         request: ConfigurePlaybackObserverRequest,
     ) -> PlaybackObserverSnapshot {
-        let snapshot = {
+        let (snapshot, previous_active, current_active) = {
             let mut guard = self.data.write().await;
+            let previous_active = guard.active.clone();
 
             if let Some(enabled) = request.enabled {
                 guard.enabled = enabled;
@@ -122,8 +126,14 @@ impl PlaybackObserverState {
                 guard.last_error = None;
             }
 
-            Self::snapshot_from_guard(&guard)
+            (
+                Self::snapshot_from_guard(&guard),
+                previous_active,
+                guard.active.clone(),
+            )
         };
+
+        emit_playback_observer_events(&app, previous_active, current_active);
 
         if snapshot.enabled {
             self.start_worker(app).await;
@@ -159,58 +169,66 @@ impl PlaybackObserverState {
 
     async fn apply_cycle_success(
         &self,
+        app: &tauri::AppHandle,
         runtime_config: ObserverRuntimeConfig,
         cycle_result: DetectionCycleResult,
     ) {
-        let mut guard = self.data.write().await;
+        let (previous_active, current_active) = {
+            let mut guard = self.data.write().await;
+            let previous_active = guard.active.clone();
 
-        if !runtime_config.enabled || !guard.enabled {
-            return;
-        }
-
-        guard.last_error = None;
-
-        if guard.selected_players != runtime_config.selected_players {
-            return;
-        }
-
-        let observed_process_is_running = runtime_config
-            .observed_process_id
-            .map(|process_id| cycle_result.matched_player_pids.contains(&process_id))
-            .unwrap_or(false);
-
-        if let Some(observed_process_id) = runtime_config.observed_process_id {
-            if observed_process_is_running {
-                if let Some(updated_detection) = cycle_result
-                    .detections
-                    .iter()
-                    .find(|detection| detection.process_id == observed_process_id)
-                {
-                    guard.active = Some(updated_detection.clone());
-                    guard.observed_process_id = Some(updated_detection.process_id);
-                    guard.observed_player = Some(updated_detection.player);
-                }
-            } else {
-                if guard.active.is_some() {
-                    guard.last_observed = guard.active.clone();
-                }
-
-                guard.active = None;
-                guard.observed_process_id = None;
-                guard.observed_player = None;
+            if !runtime_config.enabled || !guard.enabled {
+                return;
             }
-        }
 
-        if guard.observed_process_id.is_none() {
-            if let Some(first_detection) = cycle_result.detections.first() {
-                guard.active = Some(first_detection.clone());
-                guard.observed_process_id = Some(first_detection.process_id);
-                guard.observed_player = Some(first_detection.player);
-            } else {
-                guard.active = None;
-                guard.observed_player = None;
+            guard.last_error = None;
+
+            if guard.selected_players != runtime_config.selected_players {
+                return;
             }
-        }
+
+            let observed_process_is_running = runtime_config
+                .observed_process_id
+                .map(|process_id| cycle_result.matched_player_pids.contains(&process_id))
+                .unwrap_or(false);
+
+            if let Some(observed_process_id) = runtime_config.observed_process_id {
+                if observed_process_is_running {
+                    if let Some(updated_detection) = cycle_result
+                        .detections
+                        .iter()
+                        .find(|detection| detection.process_id == observed_process_id)
+                    {
+                        guard.active = Some(updated_detection.clone());
+                        guard.observed_process_id = Some(updated_detection.process_id);
+                        guard.observed_player = Some(updated_detection.player);
+                    }
+                } else {
+                    if guard.active.is_some() {
+                        guard.last_observed = guard.active.clone();
+                    }
+
+                    guard.active = None;
+                    guard.observed_process_id = None;
+                    guard.observed_player = None;
+                }
+            }
+
+            if guard.observed_process_id.is_none() {
+                if let Some(first_detection) = cycle_result.detections.first() {
+                    guard.active = Some(first_detection.clone());
+                    guard.observed_process_id = Some(first_detection.process_id);
+                    guard.observed_player = Some(first_detection.player);
+                } else {
+                    guard.active = None;
+                    guard.observed_player = None;
+                }
+            }
+
+            (previous_active, guard.active.clone())
+        };
+
+        emit_playback_observer_events(app, previous_active, current_active);
     }
 
     async fn apply_cycle_error(&self, error: String) {
@@ -220,6 +238,30 @@ impl PlaybackObserverState {
         }
 
         guard.last_error = Some(error);
+    }
+}
+
+fn emit_playback_observer_events(
+    app: &tauri::AppHandle,
+    previous_active: Option<AnimePlaybackDetection>,
+    current_active: Option<AnimePlaybackDetection>,
+) {
+    if previous_active == current_active {
+        return;
+    }
+
+    if let Some(detection) = current_active.as_ref() {
+        if let Err(error) = app.emit(PLAYBACK_EPISODE_DETECTED_EVENT, detection) {
+            eprintln!("failed to emit playback episode detected event: {error}");
+        }
+    }
+
+    if current_active.is_none() {
+        if let Some(previous) = previous_active {
+            if let Err(error) = app.emit(PLAYBACK_EPISODE_CLOSED_EVENT, previous) {
+                eprintln!("failed to emit playback episode closed event: {error}");
+            }
+        }
     }
 }
 
@@ -235,7 +277,7 @@ async fn run_playback_observer_loop(app: tauri::AppHandle) {
         match cycle_result {
             Ok(result) => {
                 app.state::<PlaybackObserverState>()
-                    .apply_cycle_success(runtime_config, result)
+                    .apply_cycle_success(&app, runtime_config, result)
                     .await;
             }
             Err(error) => {

@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { listen, UnlistenFn } from '@tauri-apps/api/event';
 
 import {
   AnimePlaybackDetection,
@@ -6,6 +7,10 @@ import {
   DetectPlayingAnimeRequest,
   PlaybackObserverSnapshot
 } from '../types';
+
+export const PLAYBACK_EPISODE_DETECTED_EVENT =
+  'player-detection:episode-detected';
+export const PLAYBACK_EPISODE_CLOSED_EVENT = 'player-detection:episode-closed';
 
 export class PlayerDetectionService {
   static async detectPlayingAnime(
@@ -26,5 +31,27 @@ export class PlayerDetectionService {
     return invoke<PlaybackObserverSnapshot>('configure_playback_observer', {
       request
     });
+  }
+
+  static async listenEpisodeDetected(
+    onDetected: (detection: AnimePlaybackDetection) => void
+  ): Promise<UnlistenFn> {
+    return listen<AnimePlaybackDetection>(
+      PLAYBACK_EPISODE_DETECTED_EVENT,
+      ({ payload }) => {
+        onDetected(payload);
+      }
+    );
+  }
+
+  static async listenEpisodeClosed(
+    onClosed: (detection: AnimePlaybackDetection) => void
+  ): Promise<UnlistenFn> {
+    return listen<AnimePlaybackDetection>(
+      PLAYBACK_EPISODE_CLOSED_EVENT,
+      ({ payload }) => {
+        onClosed(payload);
+      }
+    );
   }
 }

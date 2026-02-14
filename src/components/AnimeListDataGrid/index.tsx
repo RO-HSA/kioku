@@ -1,16 +1,12 @@
 import { Box } from '@mui/material';
 import { MaterialReactTable } from 'material-react-table';
 
-import { SynchronizedAnimeList } from '@/services/backend/types';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { AnimeListUserStatus } from '@/types/AnimeList';
 import useAnimeListDataGrid from './hooks/useAnimeListDataGrid';
 
-interface AnimeListDataGridProps {
-  listData: SynchronizedAnimeList | null;
-}
-
-const AnimeListDataGrid = ({ listData }: AnimeListDataGridProps) => {
+const AnimeListDataGrid = () => {
+  const animeListData = useMyAnimeListStore((state) => state.animeListData);
   const setProgress = useMyAnimeListStore((state) => state.setProgress);
 
   const handleProgressChange = (
@@ -22,7 +18,7 @@ const AnimeListDataGrid = ({ listData }: AnimeListDataGridProps) => {
   };
 
   const { table } = useAnimeListDataGrid({
-    listData,
+    listData: animeListData,
     onProgressChange: handleProgressChange
   });
 

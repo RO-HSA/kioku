@@ -1,9 +1,12 @@
 import { LucideProps } from 'lucide-react';
 import { ForwardRefExoticComponent, RefAttributes } from 'react';
 
-export enum SidebarNavigationStep {
-  ANIME_LIST = 'ANIME_LIST',
-  SETTINGS = 'SETTINGS'
+export interface INavLink {
+  label: string;
+  icon: ForwardRefExoticComponent<
+    Omit<LucideProps, 'ref'> & RefAttributes<SVGSVGElement>
+  >;
+  link: string;
 }
 
 export enum ConfigMenuStep {

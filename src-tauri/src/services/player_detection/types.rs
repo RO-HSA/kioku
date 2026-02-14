@@ -37,7 +37,7 @@ pub struct DetectPlayingAnimeRequest {
     pub players: Option<Vec<SupportedPlayer>>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AnimePlaybackDetection {
     pub player: SupportedPlayer,
