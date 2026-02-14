@@ -1,6 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-use std::time::Duration;
 use serde::Deserialize;
+use std::time::Duration;
 use tauri::Manager;
 use tauri_plugin_zustand::ManagerExt;
 
@@ -54,7 +54,7 @@ fn process_oauth_callback(app: tauri::AppHandle, url: String) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut builder = tauri::Builder::default();
+    let mut builder = tauri::Builder::default().plugin(tauri_plugin_notification::init());
 
     #[cfg(desktop)]
     {

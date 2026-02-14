@@ -1,16 +1,20 @@
+import { UnlistenFn } from '@tauri-apps/api/event';
+import { useEffect } from 'react';
+
 import {
   findExactAnimeMatch,
   findSuggestedAnimeMatches
 } from '@/components/NowPlaying/utils';
 import { PlayerDetectionService } from '@/services/backend/PlayerDetection';
 import { SynchronizedAnimeList } from '@/services/backend/types';
+import { NotificationService } from '@/services/Notification';
 import { useNowPlayingAliasesStore } from '@/stores/nowPlayingAliases';
 import { usePlayerDetectionStore } from '@/stores/playerDetection';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { AnimeListUserStatus, IAnimeList } from '@/types/AnimeList';
 import { getTodayAsYmd } from '@/utils/date';
-import { UnlistenFn } from '@tauri-apps/api/event';
-import { useEffect } from 'react';
+
+const notification = new NotificationService();
 
 const flattenAnimeListData = (
   animeListData: SynchronizedAnimeList | null
@@ -77,8 +81,17 @@ const usePlaybackObserverEvents = () => {
           );
 
           if (exactMatch) {
+            notification.sendNotification({
+              title: 'Now Playing',
+              body: `${exactMatch.title}\nEpisode ${detection.episode ?? '?'}`
+            });
             setMatchingResult(exactMatch.id, []);
           } else {
+            notification.sendNotification({
+              title: 'Media not recognized',
+              body: `${detection.animeTitle}\nEpisode ${detection.episode ?? '?'}\nTry selecting the correct anime from the suggestions on Now Playing menu.`
+            });
+
             const suggestions = findSuggestedAnimeMatches(
               aggregatedData,
               detection.animeTitle,

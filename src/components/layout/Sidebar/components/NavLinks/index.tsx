@@ -1,5 +1,5 @@
 import { Divider } from '@mui/material';
-import { type FC } from 'react';
+import { Fragment, type FC } from 'react';
 import { useLocation } from 'react-router';
 
 import NavButton from '@/components/NavButton';
@@ -20,9 +20,8 @@ const NavLinks: FC<NavLinksProps> = ({ onNavigate }) => {
   return (
     <div className="flex w-full flex-col gap-1">
       {navLinks.map(({ icon, label, link }) => (
-        <>
+        <Fragment key={label}>
           <NavButton
-            key={label}
             isSidebarOpen={isSidebarOpen}
             Icon={icon}
             label={label}
@@ -34,7 +33,7 @@ const NavLinks: FC<NavLinksProps> = ({ onNavigate }) => {
             }}
           />
           {link === '/now-playing' && <Divider />}
-        </>
+        </Fragment>
       ))}
     </div>
   );
