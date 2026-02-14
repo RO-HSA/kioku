@@ -1,6 +1,7 @@
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+#[cfg(any(windows, target_os = "macos"))]
 use std::process::Command;
 use std::sync::OnceLock;
 
@@ -24,7 +25,7 @@ impl SupportedPlayer {
 
     fn process_aliases(self) -> &'static [&'static str] {
         match self {
-            Self::Mpv => &["mpv", "mpv.exe", "mpvnet", "mpvnet.exe"],
+            Self::Mpv => &["mpv", "mpv.exe", "mpvnet", "mpvnet.exe", "io.mpv.mpv"],
             Self::MpcHc => &["mpc-hc", "mpc-hc.exe", "mpc-hc64", "mpc-hc64.exe"],
             Self::MpcBe => &["mpc-be", "mpc-be.exe", "mpc-be64", "mpc-be64.exe"],
         }
@@ -59,6 +60,7 @@ struct ProcessSnapshot {
     pid: u32,
     name: String,
     command_line: String,
+    args: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -81,7 +83,8 @@ pub async fn detect_playing_anime(
             continue;
         };
 
-        let Some(source) = extract_media_source(player, &process.command_line) else {
+        let Some(source) = extract_media_source(player, &process.args, &process.command_line)
+        else {
             continue;
         };
 
@@ -152,13 +155,21 @@ fn match_process_to_player(
     process: &ProcessSnapshot,
     selected_players: &[SupportedPlayer],
 ) -> Option<SupportedPlayer> {
-    let executable = split_command_line(&process.command_line)
-        .into_iter()
-        .next()
-        .unwrap_or_default();
+    let executable = process.args.first().cloned().unwrap_or_else(|| {
+        split_command_line(&process.command_line)
+            .into_iter()
+            .next()
+            .unwrap_or_default()
+    });
 
     for player in selected_players {
-        if player.matches_process_name(&process.name) || player.matches_process_name(&executable) {
+        if player.matches_process_name(&process.name)
+            || player.matches_process_name(&executable)
+            || process
+                .args
+                .iter()
+                .any(|arg| player.matches_process_name(arg))
+        {
             return Some(*player);
         }
     }
@@ -166,13 +177,25 @@ fn match_process_to_player(
     None
 }
 
-fn extract_media_source(player: SupportedPlayer, command_line: &str) -> Option<String> {
-    let mut args = split_command_line(command_line);
+fn extract_media_source(
+    player: SupportedPlayer,
+    args: &[String],
+    command_line: &str,
+) -> Option<String> {
+    let mut args = if args.is_empty() {
+        split_command_line(command_line)
+    } else {
+        args.to_vec()
+    };
+
     if args.is_empty() {
         return None;
     }
 
-    args.remove(0);
+    if player.matches_process_name(&args[0]) {
+        args.remove(0);
+    }
+
     let mut candidate: Option<String> = None;
 
     for arg in args {
@@ -626,10 +649,16 @@ fn list_processes() -> Result<Vec<ProcessSnapshot>, String> {
 
     Ok(parsed
         .into_iter()
-        .map(|process| ProcessSnapshot {
-            pid: process.process_id,
-            name: process.name,
-            command_line: process.command_line.unwrap_or_default(),
+        .map(|process| {
+            let command_line = process.command_line.unwrap_or_default();
+            let args = split_command_line(&command_line);
+
+            ProcessSnapshot {
+                pid: process.process_id,
+                name: process.name,
+                command_line,
+                args,
+            }
         })
         .collect())
 }
@@ -654,7 +683,61 @@ fn parse_windows_process_output(payload: &str) -> Result<Vec<WindowsProcess>, St
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(target_os = "linux")]
+fn list_processes() -> Result<Vec<ProcessSnapshot>, String> {
+    let entries = std::fs::read_dir("/proc")
+        .map_err(|error| format!("Failed to list /proc entries: {error}"))?;
+
+    let mut processes = Vec::new();
+
+    for entry in entries {
+        let Ok(entry) = entry else {
+            continue;
+        };
+
+        let file_name = entry.file_name();
+        let pid_raw = file_name.to_string_lossy();
+        let Ok(pid) = pid_raw.parse::<u32>() else {
+            continue;
+        };
+
+        let name = match std::fs::read_to_string(format!("/proc/{pid}/comm")) {
+            Ok(value) => value.trim().to_string(),
+            Err(_) => continue,
+        };
+
+        let args = match std::fs::read(format!("/proc/{pid}/cmdline")) {
+            Ok(bytes) => parse_linux_cmdline(&bytes),
+            Err(_) => continue,
+        };
+
+        let command_line = if args.is_empty() {
+            name.clone()
+        } else {
+            args.join(" ")
+        };
+
+        processes.push(ProcessSnapshot {
+            pid,
+            name,
+            command_line,
+            args,
+        });
+    }
+
+    Ok(processes)
+}
+
+#[cfg(target_os = "linux")]
+fn parse_linux_cmdline(bytes: &[u8]) -> Vec<String> {
+    bytes
+        .split(|byte| *byte == 0)
+        .filter(|chunk| !chunk.is_empty())
+        .map(|chunk| String::from_utf8_lossy(chunk).to_string())
+        .collect()
+}
+
+#[cfg(target_os = "macos")]
 fn list_processes() -> Result<Vec<ProcessSnapshot>, String> {
     let output = Command::new("ps")
         .args(["-axww", "-o", "pid=,comm=,args="])
@@ -699,11 +782,13 @@ fn list_processes() -> Result<Vec<ProcessSnapshot>, String> {
             .filter(|value| !value.is_empty())
             .unwrap_or(rest)
             .to_string();
+        let args = split_command_line(&command_line);
 
         processes.push(ProcessSnapshot {
             pid,
             name,
             command_line,
+            args,
         });
     }
 
