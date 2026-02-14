@@ -20,8 +20,6 @@ export interface DetectPlayingAnimeRequest {
 
 export interface AnimePlaybackDetection {
   player: SupportedPlayer;
-  processId: number;
-  source: string;
   animeTitle: string;
   episode: number | null;
 }

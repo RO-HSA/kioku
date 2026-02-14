@@ -7,8 +7,13 @@ use super::processes::{list_processes, ProcessSnapshot};
 use super::types::{AnimePlaybackDetection, DetectPlayingAnimeRequest, SupportedPlayer};
 use super::util::{dedup_players, split_command_line};
 
+pub(crate) struct DetectionCandidate {
+    pub process_id: u32,
+    pub detection: AnimePlaybackDetection,
+}
+
 pub(crate) struct DetectionCycleResult {
-    pub detections: Vec<AnimePlaybackDetection>,
+    pub detections: Vec<DetectionCandidate>,
     pub matched_player_pids: HashSet<u32>,
 }
 
@@ -19,21 +24,21 @@ pub async fn detect_playing_anime(
     let selected_players = resolve_selected_players(request);
     let cycle_result = collect_detection_cycle_result(&selected_players)?;
 
-    let mut best: Option<(u8, AnimePlaybackDetection)> = None;
-    for detection in cycle_result.detections {
-        let score = score_detection(&detection);
-        if let Some((best_score, best_detection)) = &best {
+    let mut best: Option<(u8, u32, AnimePlaybackDetection)> = None;
+    for candidate in cycle_result.detections {
+        let score = score_detection(&candidate.detection);
+        if let Some((best_score, best_process_id, _)) = &best {
             if score < *best_score
-                || (score == *best_score && detection.process_id <= best_detection.process_id)
+                || (score == *best_score && candidate.process_id <= *best_process_id)
             {
                 continue;
             }
         }
 
-        best = Some((score, detection));
+        best = Some((score, candidate.process_id, candidate.detection));
     }
 
-    Ok(best.map(|(_, detection)| detection))
+    Ok(best.map(|(_, _, detection)| detection))
 }
 
 pub(crate) fn collect_detection_cycle_result(
@@ -59,16 +64,17 @@ pub(crate) fn collect_detection_cycle_result(
             continue;
         };
 
-        detections.push(AnimePlaybackDetection {
-            player,
+        detections.push(DetectionCandidate {
             process_id: process.pid,
-            source,
-            anime_title: parsed.anime_title,
-            episode: parsed.episode,
+            detection: AnimePlaybackDetection {
+                player,
+                anime_title: parsed.anime_title,
+                episode: parsed.episode,
+            },
         });
     }
 
-    detections.sort_by_key(|detection| detection.process_id);
+    detections.sort_by_key(|candidate| candidate.process_id);
 
     Ok(DetectionCycleResult {
         detections,

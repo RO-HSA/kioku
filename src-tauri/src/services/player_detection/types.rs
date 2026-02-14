@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::util::normalize_process_name;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum SupportedPlayer {
     Mpv,
@@ -41,8 +41,6 @@ pub struct DetectPlayingAnimeRequest {
 #[serde(rename_all = "camelCase")]
 pub struct AnimePlaybackDetection {
     pub player: SupportedPlayer,
-    pub process_id: u32,
-    pub source: String,
     pub anime_title: String,
     pub episode: Option<u32>,
 }

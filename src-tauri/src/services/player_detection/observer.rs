@@ -197,11 +197,11 @@ impl PlaybackObserverState {
                     if let Some(updated_detection) = cycle_result
                         .detections
                         .iter()
-                        .find(|detection| detection.process_id == observed_process_id)
+                        .find(|candidate| candidate.process_id == observed_process_id)
                     {
-                        guard.active = Some(updated_detection.clone());
+                        guard.active = Some(updated_detection.detection.clone());
                         guard.observed_process_id = Some(updated_detection.process_id);
-                        guard.observed_player = Some(updated_detection.player);
+                        guard.observed_player = Some(updated_detection.detection.player);
                     }
                 } else {
                     if guard.active.is_some() {
@@ -216,9 +216,9 @@ impl PlaybackObserverState {
 
             if guard.observed_process_id.is_none() {
                 if let Some(first_detection) = cycle_result.detections.first() {
-                    guard.active = Some(first_detection.clone());
+                    guard.active = Some(first_detection.detection.clone());
                     guard.observed_process_id = Some(first_detection.process_id);
-                    guard.observed_player = Some(first_detection.player);
+                    guard.observed_player = Some(first_detection.detection.player);
                 } else {
                     guard.active = None;
                     guard.observed_player = None;
