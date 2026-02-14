@@ -5,7 +5,13 @@ use std::sync::OnceLock;
 const VIDEO_EXTENSIONS: &[&str] = &[
     "mkv", "mp4", "avi", "mov", "wmv", "flv", "webm", "m4v", "ts", "m2ts", "mpg", "mpeg", "ogm",
 ];
-const NUMBER_TOKENS_TO_IGNORE: &[u32] = &[360, 480, 540, 576, 720, 1080, 1440, 2160, 4320];
+
+// Numeric tokens that commonly represent video resolution, not episode number.
+// This is used by fallback numeric parsing to avoid false positives.
+// Keep this list updated as new distributions become common.
+const NUMBER_TOKENS_TO_IGNORE: &[u32] = &[
+    360, 480, 540, 576, 720, 1080, 1440, 2160, 2880, 3840, 4096, 4320, 5120, 7680,
+];
 
 #[derive(Debug, Clone)]
 pub(crate) struct ParsedAnime {
