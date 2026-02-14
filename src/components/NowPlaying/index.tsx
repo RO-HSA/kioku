@@ -9,14 +9,19 @@ import { useMemo } from 'react';
 import AnimeTitle from '../AnimeInformations/components/AnimeTitle';
 import MainInformation from '../AnimeInformations/components/MainInformation';
 import AnimeCover from '../ui/AnimeCover';
-import { findExactAnimeMatch, findSuggestedAnimeMatches } from './utils';
 
 const NowPlaying = () => {
   const animePlaying = usePlayerDetectionStore((state) => state.activeEpisode);
-  const animeListData = useMyAnimeListStore((state) => state.animeListData);
-  const aliasesByAnimeId = useNowPlayingAliasesStore(
-    (state) => state.aliasesByAnimeId
+  const activeMatchedAnimeId = usePlayerDetectionStore(
+    (state) => state.activeMatchedAnimeId
   );
+  const suggestedAnimeIds = usePlayerDetectionStore(
+    (state) => state.suggestedAnimeIds
+  );
+  const resolveActiveAnime = usePlayerDetectionStore(
+    (state) => state.resolveActiveAnime
+  );
+  const animeListData = useMyAnimeListStore((state) => state.animeListData);
   const addAlias = useNowPlayingAliasesStore((state) => state.addAlias);
 
   const aggregatedData = useMemo(() => {
@@ -32,33 +37,26 @@ const NowPlaying = () => {
   }, [animeListData]);
 
   const exactAnimeMatch = useMemo(() => {
-    if (!animePlaying?.animeTitle) {
+    if (!activeMatchedAnimeId) {
       return undefined;
     }
 
-    return findExactAnimeMatch(
-      aggregatedData,
-      animePlaying.animeTitle,
-      aliasesByAnimeId
-    );
-  }, [aggregatedData, animePlaying?.animeTitle, aliasesByAnimeId]);
+    return aggregatedData.find((anime) => anime.id === activeMatchedAnimeId);
+  }, [activeMatchedAnimeId, aggregatedData]);
 
   const suggestedMatches = useMemo(() => {
-    if (!animePlaying?.animeTitle || exactAnimeMatch) {
+    if (!animePlaying || exactAnimeMatch) {
       return [];
     }
 
-    return findSuggestedAnimeMatches(
-      aggregatedData,
-      animePlaying.animeTitle,
-      aliasesByAnimeId
-    );
-  }, [
-    aggregatedData,
-    animePlaying?.animeTitle,
-    aliasesByAnimeId,
-    exactAnimeMatch
-  ]);
+    const animeById = new Map(aggregatedData.map((anime) => [anime.id, anime]));
+
+    return suggestedAnimeIds
+      .map((animeId) => animeById.get(animeId))
+      .filter((anime): anime is (typeof aggregatedData)[number] =>
+        Boolean(anime)
+      );
+  }, [aggregatedData, animePlaying, exactAnimeMatch, suggestedAnimeIds]);
 
   const handleSuggestionClick = (animeId: number) => {
     if (!animePlaying?.animeTitle) {
@@ -66,6 +64,7 @@ const NowPlaying = () => {
     }
 
     addAlias(animeId, animePlaying.animeTitle);
+    resolveActiveAnime(animeId);
   };
 
   return (

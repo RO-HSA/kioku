@@ -2,7 +2,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { RouterProvider } from 'react-router';
 
-import usePlaybackObserverEvents from '@/hooks/usePlaybackObserverEvents';
+import usePlaybackObserverEvents from '@/hooks/detection/usePlaybackObserverEvents';
 import AnimeInformations from './components/AnimeInformations';
 import { router } from './routes';
 import './styles/global.css';

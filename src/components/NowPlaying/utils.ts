@@ -5,6 +5,9 @@ const COMBINING_MARKS_REGEX = /[\u0300-\u036f]/g;
 const NON_ALPHANUMERIC_REGEX = /[^a-z0-9\s]/g;
 const WHITESPACE_REGEX = /\s+/g;
 
+const DEFAULT_MAX_SUGGESTIONS = 10;
+const DEFAULT_MINIMUM_SCORE = 35;
+
 export const normalizeTitle = (value: string): string => {
   return value
     .normalize('NFD')
@@ -112,8 +115,8 @@ export const findSuggestedAnimeMatches = (
     return [];
   }
 
-  const maxSuggestions = options?.maxSuggestions || 5;
-  const minimumScore = options?.minimumScore || 35;
+  const maxSuggestions = options?.maxSuggestions || DEFAULT_MAX_SUGGESTIONS;
+  const minimumScore = options?.minimumScore || DEFAULT_MINIMUM_SCORE;
 
   return animeList
     .map((anime) => {
