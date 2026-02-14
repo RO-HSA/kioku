@@ -7,7 +7,8 @@ export enum SidebarNavigationStep {
 }
 
 export enum ConfigMenuStep {
-  INTEGRATIONS = 'INTEGRATIONS'
+  INTEGRATIONS = 'INTEGRATIONS',
+  DETECTION = 'DETECTION'
 }
 
 export interface MenuItem {
