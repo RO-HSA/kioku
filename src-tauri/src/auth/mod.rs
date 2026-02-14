@@ -1,26 +1,23 @@
-use std::collections::HashMap;
 use rand::{distributions::Alphanumeric, Rng};
+use std::collections::HashMap;
 use tauri::{Emitter, Manager};
 use tauri_plugin_http::reqwest;
 use tauri_plugin_opener::OpenerExt;
 
+pub mod mal;
 pub mod oauth;
+pub mod request;
 pub mod secure_store;
 pub mod token_manager;
-pub mod mal;
-pub mod request;
-pub use secure_store::{init_stronghold_key, StrongholdKeyState};
-pub use token_manager::{ProviderConfig, TokenManagerState};
-pub use request::oauth_request;
 use crate::auth::mal::PROVIDER_ID as MAL_PROVIDER_ID;
 use crate::auth::oauth::pkce::generate_pkce;
 use crate::auth::token_manager::{build_authorize_url, exchange_authorization_code};
+pub use request::oauth_request;
+pub use secure_store::{init_stronghold_key, StrongholdKeyState};
+pub use token_manager::{ProviderConfig, TokenManagerState};
 
 #[tauri::command]
-pub async fn authorize_provider(
-    provider_id: String,
-    app: tauri::AppHandle,
-) -> Result<(), String> {
+pub async fn authorize_provider(provider_id: String, app: tauri::AppHandle) -> Result<(), String> {
     authorize_provider_impl(&provider_id, app).await
 }
 
@@ -41,17 +38,18 @@ pub async fn handle_myanimelist_callback(app: tauri::AppHandle, url: String) {
     }
 }
 
-async fn authorize_provider_impl(
-    provider_id: &str,
-    app: tauri::AppHandle,
-) -> Result<(), String> {
+async fn authorize_provider_impl(provider_id: &str, app: tauri::AppHandle) -> Result<(), String> {
     let provider = app.state::<TokenManagerState>().get_provider(provider_id)?;
     let state: String = rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(32)
         .map(char::from)
         .collect();
-    let pkce = if provider.use_pkce { Some(generate_pkce()) } else { None };
+    let pkce = if provider.use_pkce {
+        Some(generate_pkce())
+    } else {
+        None
+    };
     let code_challenge = pkce.as_ref().map(|p| p.code_challenge.as_str());
 
     let authorize_url = build_authorize_url(&app, provider_id, code_challenge, Some(&state))?;
@@ -59,8 +57,11 @@ async fn authorize_provider_impl(
     if let Some(pkce) = pkce.as_ref() {
         app.state::<TokenManagerState>()
             .set_pkce_verifier(provider_id, pkce.code_verifier.clone())?;
-        app.state::<TokenManagerState>()
-            .set_pkce_state(state, provider_id, pkce.code_verifier.clone())?;
+        app.state::<TokenManagerState>().set_pkce_state(
+            state,
+            provider_id,
+            pkce.code_verifier.clone(),
+        )?;
     }
 
     app.opener()
@@ -101,7 +102,8 @@ async fn handle_oauth_callback_impl(
 
     if let Some(error) = params.get("error") {
         let failed_event_name = format!("{}-auth-failed", &provider_id);
-        app.emit(failed_event_name.as_str(), ()).map_err(|e| e.to_string())?;
+        app.emit(failed_event_name.as_str(), ())
+            .map_err(|e| e.to_string())?;
 
         return Err(format!("Error during authorization: {error}"));
     }
@@ -123,13 +125,15 @@ async fn handle_oauth_callback_impl(
             }
         }
     } else {
-        app.state::<TokenManagerState>().take_pkce_verifier(&provider_id)?
+        app.state::<TokenManagerState>()
+            .take_pkce_verifier(&provider_id)?
     };
-    
+
     exchange_authorization_code(app, &provider_id, code, code_verifier).await?;
 
     let success_event_name = format!("{}-auth-callback", &provider_id);
 
-    app.emit(success_event_name.as_str(), ()).map_err(|e| e.to_string())?;
+    app.emit(success_event_name.as_str(), ())
+        .map_err(|e| e.to_string())?;
     Ok(())
 }

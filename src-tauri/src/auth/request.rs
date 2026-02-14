@@ -25,10 +25,7 @@ pub struct OAuthResponse {
 }
 
 #[tauri::command]
-pub async fn oauth_request(
-    app: AppHandle,
-    request: OAuthRequest,
-) -> Result<OAuthResponse, String> {
+pub async fn oauth_request(app: AppHandle, request: OAuthRequest) -> Result<OAuthResponse, String> {
     let token = get_access_token(&app, &request.provider_id).await?;
     let method = reqwest::Method::from_bytes(request.method.to_uppercase().as_bytes())
         .map_err(|e| e.to_string())?;
