@@ -28,7 +28,7 @@ const NavLinks: FC<NavLinksProps> = ({ onNavigate }) => {
             label={label}
             link={link}
             isActive={location.pathname === link}
-            isDisabled={label === 'Now Playing' && !!activeEpisode}
+            isDisabled={label === 'Now Playing' && !activeEpisode}
             onClick={() => {
               onNavigate?.();
             }}
