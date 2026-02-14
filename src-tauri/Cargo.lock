@@ -2668,6 +2668,7 @@ dependencies = [
  "base64 0.22.1",
  "keyring",
  "rand 0.8.5",
+ "regex",
  "serde",
  "serde_json",
  "sha2",

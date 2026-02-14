@@ -15,6 +15,7 @@ use crate::auth::mal::{
 };
 use crate::services::anime_list_updates::{enqueue_anime_list_update, AnimeListUpdateQueue};
 use crate::services::myanimelist::synchronize_myanimelist;
+use crate::services::player_detection::detect_playing_anime;
 
 fn process_oauth_callback(app: tauri::AppHandle, url: String) {
     tauri::async_runtime::spawn(async move {
@@ -94,7 +95,8 @@ pub fn run() {
             authorize_provider,
             oauth_request,
             synchronize_myanimelist,
-            enqueue_anime_list_update
+            enqueue_anime_list_update,
+            detect_playing_anime
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
