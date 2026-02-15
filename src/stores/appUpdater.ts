@@ -102,9 +102,9 @@ export const useAppUpdaterStore = create<AppUpdaterStore>((set, get) => ({
       return;
     }
 
-    set({ hasBootstrapped: true });
     await get().refreshCurrentVersion();
     await get().checkForUpdates({ silent: true, notifyWhenAvailable: true });
+    set({ hasBootstrapped: true });
   },
   refreshCurrentVersion: async () => {
     const currentVersion = await AppUpdaterService.getCurrentVersion();
