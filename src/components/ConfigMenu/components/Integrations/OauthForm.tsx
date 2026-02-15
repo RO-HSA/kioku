@@ -4,7 +4,6 @@ import { FC } from 'react';
 import { useForm } from 'react-hook-form';
 
 import Button from '@/components/ui/Button';
-import useMyanimelistCallback from '@/hooks/integrations/useMyanimelistCallback';
 import { Provider } from '@/types/List';
 import { buildRegisterUrl } from '@/utils/url';
 
@@ -35,8 +34,6 @@ const OauthForm: FC<OauthFormProps> = ({
   setIsReauthenticating,
   authorizeFn
 }) => {
-  useMyanimelistCallback();
-
   const {
     register,
     handleSubmit,

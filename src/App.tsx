@@ -3,8 +3,8 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { RouterProvider } from 'react-router';
 
 import AppUpdateSnackbar from '@/components/AppUpdateSnackbar';
+import useAppUpdater from '@/hooks/detection/useAppUpdater';
 import usePlaybackObserverEvents from '@/hooks/detection/usePlaybackObserverEvents';
-import useAppUpdater from '@/hooks/useAppUpdater';
 import AnimeInformations from './components/AnimeInformations';
 import { router } from './routes';
 import './styles/fonts.css';
