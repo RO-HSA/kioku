@@ -113,5 +113,5 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
 export const tauriHandler = createTauriStore(
   'myanimelist',
   useMyAnimeListStore,
-  { autoStart: true }
+  { autoStart: true, saveOnChange: true }
 );
