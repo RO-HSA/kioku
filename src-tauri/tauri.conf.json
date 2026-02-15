@@ -18,7 +18,7 @@
       }
     ],
     "security": {
-      "capabilities": ["default", "zustand", "opener"],
+      "capabilities": ["default", "zustand", "opener", "desktop"],
       "csp": null
     }
   },

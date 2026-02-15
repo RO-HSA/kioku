@@ -29,6 +29,7 @@
     "@tauri-apps/plugin-http": "~2",
     "@tauri-apps/plugin-notification": "~2",
     "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-process": "~2",
     "@tauri-apps/plugin-stronghold": "~2",
     "@tauri-apps/plugin-updater": "^2",
     "@tauri-store/zustand": "^1.1.0",
