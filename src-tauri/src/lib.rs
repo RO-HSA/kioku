@@ -54,24 +54,29 @@ fn process_oauth_callback(app: tauri::AppHandle, url: String) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut builder = tauri::Builder::default().plugin(tauri_plugin_notification::init());
+    let mut builder = tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init());
 
     #[cfg(desktop)]
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(
-            |app: &tauri::AppHandle<_>, args: Vec<String>, _cwd: String| {
-                let _ = app
-                    .get_webview_window("main")
-                    .expect("no main window")
-                    .set_focus();
+        builder = builder
+            .plugin(tauri_plugin_process::init())
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .plugin(tauri_plugin_single_instance::init(
+                |app: &tauri::AppHandle<_>, args: Vec<String>, _cwd: String| {
+                    let _ = app
+                        .get_webview_window("main")
+                        .expect("no main window")
+                        .set_focus();
 
-                let oauth_callback = args.iter().find(|arg| arg.starts_with("kioku://")).cloned();
+                    let oauth_callback =
+                        args.iter().find(|arg| arg.starts_with("kioku://")).cloned();
 
-                if let Some(oauth_callback) = oauth_callback {
-                    process_oauth_callback(app.clone(), oauth_callback);
-                }
-            },
-        ));
+                    if let Some(oauth_callback) = oauth_callback {
+                        process_oauth_callback(app.clone(), oauth_callback);
+                    }
+                },
+            ));
     }
 
     builder

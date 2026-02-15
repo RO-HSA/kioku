@@ -1,8 +1,8 @@
 use serde::Deserialize;
-#[cfg(any(windows, target_os = "macos"))]
-use std::process::Command;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
+#[cfg(any(windows, target_os = "macos"))]
+use std::process::Command;
 
 use super::util::split_command_line;
 
