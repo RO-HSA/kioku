@@ -7,7 +7,7 @@ import { Provider } from '@/types/List';
 import { createTauriStore } from '@tauri-store/zustand';
 import { updateAnimeListData } from './utils';
 
-type MyAnimeListStore = {
+type AniListStore = {
   username: string | null;
   isAuthenticating: boolean;
   isAuthenticated: boolean;
@@ -35,7 +35,7 @@ type MyAnimeListStore = {
   ) => void;
 };
 
-export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
+export const useAniListStore = create<AniListStore>((set) => ({
   username: null,
   isAuthenticating: false,
   isAuthenticated: false,
@@ -59,7 +59,7 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
       });
 
       AnimeListService.enqueueListUpdate({
-        providerId: Provider.MY_ANIME_LIST,
+        providerId: Provider.ANILIST,
         entryId: animeId,
         userEpisodesWatched: newProgress
       });
@@ -78,7 +78,7 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
       });
 
       AnimeListService.enqueueListUpdate({
-        providerId: Provider.MY_ANIME_LIST,
+        providerId: Provider.ANILIST,
         entryId: animeId,
         userScore: newScore
       });
@@ -102,7 +102,7 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
       });
 
       AnimeListService.enqueueListUpdate({
-        providerId: Provider.MY_ANIME_LIST,
+        providerId: Provider.ANILIST,
         entryId: animeId,
         ...data
       });
@@ -111,8 +111,7 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
     })
 }));
 
-export const tauriHandler = createTauriStore(
-  'myanimelist',
-  useMyAnimeListStore,
-  { autoStart: true, saveOnChange: true }
-);
+export const tauriHandler = createTauriStore('anilist', useAniListStore, {
+  autoStart: true,
+  saveOnChange: true
+});
