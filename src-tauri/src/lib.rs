@@ -10,8 +10,12 @@ use crate::auth::mal::{
     AUTHORIZE_URL as MAL_AUTHORIZE_URL, CLIENT_ID as MAL_CLIENT_ID, PROVIDER_ID as MAL_PROVIDER_ID,
     TOKEN_URL as MAL_TOKEN_URL,
 };
+use crate::auth::anilist::{
+    AUTHORIZE_URL as ANILIST_AUTHORIZE_URL, CLIENT_ID as ANILIST_CLIENT_ID,
+    PROVIDER_ID as ANILIST_PROVIDER_ID, TOKEN_URL as ANILIST_TOKEN_URL,
+};
 use crate::auth::{
-    authorize_myanimelist, authorize_provider, handle_oauth_callback, init_stronghold_key,
+    authorize_myanimelist, authorize_anilist, authorize_provider, handle_oauth_callback, init_stronghold_key,
     oauth_request, ProviderConfig, StrongholdKeyState, TokenManagerState,
 };
 use crate::services::anime_list_updates::{enqueue_anime_list_update, AnimeListUpdateQueue};
@@ -120,6 +124,15 @@ pub fn run() {
                 return Err(std::io::Error::new(std::io::ErrorKind::Other, err).into());
             }
 
+            let anilist_config = ProviderConfig::new(ANILIST_CLIENT_ID, ANILIST_AUTHORIZE_URL, ANILIST_TOKEN_URL);
+
+            if let Err(err) = app
+                .state::<TokenManagerState>()
+                .register_provider(ANILIST_PROVIDER_ID, anilist_config)
+            {
+                return Err(std::io::Error::new(std::io::ErrorKind::Other, err).into());
+            }
+
             app.manage(AnimeListUpdateQueue::new(app.handle().clone()));
             let observer_config = read_playback_observer_bootstrap_config(&app.handle());
             app.manage(PlaybackObserverState::new(
@@ -137,6 +150,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             authorize_myanimelist,
             authorize_provider,
+            authorize_anilist,
             oauth_request,
             synchronize_myanimelist,
             enqueue_anime_list_update,

@@ -1,5 +1,6 @@
 import useAnilistCallback from '@/hooks/integrations/useAnilistCallback';
 import useMyanimelistCallback from '@/hooks/integrations/useMyanimelistCallback';
+import { AniListService } from '@/services/backend/AniList';
 import { MyAnimeListService } from '@/services/backend/MyAnimeList';
 import { useConfigMenuStore } from '@/stores/config/configMenu';
 import { useAniListStore } from '@/stores/providers/anilist';
@@ -84,7 +85,7 @@ const Integrations = () => {
             isReauthenticating={isReauthenticatingAniList}
             setIsAuthenticating={setIsAuthenticatingAniList}
             setIsReauthenticating={setIsReauthenticatingAniList}
-            authorizeFn={MyAnimeListService.authorize}
+            authorizeFn={AniListService.authorize}
           />
         </Section>
       )}
