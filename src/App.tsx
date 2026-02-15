@@ -2,6 +2,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { RouterProvider } from 'react-router';
 
+import AppUpdateSnackbar from '@/components/AppUpdateSnackbar';
 import useAppUpdater from '@/hooks/useAppUpdater';
 import usePlaybackObserverEvents from '@/hooks/detection/usePlaybackObserverEvents';
 import AnimeInformations from './components/AnimeInformations';
@@ -16,6 +17,7 @@ function App() {
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <RouterProvider router={router} />
       <AnimeInformations />
+      <AppUpdateSnackbar />
     </LocalizationProvider>
   );
 }

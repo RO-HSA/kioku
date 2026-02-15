@@ -29,6 +29,7 @@ interface AppUpdaterStore {
   status: AppUpdateStatus;
   currentVersion: string | null;
   availableVersion: string | null;
+  availableUpdateSnackbarOpen: boolean;
   installedVersion: string | null;
   releaseDate: string | null;
   releaseNotes: string | null;
@@ -44,6 +45,7 @@ interface AppUpdaterStore {
   downloadAndInstall: () => Promise<void>;
   restartNow: () => Promise<void>;
   askRestartLater: () => void;
+  closeAvailableUpdateSnackbar: () => void;
 }
 
 const notification = new NotificationService();
@@ -85,6 +87,7 @@ export const useAppUpdaterStore = create<AppUpdaterStore>((set, get) => ({
   status: 'idle',
   currentVersion: null,
   availableVersion: null,
+  availableUpdateSnackbarOpen: false,
   installedVersion: null,
   releaseDate: null,
   releaseNotes: null,
@@ -151,6 +154,7 @@ export const useAppUpdaterStore = create<AppUpdaterStore>((set, get) => ({
         set((state) => ({
           currentVersion: currentVersion ?? state.currentVersion,
           availableVersion: null,
+          availableUpdateSnackbarOpen: false,
           releaseDate: null,
           releaseNotes: null,
           lastCheckedAt,
@@ -169,6 +173,7 @@ export const useAppUpdaterStore = create<AppUpdaterStore>((set, get) => ({
       set({
         currentVersion: update.currentVersion ?? currentVersion,
         availableVersion: update.version,
+        availableUpdateSnackbarOpen: true,
         releaseDate: update.date ?? null,
         releaseNotes: update.body ?? null,
         lastCheckedAt,
@@ -254,6 +259,7 @@ export const useAppUpdaterStore = create<AppUpdaterStore>((set, get) => ({
         status: 'installed',
         installedVersion: installedVersion ?? state.installedVersion,
         availableVersion: null,
+        availableUpdateSnackbarOpen: false,
         restartRequired: true,
         restartPromptVisible: true,
         downloadedBytes: 0,
@@ -300,6 +306,11 @@ export const useAppUpdaterStore = create<AppUpdaterStore>((set, get) => ({
   askRestartLater: () => {
     set({
       restartPromptVisible: false
+    });
+  },
+  closeAvailableUpdateSnackbar: () => {
+    set({
+      availableUpdateSnackbarOpen: false
     });
   }
 }));
