@@ -14,7 +14,7 @@ import { useCallback, useState } from 'react';
 
 import { useAnimeDetailsStore } from '@/stores/animeDetails';
 import { Provider } from '@/types/List';
-import { buildUrl } from '@/utils/url';
+import { buildEntityUrl } from '@/utils/url';
 import AnimeCover from '../ui/AnimeCover';
 import Button from '../ui/Button';
 import AnimeListForm from './components/AnimeListForm';
@@ -72,14 +72,18 @@ const AnimeInformations = () => {
             <AnimeCover
               title={title}
               imageUrl={imageUrl}
-              url={buildUrl(Provider.MY_ANIME_LIST, 'anime', selectedAnime.id)}
+              url={buildEntityUrl(
+                Provider.MY_ANIME_LIST,
+                'anime',
+                selectedAnime.id
+              )}
             />
           </Grid>
 
           <Grid size={{ xs: 12, sm: 'grow' }} className="min-w-0">
             <div className="flex flex-col gap-1">
               <AnimeTitle
-                url={buildUrl(
+                url={buildEntityUrl(
                   Provider.MY_ANIME_LIST,
                   'anime',
                   selectedAnime.id

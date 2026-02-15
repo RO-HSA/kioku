@@ -3,7 +3,7 @@ import { useNowPlayingAliasesStore } from '@/stores/nowPlayingAliases';
 import { usePlayerDetectionStore } from '@/stores/playerDetection';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { Provider } from '@/types/List';
-import { buildUrl } from '@/utils/url';
+import { buildEntityUrl } from '@/utils/url';
 import { Box, Container, Grid, Typography } from '@mui/material';
 import { useMemo } from 'react';
 import AnimeTitle from '../AnimeInformations/components/AnimeTitle';
@@ -92,7 +92,7 @@ const NowPlaying = () => {
               <AnimeCover
                 title={exactAnimeMatch.title}
                 imageUrl={exactAnimeMatch.imageUrl}
-                url={buildUrl(
+                url={buildEntityUrl(
                   Provider.MY_ANIME_LIST,
                   'anime',
                   exactAnimeMatch.id
@@ -103,7 +103,7 @@ const NowPlaying = () => {
             <Grid size={{ xs: 12, sm: 'grow' }} className="min-w-0">
               <div className="flex flex-col gap-1 pb-2.5">
                 <AnimeTitle
-                  url={buildUrl(
+                  url={buildEntityUrl(
                     Provider.MY_ANIME_LIST,
                     'anime',
                     exactAnimeMatch.id

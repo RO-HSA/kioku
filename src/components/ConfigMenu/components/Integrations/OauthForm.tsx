@@ -1,34 +1,41 @@
 import { TextField } from '@mui/material';
+import { openUrl } from '@tauri-apps/plugin-opener';
+import { FC } from 'react';
 import { useForm } from 'react-hook-form';
 
 import Button from '@/components/ui/Button';
 import useMyanimelistCallback from '@/hooks/integrations/useMyanimelistCallback';
-import { MyAnimeListService } from '@/services/backend/MyAnimeList';
-import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
-import { openUrl } from '@tauri-apps/plugin-opener';
+import { Provider } from '@/types/List';
+import { buildRegisterUrl } from '@/utils/url';
 
 type FormData = {
   username: string;
 };
 
-const MyanimelistForm = () => {
-  useMyanimelistCallback();
+interface OauthFormProps {
+  provider: Provider;
+  username: string | null;
+  setUsername: (username: string | null) => void;
+  isAuthenticated: boolean;
+  isAuthenticating: boolean;
+  isReauthenticating: boolean;
+  setIsAuthenticating: (isAuthenticating: boolean) => void;
+  setIsReauthenticating: (isReauthenticating: boolean) => void;
+  authorizeFn: () => Promise<void>;
+}
 
-  const username = useMyAnimeListStore((state) => state.username);
-  const setUsername = useMyAnimeListStore((state) => state.setUsername);
-  const isAuthenticated = useMyAnimeListStore((state) => state.isAuthenticated);
-  const isAuthenticating = useMyAnimeListStore(
-    (state) => state.isAuthenticating
-  );
-  const isReauthenticating = useMyAnimeListStore(
-    (state) => state.isReauthenticating
-  );
-  const setIsAuthenticating = useMyAnimeListStore(
-    (state) => state.setIsAuthenticating
-  );
-  const setIsReauthenticating = useMyAnimeListStore(
-    (state) => state.setIsReauthenticating
-  );
+const OauthForm: FC<OauthFormProps> = ({
+  provider,
+  username,
+  setUsername,
+  isAuthenticated,
+  isAuthenticating,
+  isReauthenticating,
+  setIsAuthenticating,
+  setIsReauthenticating,
+  authorizeFn
+}) => {
+  useMyanimelistCallback();
 
   const {
     register,
@@ -39,7 +46,7 @@ const MyanimelistForm = () => {
   const onSubmit = async () => {
     setIsAuthenticating(true);
     setIsReauthenticating(true);
-    await MyAnimeListService.authorize();
+    await authorizeFn();
   };
 
   const isDisabled =
@@ -75,12 +82,12 @@ const MyanimelistForm = () => {
       <div>
         <Button
           variant="ghost"
-          onClick={() => openUrl('https://myanimelist.net/register.php')}>
-          Create a new MyAnimeList account{' '}
+          onClick={() => openUrl(buildRegisterUrl(provider))}>
+          Create a new {provider} account{' '}
         </Button>
       </div>
     </form>
   );
 };
 
-export default MyanimelistForm;
+export default OauthForm;
