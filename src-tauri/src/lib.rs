@@ -54,11 +54,14 @@ fn process_oauth_callback(app: tauri::AppHandle, url: String) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut builder = tauri::Builder::default().plugin(tauri_plugin_notification::init());
+    let mut builder = tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init());
 
     #[cfg(desktop)]
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(
+        builder = builder
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_single_instance::init(
             |app: &tauri::AppHandle<_>, args: Vec<String>, _cwd: String| {
                 let _ = app
                     .get_webview_window("main")
