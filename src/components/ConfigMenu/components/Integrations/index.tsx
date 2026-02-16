@@ -1,3 +1,4 @@
+import useMyanimelistCallback from '@/hooks/integrations/useMyanimelistCallback';
 import { AniListService } from '@/services/backend/AniList';
 import { MyAnimeListService } from '@/services/backend/MyAnimeList';
 import { useConfigMenuStore } from '@/stores/config/configMenu';
@@ -11,6 +12,7 @@ import OauthForm from './OauthForm';
 const tabs = ['MyAnimeList', 'AniList'];
 
 const Integrations = () => {
+  useMyanimelistCallback();
   const selectedTab = useConfigMenuStore((state) => state.selectedTab);
 
   const myAnimeListUsername = useMyAnimeListStore((state) => state.username);
