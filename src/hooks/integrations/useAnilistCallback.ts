@@ -3,6 +3,8 @@ import { useEffect } from 'react';
 
 import { AniListService } from '@/services/backend/AniList';
 import { useAniListStore } from '@/stores/providers/anilist';
+import { useProviderStore } from '@/stores/providers/provider';
+import { Provider } from '@/types/List';
 
 const useAnilistCallback = () => {
   const setIsAuthenticating = useAniListStore(
@@ -27,6 +29,13 @@ const useAnilistCallback = () => {
         setIsReauthenticating(false);
         AniListService.synchronizeList().then((response) => {
           setAnimeListData(response);
+          const activeProvider = useProviderStore.getState().activeProvider;
+
+          if (activeProvider === null) {
+            useProviderStore.setState({
+              activeProvider: Provider.MY_ANIME_LIST
+            });
+          }
         });
       });
     };

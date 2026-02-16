@@ -9,7 +9,7 @@ type ProviderStore = {
 };
 
 export const useProviderStore = create<ProviderStore>((set) => ({
-  activeProvider: Provider.ANILIST,
+  activeProvider: null,
   setActiveProvider: (activeProvider) => set(() => ({ activeProvider }))
 }));
 
