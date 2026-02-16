@@ -1,13 +1,15 @@
 import { ListType, Provider } from '@/types/List';
 
 export const buildEntityUrl = (
-  provider: string,
+  provider: Provider,
   type: ListType,
   id: number
 ) => {
   switch (provider) {
-    case 'myanimelist':
+    case Provider.MY_ANIME_LIST:
       return `https://myanimelist.net/${type}/${id}`;
+    case Provider.ANILIST:
+      return `https://anilist.co/${type}/${id}`;
     default:
       return `https://myanimelist.net/${type}/${id}`;
   }
