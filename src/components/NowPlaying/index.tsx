@@ -2,8 +2,8 @@ import { Box, Container, Grid, Typography } from '@mui/material';
 import { useMemo } from 'react';
 
 import Button from '@/components/ui/Button';
-import { useNowPlayingAliasesStore } from '@/stores/nowPlayingAliases';
-import { usePlayerDetectionStore } from '@/stores/playerDetection';
+import { useNowPlayingAliasesStore } from '@/stores/detection/nowPlayingAliases';
+import { usePlayerDetectionStore } from '@/stores/detection/playerDetection';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { Provider } from '@/types/List';
 import { buildEntityUrl } from '@/utils/url';
@@ -64,7 +64,7 @@ const NowPlaying = () => {
       return;
     }
 
-    addAlias(animeId, animePlaying.animeTitle);
+    addAlias(Provider.MY_ANIME_LIST, animeId, animePlaying.animeTitle);
     resolveActiveAnime(animeId);
   };
 

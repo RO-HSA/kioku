@@ -8,10 +8,11 @@ import {
 import { PlayerDetectionService } from '@/services/backend/PlayerDetection';
 import { SynchronizedAnimeList } from '@/services/backend/types';
 import { NotificationService } from '@/services/Notification';
-import { useNowPlayingAliasesStore } from '@/stores/nowPlayingAliases';
-import { usePlayerDetectionStore } from '@/stores/playerDetection';
+import { useNowPlayingAliasesStore } from '@/stores/detection/nowPlayingAliases';
+import { usePlayerDetectionStore } from '@/stores/detection/playerDetection';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { AnimeListUserStatus, IAnimeList } from '@/types/AnimeList';
+import { Provider } from '@/types/List';
 import { getTodayAsYmd } from '@/utils/date';
 
 const notification = new NotificationService();
@@ -70,8 +71,9 @@ const usePlaybackObserverEvents = () => {
       unlistenDetected = await PlayerDetectionService.listenEpisodeDetected(
         (detection) => {
           const animeListData = useMyAnimeListStore.getState().animeListData;
-          const aliasesByAnimeId =
-            useNowPlayingAliasesStore.getState().aliasesByAnimeId;
+          const aliasesByAnimeId = useNowPlayingAliasesStore
+            .getState()
+            .getAliasesByProvider(Provider.MY_ANIME_LIST);
           const aggregatedData = flattenAnimeListData(animeListData);
 
           const exactMatch = findExactAnimeMatch(
