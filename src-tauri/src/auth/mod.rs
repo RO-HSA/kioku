@@ -89,8 +89,35 @@ async fn handle_oauth_callback_impl(
 ) -> Result<(), String> {
     let parsed = reqwest::Url::parse(url).map_err(|e| e.to_string())?;
 
+    let mut params: HashMap<String, String> = parsed
+        .query_pairs()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+
+    if let Some(fragment) = parsed.fragment() {
+        let fragment_url = reqwest::Url::parse(&format!("kioku://callback/?{fragment}"))
+            .map_err(|e| e.to_string())?;
+        params.extend(
+            fragment_url
+                .query_pairs()
+                .map(|(k, v)| (k.to_string(), v.to_string())),
+        );
+    }
+
+    let state = params.get("state").cloned();
+    let provider_from_state = if let Some(state) = state.as_ref() {
+        app.state::<TokenManagerState>()
+            .get_pkce_state_provider(state)?
+    } else {
+        None
+    };
+
     let provider_id = if let Some(provider) = provider_override {
         provider.to_string()
+    } else if let Some(provider_id) = provider_from_state {
+        provider_id
+    } else if params.contains_key("access_token") {
+        ANILIST_PROVIDER_ID.to_string()
     } else {
         parsed
             .host_str()
@@ -104,26 +131,6 @@ async fn handle_oauth_callback_impl(
             })
             .ok_or_else(|| "Missing provider id in callback URL".to_string())?
     };
-
-    let mut params: HashMap<String, String> = parsed
-        .query_pairs()
-        .map(|(k, v)| (k.to_string(), v.to_string()))
-        .collect();
-    println!("OAuth callback params: {:?}", parsed);
-
-    if provider_id == ANILIST_PROVIDER_ID {
-        if let Some(fragment) = parsed.fragment() {
-            let fragment_url = reqwest::Url::parse(&format!("kioku://anilist/?{fragment}"))
-                .map_err(|e| e.to_string())?;
-            params.extend(
-                fragment_url
-                    .query_pairs()
-                    .map(|(k, v)| (k.to_string(), v.to_string())),
-            );
-        }
-    }
-
-    let state = params.get("state").cloned();
 
     if let Some(error) = params.get("error") {
         let failed_event_name = format!("{}-auth-failed", &provider_id);

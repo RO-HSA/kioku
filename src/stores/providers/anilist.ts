@@ -50,6 +50,9 @@ export const useAniListStore = create<AniListStore>((set) => ({
   setProgress: (animeId, status, newProgress) =>
     set((state) => {
       if (!state.animeListData) return {};
+      const anime = state.animeListData[status].find(
+        (item) => item.id === animeId
+      );
 
       const updatedAnimeListData = updateAnimeListData({
         animeId,
@@ -58,9 +61,13 @@ export const useAniListStore = create<AniListStore>((set) => ({
         data: { userEpisodesWatched: newProgress }
       });
 
+      if (anime?.entryId === undefined) {
+        return { animeListData: updatedAnimeListData };
+      }
+
       AnimeListService.enqueueListUpdate({
         providerId: Provider.ANILIST,
-        entryId: animeId,
+        entryId: anime.entryId,
         userEpisodesWatched: newProgress
       });
 
@@ -69,6 +76,9 @@ export const useAniListStore = create<AniListStore>((set) => ({
   setScore: (animeId, status, newScore) =>
     set((state) => {
       if (!state.animeListData) return {};
+      const anime = state.animeListData[status].find(
+        (item) => item.id === animeId
+      );
 
       const updatedAnimeListData = updateAnimeListData({
         animeId,
@@ -77,9 +87,13 @@ export const useAniListStore = create<AniListStore>((set) => ({
         data: { userScore: newScore }
       });
 
+      if (anime?.entryId === undefined) {
+        return { animeListData: updatedAnimeListData };
+      }
+
       AnimeListService.enqueueListUpdate({
         providerId: Provider.ANILIST,
-        entryId: animeId,
+        entryId: anime.entryId,
         userScore: newScore
       });
 
@@ -92,6 +106,9 @@ export const useAniListStore = create<AniListStore>((set) => ({
   ) =>
     set((state) => {
       if (!state.animeListData) return {};
+      const anime = state.animeListData[currentStatus].find(
+        (item) => item.id === animeId
+      );
 
       const updatedAnimeListData = updateAnimeListData({
         animeId,
@@ -101,9 +118,13 @@ export const useAniListStore = create<AniListStore>((set) => ({
         isSingleUpdate: false
       });
 
+      if (anime?.entryId === undefined) {
+        return { animeListData: updatedAnimeListData };
+      }
+
       AnimeListService.enqueueListUpdate({
         providerId: Provider.ANILIST,
-        entryId: animeId,
+        entryId: anime.entryId,
         ...data
       });
 

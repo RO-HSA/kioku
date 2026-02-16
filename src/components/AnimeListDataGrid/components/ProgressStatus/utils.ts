@@ -8,6 +8,14 @@ export const estimateBroadcastedEpisodes = (
   startDate: string | null,
   broadcast: AnimeListBroadcast
 ): number => {
+  if (
+    broadcast.availableEpisodes !== undefined &&
+    broadcast.availableEpisodes !== null
+  ) {
+    const available = Math.max(0, broadcast.availableEpisodes);
+    return total > 0 ? Math.min(available, total) : available;
+  }
+
   if (!startDate || !broadcast.dayOfTheWeek || !broadcast.startTime) {
     return total;
   }

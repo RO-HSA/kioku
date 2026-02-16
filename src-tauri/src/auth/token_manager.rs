@@ -164,6 +164,17 @@ impl TokenManagerState {
         Ok(guard.pkce_states.remove(state))
     }
 
+    pub fn get_pkce_state_provider(&self, state: &str) -> Result<Option<String>, String> {
+        let guard = self
+            .0
+            .lock()
+            .map_err(|_| "Token manager lock poisoned".to_string())?;
+        Ok(guard
+            .pkce_states
+            .get(state)
+            .map(|(provider_id, _)| provider_id.clone()))
+    }
+
     fn set_access_token(
         &self,
         provider_id: &str,

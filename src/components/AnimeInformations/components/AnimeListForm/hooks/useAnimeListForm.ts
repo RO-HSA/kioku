@@ -2,8 +2,11 @@ import { useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 
 import { useAnimeDetailsStore } from '@/stores/animeDetails';
+import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
+import { useProviderStore } from '@/stores/providers/provider';
 import { IAnimeList } from '@/types/AnimeList';
+import { Provider } from '@/types/List';
 import { AnimeListFormData } from './types';
 
 interface UseAnimeListFormProps {
@@ -15,7 +18,14 @@ const useAnimeListForm = ({ selectedAnime }: UseAnimeListFormProps) => {
   const setSelectedAnime = useAnimeDetailsStore(
     (state) => state.setSelectedAnime
   );
-  const updateAnimeList = useMyAnimeListStore((state) => state.updateAnimeList);
+
+  const activeProvider = useProviderStore((state) => state.activeProvider);
+  const updateMyAnimeListAnimeList = useMyAnimeListStore(
+    (state) => state.updateAnimeList
+  );
+  const updateAniListAnimeList = useAniListStore(
+    (state) => state.updateAnimeList
+  );
 
   const {
     userStatus,
@@ -67,11 +77,36 @@ const useAnimeListForm = ({ selectedAnime }: UseAnimeListFormProps) => {
 
     if (Object.keys(payload).length === 0) return;
 
-    updateAnimeList(selectedAnime.id, selectedAnime.userStatus, payload);
+    switch (activeProvider) {
+      case Provider.MY_ANIME_LIST:
+        updateMyAnimeListAnimeList(
+          selectedAnime.id,
+          selectedAnime.userStatus,
+          payload
+        );
+        break;
+      case Provider.ANILIST:
+        updateAniListAnimeList(
+          selectedAnime.id,
+          selectedAnime.userStatus,
+          payload
+        );
+        break;
+      default:
+        break;
+    }
 
     setIsOpen(false);
     setSelectedAnime(null);
-  }, [getDirtyPayload, setIsOpen, setSelectedAnime, updateAnimeList]);
+  }, [
+    getDirtyPayload,
+    setIsOpen,
+    setSelectedAnime,
+    updateMyAnimeListAnimeList,
+    updateAniListAnimeList,
+    activeProvider,
+    selectedAnime
+  ]);
 
   return {
     control,

@@ -1,26 +1,47 @@
 import { IconButton, Tooltip } from '@mui/material';
+import { LoaderCircle, RefreshCw } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
+import { AniListService } from '@/services/backend/AniList';
 import { MyAnimeListService } from '@/services/backend/MyAnimeList';
+import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
-import { LoaderCircle, RefreshCw } from 'lucide-react';
+import { useProviderStore } from '@/stores/providers/provider';
+import { Provider } from '@/types/List';
 
 const RefreshListButton = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const setAnimeListData = useMyAnimeListStore(
+
+  const activeProvider = useProviderStore((state) => state.activeProvider);
+  const setMyAnimeListData = useMyAnimeListStore(
     (state) => state.setAnimeListData
   );
+  const setAniListData = useAniListStore((state) => state.setAnimeListData);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
 
-    try {
-      const result = await MyAnimeListService.synchronizeList();
-      setAnimeListData(result);
-    } finally {
-      setIsRefreshing(false);
+    switch (activeProvider) {
+      case Provider.MY_ANIME_LIST:
+        try {
+          const result = await MyAnimeListService.synchronizeList();
+          setMyAnimeListData(result);
+        } finally {
+          setIsRefreshing(false);
+        }
+        break;
+      case Provider.ANILIST:
+        try {
+          const result = await AniListService.synchronizeList();
+          setAniListData(result);
+        } finally {
+          setIsRefreshing(false);
+        }
+        break;
+      default:
+        setIsRefreshing(false);
     }
-  }, [setAnimeListData, setIsRefreshing]);
+  }, [setMyAnimeListData, setAniListData, setIsRefreshing, activeProvider]);
 
   return (
     <>
