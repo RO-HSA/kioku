@@ -1,4 +1,4 @@
-import { MyAnimeListService } from '@/services/backend/MyAnimeList';
+import { AnimeListService } from '@/services/backend/AnimeList';
 import { SynchronizedAnimeList } from '@/services/backend/types';
 import { AnimeListUserStatus, IAnimeList } from '@/types/AnimeList';
 import { Provider } from '@/types/List';
@@ -57,7 +57,7 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
         data: { userEpisodesWatched: newProgress }
       });
 
-      MyAnimeListService.enqueueListUpdate({
+      AnimeListService.enqueueListUpdate({
         providerId: Provider.MY_ANIME_LIST,
         entryId: animeId,
         userEpisodesWatched: newProgress
@@ -76,7 +76,7 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
         data: { userScore: newScore }
       });
 
-      MyAnimeListService.enqueueListUpdate({
+      AnimeListService.enqueueListUpdate({
         providerId: Provider.MY_ANIME_LIST,
         entryId: animeId,
         userScore: newScore
@@ -100,7 +100,7 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
         isSingleUpdate: false
       });
 
-      MyAnimeListService.enqueueListUpdate({
+      AnimeListService.enqueueListUpdate({
         providerId: Provider.MY_ANIME_LIST,
         entryId: animeId,
         ...data
