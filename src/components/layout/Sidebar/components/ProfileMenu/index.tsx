@@ -38,7 +38,7 @@ const ProfileMenu = () => {
         className="flex p-2 items-center justify-between hover:bg-action-hover rounded-lg"
         aria-expanded={mainPopoverOpen ? 'true' : undefined}
         onClick={handleOpenMainPopover}>
-        <div className="flex gap-3 items-center">
+        <div className="flex gap-3 items-center select-none">
           <Avatar
             sizes="40px"
             sx={{ borderRadius: '20%' }}
@@ -87,6 +87,25 @@ const ProfileMenu = () => {
             transformOrigin={{
               vertical: 'top',
               horizontal: 'left'
+            }}
+            slotProps={{
+              paper: {
+                sx: {
+                  mt: 1.5,
+                  '&::before': {
+                    content: '""',
+                    display: 'block',
+                    position: 'absolute',
+                    top: 0,
+                    right: 14,
+                    width: 10,
+                    height: 10,
+                    bgcolor: 'background.paper',
+                    transform: 'translateY(-50%) rotate(45deg)',
+                    zIndex: 0
+                  }
+                }
+              }
             }}>
             {connectedAccounts.map((account) => (
               <MenuItem
