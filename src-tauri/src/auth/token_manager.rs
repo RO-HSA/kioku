@@ -7,7 +7,9 @@ use serde_json;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_http::reqwest;
 
-use crate::auth::secure_store::{read_refresh_token, save_refresh_token};
+use crate::auth::secure_store::{
+    read_access_token, read_refresh_token, save_access_token, save_refresh_token,
+};
 use crate::auth::mal::PROVIDER_ID as MAL_PROVIDER_ID;
 use crate::auth::anilist::PROVIDER_ID as ANILIST_PROVIDER_ID;
 
@@ -230,11 +232,7 @@ pub fn store_tokens(
     provider_id: &str,
     response: &TokenResponse,
 ) -> Result<(), String> {
-    app.state::<TokenManagerState>().set_access_token(
-        provider_id,
-        response.access_token.clone(),
-        response.expires_in,
-    )?;
+    store_access_token(app, provider_id, &response.access_token, response.expires_in)?;
 
     if let Some(refresh_token) = response.refresh_token.as_ref() {
         save_refresh_token(app, provider_id, refresh_token)?;
@@ -253,6 +251,13 @@ pub fn store_access_token(
         provider_id,
         access_token.to_string(),
         expires_in,
+    )?;
+
+    save_access_token(
+        app,
+        provider_id,
+        access_token,
+        compute_expires_at_unix_secs(expires_in)?,
     )
 }
 
@@ -262,6 +267,14 @@ pub async fn get_access_token(app: &AppHandle, provider_id: &str) -> Result<Stri
         .get_valid_access_token(provider_id)?
     {
         return Ok(token);
+    }
+
+    if let Some(token) = restore_access_token_from_store(app, provider_id)? {
+        return Ok(token);
+    }
+
+    if provider_id == ANILIST_PROVIDER_ID {
+        return Err("AniList access token expired or missing; reauthorize AniList".to_string());
     }
 
     refresh_access_token(app, provider_id).await
@@ -392,4 +405,53 @@ async fn refresh_access_token(app: &AppHandle, provider_id: &str) -> Result<Stri
     let access_token = token_response.access_token.clone();
     store_tokens(app, provider_id, &token_response)?;
     Ok(access_token)
+}
+
+fn compute_expires_at_unix_secs(expires_in: u64) -> Result<u64, String> {
+    let expires_at = SystemTime::now()
+        .checked_add(Duration::from_secs(expires_in))
+        .ok_or_else(|| "Failed to compute access token expiration".to_string())?;
+
+    expires_at
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_err(|_| "Computed access token expiration is before UNIX epoch".to_string())
+        .map(|value| value.as_secs())
+}
+
+fn restore_access_token_from_store(
+    app: &AppHandle,
+    provider_id: &str,
+) -> Result<Option<String>, String> {
+    let Some((token, expires_at_unix_secs)) = read_access_token(app, provider_id)? else {
+        return Ok(None);
+    };
+
+    let expires_at = SystemTime::UNIX_EPOCH
+        .checked_add(Duration::from_secs(expires_at_unix_secs))
+        .ok_or_else(|| "Stored access token expiration is invalid".to_string())?;
+    let refresh_at = expires_at
+        .checked_sub(Duration::from_secs(REFRESH_EARLY_SECS))
+        .unwrap_or(expires_at);
+    let now = SystemTime::now();
+
+    if now >= refresh_at {
+        return Ok(None);
+    }
+
+    let remaining_secs = expires_at
+        .duration_since(now)
+        .map_err(|_| "Stored access token is expired".to_string())?
+        .as_secs();
+
+    if remaining_secs == 0 {
+        return Ok(None);
+    }
+
+    app.state::<TokenManagerState>().set_access_token(
+        provider_id,
+        token.clone(),
+        remaining_secs,
+    )?;
+
+    Ok(Some(token))
 }

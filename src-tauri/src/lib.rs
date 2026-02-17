@@ -20,6 +20,7 @@ use crate::auth::{
 };
 use crate::services::anime_list_updates::{enqueue_anime_list_update, AnimeListUpdateQueue};
 use crate::services::myanimelist::synchronize_myanimelist;
+use crate::services::anilist::synchronize_anilist;
 use crate::services::player_detection::{
     configure_playback_observer, detect_playing_anime, get_playback_observer_state,
     start_playback_observer, PlaybackObserverState, SupportedPlayer,
@@ -153,6 +154,7 @@ pub fn run() {
             authorize_provider,
             oauth_request,
             synchronize_myanimelist,
+            synchronize_anilist,
             enqueue_anime_list_update,
             detect_playing_anime,
             get_playback_observer_state,

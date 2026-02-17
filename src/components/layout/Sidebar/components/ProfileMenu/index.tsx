@@ -11,6 +11,7 @@ import {
   Typography
 } from '@mui/material';
 import { ArrowRightToLine, ChevronUp } from 'lucide-react';
+import { Fragment } from 'react/jsx-runtime';
 
 import { mapProviderToName } from '@/utils/provider';
 import useProfileMenu from './useProfileMenu';
@@ -66,14 +67,14 @@ const ProfileMenu = () => {
         transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}>
         <MenuList>
           {menuItems.map(({ label, icon, renderDivider, handleClick }) => (
-            <>
-              <MenuItem key={label} onClick={handleClick}>
+            <Fragment key={label}>
+              <MenuItem onClick={handleClick}>
                 <ListItemIcon>{icon}</ListItemIcon>
                 <ListItemText>{label}</ListItemText>
               </MenuItem>
 
               {renderDivider && <Divider />}
-            </>
+            </Fragment>
           ))}
 
           <Menu
