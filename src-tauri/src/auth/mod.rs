@@ -92,8 +92,6 @@ async fn handle_oauth_callback_impl(
         .map(|(k, v)| (k.to_string(), v.to_string()))
         .collect();
 
-    println!("OAuth callback params: {:?}", parsed);
-
     if let Some(fragment) = parsed.fragment() {
         let fragment_url = reqwest::Url::parse(&format!("kioku://callback/?{fragment}"))
             .map_err(|e| e.to_string())?;
@@ -158,11 +156,16 @@ async fn handle_oauth_callback_impl(
             }
         }
 
+        let expires_in = params
+            .get("expires_in")
+            .and_then(|s| s.parse::<u64>().ok())
+            .unwrap_or(ANILIST_TOKEN_EXPIRES_IN_SECS);
+
         store_access_token(
             app,
             &provider_id,
             access_token,
-            ANILIST_TOKEN_EXPIRES_IN_SECS,
+            expires_in,
         )?;
 
         let success_event_name = format!("{}-auth-callback", &provider_id);
