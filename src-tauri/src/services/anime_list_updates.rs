@@ -6,7 +6,9 @@ use tauri_plugin_http::reqwest;
 use tokio::sync::mpsc;
 
 use crate::auth::mal::PROVIDER_ID as MAL_PROVIDER_ID;
+use crate::auth::anilist::PROVIDER_ID as ANILIST_PROVIDER_ID;
 use crate::services::myanimelist::update_myanimelist_list_entry;
+use crate::services::anilist::update_anilist_list_entry;
 
 const UPDATE_INTERVAL_MS: u64 = 1000;
 const UPDATE_QUEUE_CAPACITY: usize = 256;
@@ -16,7 +18,9 @@ const UPDATE_QUEUE_CAPACITY: usize = 256;
 pub struct AnimeListUpdateRequest {
     pub provider_id: String,
     #[serde(alias = "id")]
-    pub entry_id: u64,
+    pub entry_id: Option<u64>,
+    #[serde(default, alias = "mediaId")]
+    pub media_id: Option<u64>,
     pub user_status: Option<String>,
     pub user_score: Option<u32>,
     pub user_episodes_watched: Option<u32>,
@@ -65,7 +69,7 @@ fn spawn_update_worker(
         while let Some(update) = receiver.recv().await {
             if let Err(err) = handle_update(&app, &client, &update).await {
                 eprintln!(
-                    "Anime list update failed (provider={}, entry_id={}): {}",
+                    "Anime list update failed (provider={}, entry_id={:?}): {}",
                     update.provider_id, update.entry_id, err
                 );
             }
@@ -81,6 +85,7 @@ async fn handle_update(
     update: &AnimeListUpdateRequest,
 ) -> Result<(), String> {
     match update.provider_id.as_str() {
+        ANILIST_PROVIDER_ID => update_anilist_list_entry(app, client, update).await,
         MAL_PROVIDER_ID => update_myanimelist_list_entry(app, client, update).await,
         _ => Err(format!("Provider not supported: {}", update.provider_id)),
     }

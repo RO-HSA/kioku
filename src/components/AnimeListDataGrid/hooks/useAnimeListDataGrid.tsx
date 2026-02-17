@@ -7,12 +7,15 @@ import ProgressStatus from '@/components/AnimeListDataGrid/components/ProgressSt
 import { SynchronizedAnimeList } from '@/services/backend/types';
 import { useAnimeDetailsStore } from '@/stores/animeDetails';
 import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
+import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
+import { useProviderStore } from '@/stores/providers/provider';
 import {
   AnimeListStatus,
   AnimeListUserStatus,
   IAnimeList
 } from '@/types/AnimeList';
+import { Provider } from '@/types/List';
 import ScoreSelect from '../../ScoreSelect';
 import CustomTopToolbar from '../components/CustomTopToolbar';
 import MediaType from '../components/MediaType';
@@ -21,17 +24,9 @@ import useMaterialTableTheme from './useMaterialTableTheme';
 
 interface UseAnimeListDataGridProps {
   listData: SynchronizedAnimeList | null;
-  onProgressChange: (
-    animeId: number,
-    status: AnimeListUserStatus,
-    newProgress: number
-  ) => void;
 }
 
-const useAnimeListDataGrid = ({
-  listData,
-  onProgressChange
-}: UseAnimeListDataGridProps) => {
+const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
   const [isLoading, setIsLoading] = useState(true);
 
   const selectedUserStatus = useAnimeListDataGridStore(
@@ -43,7 +38,43 @@ const useAnimeListDataGrid = ({
     (state) => state.setSelectedAnime
   );
 
-  const setScore = useMyAnimeListStore((state) => state.setScore);
+  const activeProvider = useProviderStore((state) => state.activeProvider);
+
+  const setMyAnimeListScore = useMyAnimeListStore((state) => state.setScore);
+  const setMyAnimeListProgress = useMyAnimeListStore(
+    (state) => state.setProgress
+  );
+
+  const setAniListScore = useAniListStore((state) => state.setScore);
+  const setAniListProgress = useAniListStore((state) => state.setProgress);
+
+  const setScore = useCallback(
+    (animeId: number, status: AnimeListUserStatus, newScore: number) => {
+      switch (activeProvider) {
+        case Provider.MY_ANIME_LIST:
+          return setMyAnimeListScore(animeId, status, newScore);
+        case Provider.ANILIST:
+          return setAniListScore(animeId, status, newScore);
+        default:
+          return () => {};
+      }
+    },
+    [activeProvider, setAniListScore, setMyAnimeListScore]
+  );
+
+  const handleProgressChange = useCallback(
+    (animeId: number, status: AnimeListUserStatus, newProgress: number) => {
+      switch (activeProvider) {
+        case Provider.MY_ANIME_LIST:
+          return setMyAnimeListProgress(animeId, status, newProgress);
+        case Provider.ANILIST:
+          return setAniListProgress(animeId, status, newProgress);
+        default:
+          return () => {};
+      }
+    },
+    [activeProvider, setMyAnimeListProgress, setAniListProgress]
+  );
 
   const {
     mrtTheme,
@@ -156,7 +187,7 @@ const useAnimeListDataGrid = ({
               broadcast={row.original.broadcast}
               status={row.original.userStatus}
               onProgressChange={(newProgress) => {
-                onProgressChange(
+                handleProgressChange(
                   row.original.id,
                   row.original.userStatus,
                   newProgress
@@ -207,7 +238,7 @@ const useAnimeListDataGrid = ({
         }
       }
     ],
-    [onProgressChange]
+    [handleProgressChange, setScore]
   );
 
   const allData = useMemo(() => {

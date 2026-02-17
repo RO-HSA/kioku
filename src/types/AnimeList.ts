@@ -13,6 +13,7 @@ export type AnimeListUserStatus =
 export type AnimeListBroadcast = {
   dayOfTheWeek: string | null;
   startTime: string | null;
+  availableEpisodes?: number | null;
 };
 
 export interface IAnime {
@@ -34,6 +35,7 @@ export interface IAnime {
 }
 
 export interface IAnimeUserList {
+  entryId?: number;
   userStatus: AnimeListUserStatus;
   userScore: number;
   userEpisodesWatched: number;

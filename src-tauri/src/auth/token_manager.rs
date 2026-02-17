@@ -8,6 +8,8 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_http::reqwest;
 
 use crate::auth::secure_store::{read_refresh_token, save_refresh_token};
+use crate::auth::mal::PROVIDER_ID as MAL_PROVIDER_ID;
+use crate::auth::anilist::PROVIDER_ID as ANILIST_PROVIDER_ID;
 
 const REFRESH_EARLY_SECS: u64 = 60;
 
@@ -162,6 +164,17 @@ impl TokenManagerState {
         Ok(guard.pkce_states.remove(state))
     }
 
+    pub fn get_pkce_state_provider(&self, state: &str) -> Result<Option<String>, String> {
+        let guard = self
+            .0
+            .lock()
+            .map_err(|_| "Token manager lock poisoned".to_string())?;
+        Ok(guard
+            .pkce_states
+            .get(state)
+            .map(|(provider_id, _)| provider_id.clone()))
+    }
+
     fn set_access_token(
         &self,
         provider_id: &str,
@@ -230,6 +243,19 @@ pub fn store_tokens(
     Ok(())
 }
 
+pub fn store_access_token(
+    app: &AppHandle,
+    provider_id: &str,
+    access_token: &str,
+    expires_in: u64,
+) -> Result<(), String> {
+    app.state::<TokenManagerState>().set_access_token(
+        provider_id,
+        access_token.to_string(),
+        expires_in,
+    )
+}
+
 pub async fn get_access_token(app: &AppHandle, provider_id: &str) -> Result<String, String> {
     if let Some(token) = app
         .state::<TokenManagerState>()
@@ -257,7 +283,13 @@ pub fn build_authorize_url(
 
     let mut params: Vec<(String, String)> =
         Vec::with_capacity(3 + authorize_extra_params.len() + 1);
-    params.push(("response_type".to_string(), "code".to_string()));
+
+    if provider_id == MAL_PROVIDER_ID {
+        params.push(("response_type".to_string(), "code".to_string()));
+    } else if provider_id == ANILIST_PROVIDER_ID {
+        params.push(("response_type".to_string(), "token".to_string()));
+    }
+
     params.push(("client_id".to_string(), client_id));
 
     if use_pkce {
@@ -265,8 +297,11 @@ pub fn build_authorize_url(
         params.push(("code_challenge".to_string(), challenge.to_string()));
     }
 
+    
     if let Some(state) = state {
-        params.push(("state".to_string(), state.to_string()));
+        if provider_id == MAL_PROVIDER_ID {
+            params.push(("state".to_string(), state.to_string()));
+        }
     }
 
     params.extend(authorize_extra_params);
