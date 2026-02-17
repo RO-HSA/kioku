@@ -1,10 +1,10 @@
+import { createTauriStore } from '@tauri-store/zustand';
 import { create } from 'zustand';
 
 import { AnimeListService } from '@/services/backend/AnimeList';
 import { SynchronizedAnimeList } from '@/services/backend/types';
 import { AnimeListUserStatus, IAnimeList } from '@/types/AnimeList';
 import { Provider } from '@/types/List';
-import { createTauriStore } from '@tauri-store/zustand';
 import { updateAnimeListData } from './utils';
 
 type AniListStore = {
