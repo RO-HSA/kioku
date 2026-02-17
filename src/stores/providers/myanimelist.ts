@@ -9,15 +9,18 @@ import { updateAnimeListData } from './utils';
 
 type MyAnimeListStore = {
   username: string | null;
+  profilePictureUrl: string | null;
   isAuthenticating: boolean;
   isAuthenticated: boolean;
   isReauthenticating: boolean;
   animeListData: SynchronizedAnimeList | null;
   setUsername: (username: string | null) => void;
+  setProfilePictureUrl: (url: string | null) => void;
   setIsAuthenticating: (isAuthenticating: boolean) => void;
   setIsAuthenticated: (isAuthenticated: boolean) => void;
   setIsReauthenticating: (isReauthenticating: boolean) => void;
   setAnimeListData: (animeListData: SynchronizedAnimeList | null) => void;
+  signOut: () => void;
   setProgress: (
     animeId: number,
     status: AnimeListUserStatus,
@@ -37,16 +40,27 @@ type MyAnimeListStore = {
 
 export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
   username: null,
+  profilePictureUrl: null,
   isAuthenticating: false,
   isAuthenticated: false,
   isReauthenticating: false,
   animeListData: null,
-  setIsAuthenticated: (isAuthenticated) => set(() => ({ isAuthenticated })),
   setUsername: (username) => set(() => ({ username })),
+  setProfilePictureUrl: (url) => set(() => ({ profilePictureUrl: url })),
+  setIsAuthenticated: (isAuthenticated) => set(() => ({ isAuthenticated })),
   setIsAuthenticating: (isAuthenticating) => set(() => ({ isAuthenticating })),
   setIsReauthenticating: (isReauthenticating) =>
     set(() => ({ isReauthenticating })),
   setAnimeListData: (animeListData) => set(() => ({ animeListData })),
+  signOut: () =>
+    set(() => ({
+      username: null,
+      profilePictureUrl: null,
+      isAuthenticated: false,
+      isAuthenticating: false,
+      isReauthenticating: false,
+      animeListData: null
+    })),
   setProgress: (animeId, status, newProgress) =>
     set((state) => {
       if (!state.animeListData) return {};

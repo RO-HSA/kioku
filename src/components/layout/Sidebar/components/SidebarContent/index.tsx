@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { useConfigMenuStore } from '@/stores/config/configMenu';
 import { useSidebarStore } from '@/stores/sidebar/sidebar';
 import NavLinks from '../NavLinks';
+import ProfileMenu from '../ProfileMenu';
 
 const SidebarContent = () => {
   const { isMobile } = useWindowSize();
@@ -66,6 +67,10 @@ const SidebarContent = () => {
 
         <Box className="w-full overflow-hidden">
           <ModeToggle />
+
+          <Box className="border-t border-divider pt-4">
+            <ProfileMenu />
+          </Box>
         </Box>
       </nav>
     </div>

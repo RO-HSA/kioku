@@ -25,3 +25,14 @@ export const buildRegisterUrl = (provider: Provider) => {
       return 'https://myanimelist.net/register.php';
   }
 };
+
+export const buildProfileUrl = (provider: Provider, username: string) => {
+  switch (provider) {
+    case Provider.MY_ANIME_LIST:
+      return `https://myanimelist.net/profile/${username}`;
+    case Provider.ANILIST:
+      return `https://anilist.co/user/${username}`;
+    default:
+      return '';
+  }
+};
