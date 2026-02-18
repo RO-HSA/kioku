@@ -8,6 +8,9 @@ import {
   type MouseEvent
 } from 'react';
 
+import { calculatePlaybackMatches } from '@/hooks/detection/utils';
+import { useNowPlayingAliasesStore } from '@/stores/detection/nowPlayingAliases';
+import { usePlayerDetectionStore } from '@/stores/detection/playerDetection';
 import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { useProviderStore } from '@/stores/providers/provider';
@@ -40,6 +43,9 @@ const useProfileMenu = () => {
   const myAnimeListProfilePictureUrl = useMyAnimeListStore(
     (state) => state.profilePictureUrl
   );
+  const myAnimeListAnimeData = useMyAnimeListStore(
+    (state) => state.animeListData
+  );
   const signOutMyAnimeList = useMyAnimeListStore((state) => state.signOut);
 
   const isAniListAuthenticated = useAniListStore(
@@ -49,7 +55,17 @@ const useProfileMenu = () => {
   const anilistProfilePictureUrl = useAniListStore(
     (state) => state.profilePictureUrl
   );
+  const aniListAnimeData = useAniListStore((state) => state.animeListData);
   const signOutAniList = useAniListStore((state) => state.signOut);
+
+  const detection = usePlayerDetectionStore((state) => state.activeEpisode);
+  const setMatchingResult = usePlayerDetectionStore(
+    (state) => state.setMatchingResult
+  );
+
+  const getAliasesByProvider = useNowPlayingAliasesStore(
+    (state) => state.getAliasesByProvider
+  );
 
   const mainPopoverOpen = Boolean(mainPopoverEl);
   const switchAccountOpen = Boolean(switchAccountEl);
@@ -130,11 +146,56 @@ const useProfileMenu = () => {
     setSwitchAccountEl(null);
   };
 
-  const handleSwitchAccount = (provider: Provider) => {
-    setActiveProvider(provider);
-    handleCloseSwitchAccountPopover();
-    handleCloseMainPopover();
-  };
+  const handleSwitchAccount = useCallback(
+    (provider: Provider) => {
+      if (provider === activeProvider) {
+        return handleCloseSwitchAccountPopover();
+      }
+
+      setActiveProvider(provider);
+      handleCloseSwitchAccountPopover();
+      handleCloseMainPopover();
+
+      if (!detection) return;
+
+      switch (provider) {
+        case Provider.MY_ANIME_LIST:
+          if (!myAnimeListAnimeData) return;
+
+          calculatePlaybackMatches({
+            animeListData: myAnimeListAnimeData,
+            animeTitle: detection.animeTitle,
+            episodeNumber: detection.episode,
+            aliasesByAnimeId: getAliasesByProvider(Provider.MY_ANIME_LIST),
+            setMatchingResult
+          });
+          break;
+        case Provider.ANILIST:
+          if (!aniListAnimeData) return;
+
+          calculatePlaybackMatches({
+            animeListData: aniListAnimeData,
+            animeTitle: detection.animeTitle,
+            episodeNumber: detection.episode,
+            aliasesByAnimeId: getAliasesByProvider(Provider.ANILIST),
+            setMatchingResult
+          });
+          break;
+        default:
+          return;
+      }
+    },
+    [
+      detection,
+      myAnimeListAnimeData,
+      aniListAnimeData,
+      setActiveProvider,
+      handleCloseSwitchAccountPopover,
+      handleCloseMainPopover,
+      setMatchingResult,
+      getAliasesByProvider
+    ]
+  );
 
   const connectedAccounts = useMemo(() => {
     const accounts = [];

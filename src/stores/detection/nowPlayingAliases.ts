@@ -3,9 +3,9 @@ import { create } from 'zustand';
 
 import { Provider } from '@/types/List';
 
-type AliasesByAnimeId = Record<string, string[]>;
-type AliasesByProvider = Partial<Record<Provider, AliasesByAnimeId>>;
-type PersistedAliases = AliasesByProvider | AliasesByAnimeId;
+export type AliasesByAnimeId = Record<string, string[]>;
+export type AliasesByProvider = Partial<Record<Provider, AliasesByAnimeId>>;
+export type PersistedAliases = AliasesByProvider | AliasesByAnimeId;
 
 const hasProviderBuckets = (
   aliases: PersistedAliases
