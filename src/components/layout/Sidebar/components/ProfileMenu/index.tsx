@@ -40,7 +40,7 @@ const ProfileMenu = () => {
     <>
       <div
         className={cn(
-          'flex items-center justify-between hover:bg-action-hover rounded-lg transition-all duration-300 ease-in-out',
+          'flex items-center justify-between hover:bg-action-hover rounded-lg transition-all duration-300 ease-in-out cursor-pointer',
           isOpen ? 'p-2' : 'p-1'
         )}
         aria-expanded={mainPopoverOpen ? 'true' : undefined}

@@ -68,7 +68,7 @@ const SidebarContent = () => {
         <Box className="w-full overflow-hidden">
           <ModeToggle />
 
-          <Box className="border-t border-divider pt-4">
+          <Box className="border-t border-divider pt-4 mt-2">
             <ProfileMenu />
           </Box>
         </Box>
