@@ -62,7 +62,7 @@ const OauthForm: FC<OauthFormProps> = ({
           label="Username"
           size="small"
           variant="outlined"
-          value={username}
+          value={username ?? ''}
           onChange={(e) => setUsername(e.target.value)}
         />
 

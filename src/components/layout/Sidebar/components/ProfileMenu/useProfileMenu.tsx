@@ -114,6 +114,7 @@ const useProfileMenu = () => {
   ]);
 
   const handleOpenMainPopover = (event: MouseEvent<HTMLElement>) => {
+    if (!activeProvider) return;
     setMainPopoverEl(event.currentTarget);
   };
 
