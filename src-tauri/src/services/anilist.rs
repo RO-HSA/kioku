@@ -748,7 +748,9 @@ pub async fn synchronize_anilist(app: tauri::AppHandle) -> Result<SynchronizedAn
     let mut result = SynchronizedAnimeList::default();
 
     if collection.has_next_chunk {
-        eprintln!("AniList returned additional chunks; only the first chunk is currently synchronized.");
+        eprintln!(
+            "AniList returned additional chunks; only the first chunk is currently synchronized."
+        );
     }
 
     for list in collection.lists {

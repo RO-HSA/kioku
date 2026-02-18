@@ -113,6 +113,7 @@ pub fn run() {
             }
 
             let mal_config = ProviderConfig::new(MAL_CLIENT_ID, MAL_AUTHORIZE_URL, MAL_TOKEN_URL)
+                .with_callback_provider_hint(MAL_PROVIDER_ID)
                 .with_authorize_param("redirect_uri", "kioku://myanimelist")
                 .with_authorize_param("code_challenge_method", "plain")
                 .with_token_param("redirect_uri", "kioku://myanimelist");
@@ -127,8 +128,13 @@ pub fn run() {
             let anilist_config =
                 ProviderConfig::new(ANILIST_CLIENT_ID, ANILIST_AUTHORIZE_URL, ANILIST_TOKEN_URL)
                     .with_pkce(false)
-                    .with_authorize_param("redirect_uri", "kioku://anilist")
-                    .with_token_param("redirect_uri", "kioku://anilist");
+                    .with_state(false)
+                    .with_authorize_response_type("token")
+                    .without_callback_code()
+                    .with_callback_access_token_param("access_token")
+                    .with_refresh_token(false)
+                    .with_default_access_token_ttl_secs(60 * 60 * 24 * 365)
+                    .with_callback_provider_hint(ANILIST_PROVIDER_ID);
 
             if let Err(err) = app
                 .state::<TokenManagerState>()

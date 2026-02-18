@@ -5,10 +5,10 @@ use tauri::Manager;
 use tauri_plugin_http::reqwest;
 use tokio::sync::mpsc;
 
-use crate::auth::mal::PROVIDER_ID as MAL_PROVIDER_ID;
 use crate::auth::anilist::PROVIDER_ID as ANILIST_PROVIDER_ID;
-use crate::services::myanimelist::update_myanimelist_list_entry;
+use crate::auth::mal::PROVIDER_ID as MAL_PROVIDER_ID;
 use crate::services::anilist::update_anilist_list_entry;
+use crate::services::myanimelist::update_myanimelist_list_entry;
 
 const UPDATE_INTERVAL_MS: u64 = 1000;
 const UPDATE_QUEUE_CAPACITY: usize = 256;
