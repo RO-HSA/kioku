@@ -65,6 +65,10 @@ export const useAniListStore = create<AniListStore>((set) => ({
     set((state) => {
       if (!state.animeListData) return {};
 
+      const anime = state.animeListData[status].find(
+        (item) => item.id === animeId
+      );
+
       const updatedAnimeListData = updateAnimeListData({
         animeId,
         status,
@@ -72,9 +76,13 @@ export const useAniListStore = create<AniListStore>((set) => ({
         data: { userEpisodesWatched: newProgress }
       });
 
+      if (anime?.entryId === undefined) {
+        return { animeListData: updatedAnimeListData };
+      }
+
       AnimeListService.enqueueListUpdate({
         providerId: Provider.ANILIST,
-        entryId: animeId,
+        entryId: anime.entryId,
         userEpisodesWatched: newProgress
       });
 
