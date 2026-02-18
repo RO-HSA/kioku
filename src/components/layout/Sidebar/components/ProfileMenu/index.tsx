@@ -12,6 +12,8 @@ import {
 } from '@mui/material';
 import { ArrowRightToLine, ChevronUp } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
+import { useSidebarStore } from '@/stores/sidebar/sidebar';
 import { mapProviderToName } from '@/utils/provider';
 import useProfileMenu from './useProfileMenu';
 
@@ -32,20 +34,37 @@ const ProfileMenu = () => {
     handleCloseSwitchAccountPopover
   } = useProfileMenu();
 
+  const isOpen = useSidebarStore((state) => state.isOpen);
+
   return (
     <>
       <div
-        className="flex p-2 items-center justify-between hover:bg-action-hover rounded-lg"
+        className={cn(
+          'flex items-center justify-between hover:bg-action-hover rounded-lg transition-all duration-300 ease-in-out',
+          isOpen ? 'p-2' : 'p-1'
+        )}
         aria-expanded={mainPopoverOpen ? 'true' : undefined}
         onClick={handleOpenMainPopover}>
-        <div className="flex gap-3 items-center select-none">
+        <div
+          className={cn(
+            'flex gap-3 items-center select-none transition-all duration-300 ease-in-out',
+            !isOpen && 'justify-center gap-0'
+          )}>
           <Avatar
-            sizes="40px"
+            className={cn(
+              'shrink-0 transition-all duration-300 ease-in-out',
+              isOpen ? 'size-10!' : 'size-7.5!'
+            )}
             sx={{ borderRadius: '20%' }}
             src={profileImage ?? undefined}
           />
 
-          <Box gap={2}>
+          <Box
+            className={cn(
+              'truncate w-full opacity-100 transition-opacity duration-300 ease-in-out',
+              !isOpen && 'opacity-0 w-0 h-0'
+            )}
+            gap={2}>
             <Typography variant="body1" fontWeight="bold">
               {username}
             </Typography>
@@ -55,7 +74,13 @@ const ProfileMenu = () => {
           </Box>
         </div>
 
-        <ChevronUp className="text-Chip-defaultBorder" size={19} />
+        <ChevronUp
+          className={cn(
+            'text-Chip-defaultBorder transition-all duration-300 ease-in-out opacity-100',
+            !isOpen && 'opacity-0'
+          )}
+          size={19}
+        />
       </div>
 
       <Popover
