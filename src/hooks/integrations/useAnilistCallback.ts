@@ -62,7 +62,12 @@ const useAnilistCallback = () => {
       setIsAuthenticating(false);
       setIsReauthenticating(false);
     };
-  }, [setIsAuthenticated, setIsAuthenticating, setAnimeListData]);
+  }, [
+    setIsAuthenticated,
+    setIsAuthenticating,
+    setIsReauthenticating,
+    setAnimeListData
+  ]);
 };
 
 export default useAnilistCallback;
