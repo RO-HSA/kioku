@@ -1,10 +1,12 @@
 import { Box, Container, Grid, Typography } from '@mui/material';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import Button from '@/components/ui/Button';
 import { useNowPlayingAliasesStore } from '@/stores/detection/nowPlayingAliases';
 import { usePlayerDetectionStore } from '@/stores/detection/playerDetection';
+import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
+import { useProviderStore } from '@/stores/providers/provider';
 import { Provider } from '@/types/List';
 import { buildEntityUrl } from '@/utils/url';
 import AnimeTitle from '../AnimeInformations/components/AnimeTitle';
@@ -22,20 +24,42 @@ const NowPlaying = () => {
   const resolveActiveAnime = usePlayerDetectionStore(
     (state) => state.resolveActiveAnime
   );
-  const animeListData = useMyAnimeListStore((state) => state.animeListData);
+
+  const myAnimeListAnimeData = useMyAnimeListStore(
+    (state) => state.animeListData
+  );
+  const aniListAnimeData = useAniListStore((state) => state.animeListData);
+
   const addAlias = useNowPlayingAliasesStore((state) => state.addAlias);
 
-  const aggregatedData = useMemo(() => {
-    if (!animeListData) return [];
+  const activeProvider = useProviderStore((state) => state.activeProvider);
 
-    return [
-      ...animeListData.watching,
-      ...animeListData.completed,
-      ...animeListData.onHold,
-      ...animeListData.dropped,
-      ...animeListData.planToWatch
-    ];
-  }, [animeListData]);
+  const aggregatedData = useMemo(() => {
+    switch (activeProvider) {
+      case Provider.MY_ANIME_LIST:
+        if (!myAnimeListAnimeData) return [];
+
+        return [
+          ...myAnimeListAnimeData.watching,
+          ...myAnimeListAnimeData.completed,
+          ...myAnimeListAnimeData.onHold,
+          ...myAnimeListAnimeData.dropped,
+          ...myAnimeListAnimeData.planToWatch
+        ];
+      case Provider.ANILIST:
+        if (!aniListAnimeData) return [];
+
+        return [
+          ...aniListAnimeData.watching,
+          ...aniListAnimeData.completed,
+          ...aniListAnimeData.onHold,
+          ...aniListAnimeData.dropped,
+          ...aniListAnimeData.planToWatch
+        ];
+      default:
+        return [];
+    }
+  }, [activeProvider, aniListAnimeData, myAnimeListAnimeData]);
 
   const exactAnimeMatch = useMemo(() => {
     if (!activeMatchedAnimeId) {
@@ -59,14 +83,17 @@ const NowPlaying = () => {
       );
   }, [aggregatedData, animePlaying, exactAnimeMatch, suggestedAnimeIds]);
 
-  const handleSuggestionClick = (animeId: number) => {
-    if (!animePlaying?.animeTitle) {
-      return;
-    }
+  const handleSuggestionClick = useCallback(
+    (animeId: number) => {
+      if (!animePlaying?.animeTitle) return;
 
-    addAlias(Provider.MY_ANIME_LIST, animeId, animePlaying.animeTitle);
-    resolveActiveAnime(animeId);
-  };
+      if (!activeProvider) return;
+
+      addAlias(activeProvider, animeId, animePlaying.animeTitle);
+      resolveActiveAnime(animeId);
+    },
+    [activeProvider, addAlias, resolveActiveAnime, animePlaying]
+  );
 
   return (
     <Container className="h-full min-h-0 flex flex-col py-4">
