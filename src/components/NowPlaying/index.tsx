@@ -2,6 +2,7 @@ import { Box, Container, Grid, Typography } from '@mui/material';
 import { useCallback, useMemo } from 'react';
 
 import Button from '@/components/ui/Button';
+import { flattenAnimeListData } from '@/hooks/detection/utils';
 import { useNowPlayingAliasesStore } from '@/stores/detection/nowPlayingAliases';
 import { usePlayerDetectionStore } from '@/stores/detection/playerDetection';
 import { useAniListStore } from '@/stores/providers/anilist';
@@ -37,25 +38,9 @@ const NowPlaying = () => {
   const aggregatedData = useMemo(() => {
     switch (activeProvider) {
       case Provider.MY_ANIME_LIST:
-        if (!myAnimeListAnimeData) return [];
-
-        return [
-          ...myAnimeListAnimeData.watching,
-          ...myAnimeListAnimeData.completed,
-          ...myAnimeListAnimeData.onHold,
-          ...myAnimeListAnimeData.dropped,
-          ...myAnimeListAnimeData.planToWatch
-        ];
+        return flattenAnimeListData(myAnimeListAnimeData);
       case Provider.ANILIST:
-        if (!aniListAnimeData) return [];
-
-        return [
-          ...aniListAnimeData.watching,
-          ...aniListAnimeData.completed,
-          ...aniListAnimeData.onHold,
-          ...aniListAnimeData.dropped,
-          ...aniListAnimeData.planToWatch
-        ];
+        return flattenAnimeListData(aniListAnimeData);
       default:
         return [];
     }
