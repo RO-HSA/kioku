@@ -58,9 +58,7 @@ const Details: FC<DetailsProps> = ({
 
       <div className="grid grid-cols-2">
         <Typography variant="body2">Score:</Typography>
-        <Typography variant="body2">
-          {score > 10 ? score / 10 : score}
-        </Typography>
+        <Typography variant="body2">{score}</Typography>
       </div>
     </div>
   );
