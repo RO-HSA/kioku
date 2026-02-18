@@ -120,6 +120,7 @@ pub fn save_refresh_token(
     refresh_token: &str,
 ) -> Result<(), String> {
     let key = app.state::<StrongholdKeyState>().get_key()?;
+
     let stronghold = open_stronghold(app, &key)?;
     let client = stronghold
         .load_client(CLIENT_ID)
@@ -135,7 +136,8 @@ pub fn save_refresh_token(
         )
         .map_err(|e| e.to_string())?;
 
-    stronghold.save().map_err(|e| e.to_string())
+    stronghold.save().map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 pub fn read_refresh_token(app: &AppHandle, provider_id: &str) -> Result<Option<String>, String> {
@@ -175,7 +177,11 @@ pub fn save_access_token(
 
     client
         .store()
-        .insert(access_record_key(provider_id).as_bytes().to_vec(), encoded, None)
+        .insert(
+            access_record_key(provider_id).as_bytes().to_vec(),
+            encoded,
+            None,
+        )
         .map_err(|e| e.to_string())?;
 
     stronghold.save().map_err(|e| e.to_string())

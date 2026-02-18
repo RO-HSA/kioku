@@ -7,11 +7,11 @@ use serde_json;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_http::reqwest;
 
+use crate::auth::anilist::PROVIDER_ID as ANILIST_PROVIDER_ID;
+use crate::auth::mal::PROVIDER_ID as MAL_PROVIDER_ID;
 use crate::auth::secure_store::{
     read_access_token, read_refresh_token, save_access_token, save_refresh_token,
 };
-use crate::auth::mal::PROVIDER_ID as MAL_PROVIDER_ID;
-use crate::auth::anilist::PROVIDER_ID as ANILIST_PROVIDER_ID;
 
 const REFRESH_EARLY_SECS: u64 = 60;
 
@@ -232,7 +232,12 @@ pub fn store_tokens(
     provider_id: &str,
     response: &TokenResponse,
 ) -> Result<(), String> {
-    store_access_token(app, provider_id, &response.access_token, response.expires_in)?;
+    store_access_token(
+        app,
+        provider_id,
+        &response.access_token,
+        response.expires_in,
+    )?;
 
     if let Some(refresh_token) = response.refresh_token.as_ref() {
         save_refresh_token(app, provider_id, refresh_token)?;
@@ -310,7 +315,6 @@ pub fn build_authorize_url(
         params.push(("code_challenge".to_string(), challenge.to_string()));
     }
 
-    
     if let Some(state) = state {
         if provider_id == MAL_PROVIDER_ID {
             params.push(("state".to_string(), state.to_string()));
@@ -337,6 +341,12 @@ pub async fn exchange_authorization_code(
         token_extra_params,
         ..
     } = app.state::<TokenManagerState>().get_provider(provider_id)?;
+
+    if token_url.trim().is_empty() {
+        return Err(format!(
+            "Missing token URL configuration for provider {provider_id}"
+        ));
+    }
 
     if use_pkce && code_verifier.is_none() {
         return Err("Missing PKCE code verifier".to_string());
@@ -383,6 +393,12 @@ async fn refresh_access_token(app: &AppHandle, provider_id: &str) -> Result<Stri
         token_extra_params: _,
         refresh_extra_params,
     } = app.state::<TokenManagerState>().get_provider(provider_id)?;
+
+    if token_url.trim().is_empty() {
+        return Err(format!(
+            "Missing token URL configuration for provider {provider_id}"
+        ));
+    }
 
     let mut params: Vec<(String, String)> = Vec::with_capacity(3 + refresh_extra_params.len());
     params.push(("client_id".to_string(), client_id));

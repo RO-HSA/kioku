@@ -4,21 +4,30 @@ use tauri::{Emitter, Manager};
 use tauri_plugin_http::reqwest;
 use tauri_plugin_opener::OpenerExt;
 
-pub mod mal;
 pub mod anilist;
+pub mod mal;
 pub mod oauth;
 pub mod request;
 pub mod secure_store;
 pub mod token_manager;
-use crate::auth::mal::PROVIDER_ID as MAL_PROVIDER_ID;
 use crate::auth::anilist::PROVIDER_ID as ANILIST_PROVIDER_ID;
+use crate::auth::mal::PROVIDER_ID as MAL_PROVIDER_ID;
 use crate::auth::oauth::pkce::generate_pkce;
-use crate::auth::token_manager::{build_authorize_url, exchange_authorization_code, store_access_token};
+use crate::auth::token_manager::{
+    build_authorize_url, exchange_authorization_code, store_access_token,
+};
 pub use request::oauth_request;
 pub use secure_store::{init_stronghold_key, StrongholdKeyState};
 pub use token_manager::{ProviderConfig, TokenManagerState};
 
 const ANILIST_TOKEN_EXPIRES_IN_SECS: u64 = 60 * 60 * 24 * 365;
+
+fn emit_auth_failed(app: &tauri::AppHandle, provider_id: &str) {
+    let failed_event_name = format!("{provider_id}-auth-failed");
+    if let Err(err) = app.emit(failed_event_name.as_str(), ()) {
+        eprintln!("Failed to emit {failed_event_name}: {err}");
+    }
+}
 
 #[tauri::command]
 pub async fn authorize_provider(provider_id: String, app: tauri::AppHandle) -> Result<(), String> {
@@ -130,76 +139,79 @@ async fn handle_oauth_callback_impl(
             .ok_or_else(|| "Missing provider id in callback URL".to_string())?
     };
 
-    if let Some(error) = params.get("error") {
-        let failed_event_name = format!("{}-auth-failed", &provider_id);
-        app.emit(failed_event_name.as_str(), ())
-            .map_err(|e| e.to_string())?;
+    let callback_result: Result<(), String> = async {
+        if let Some(error) = params.get("error") {
+            return Err(format!("Error during authorization: {error}"));
+        }
 
-        return Err(format!("Error during authorization: {error}"));
-    }
+        if provider_id == ANILIST_PROVIDER_ID && params.contains_key("access_token") {
+            let access_token = params
+                .get("access_token")
+                .ok_or_else(|| "Missing access token".to_string())?;
 
-    if provider_id == ANILIST_PROVIDER_ID {
-        let access_token = params
-            .get("access_token")
-            .ok_or_else(|| "Missing access token".to_string())?;
-
-        if let Some(state) = state.as_ref() {
-            match app.state::<TokenManagerState>().take_pkce_state(state)? {
-                Some((state_provider_id, _)) => {
+            if let Some(state) = state.as_ref() {
+                if let Some((state_provider_id, _)) =
+                    app.state::<TokenManagerState>().take_pkce_state(state)?
+                {
                     if state_provider_id != provider_id {
                         return Err("OAuth state/provider mismatch".to_string());
                     }
                 }
-                None => {
-                    return Err("Missing PKCE verifier for state".to_string());
-                }
             }
+
+            let expires_in = params
+                .get("expires_in")
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or(ANILIST_TOKEN_EXPIRES_IN_SECS);
+
+            store_access_token(app, &provider_id, access_token, expires_in)?;
+
+            let success_event_name = format!("{}-auth-callback", &provider_id);
+            app.emit(success_event_name.as_str(), ())
+                .map_err(|e| e.to_string())?;
+            return Ok(());
         }
 
-        let expires_in = params
-            .get("expires_in")
-            .and_then(|s| s.parse::<u64>().ok())
-            .unwrap_or(ANILIST_TOKEN_EXPIRES_IN_SECS);
+        let code = params
+            .get("code")
+            .ok_or_else(|| "Missing authorization code".to_string())?;
 
-        store_access_token(
-            app,
-            &provider_id,
-            access_token,
-            expires_in,
-        )?;
+        let code_verifier = if let Some(state) = state.as_ref() {
+            match app.state::<TokenManagerState>().take_pkce_state(state)? {
+                Some((state_provider_id, verifier)) => {
+                    if state_provider_id != provider_id {
+                        return Err("OAuth state/provider mismatch".to_string());
+                    }
+                    Some(verifier)
+                }
+                None => {
+                    let provider = app
+                        .state::<TokenManagerState>()
+                        .get_provider(&provider_id)?;
+                    if provider.use_pkce {
+                        return Err("Missing PKCE verifier for state".to_string());
+                    }
+                    None
+                }
+            }
+        } else {
+            app.state::<TokenManagerState>()
+                .take_pkce_verifier(&provider_id)?
+        };
+
+        exchange_authorization_code(app, &provider_id, code, code_verifier).await?;
 
         let success_event_name = format!("{}-auth-callback", &provider_id);
         app.emit(success_event_name.as_str(), ())
             .map_err(|e| e.to_string())?;
-        return Ok(());
+        Ok(())
+    }
+    .await;
+
+    if let Err(err) = callback_result {
+        emit_auth_failed(app, &provider_id);
+        return Err(err);
     }
 
-    let code = params
-        .get("code")
-        .ok_or_else(|| "Missing authorization code".to_string())?;
-
-    let code_verifier = if let Some(state) = state.as_ref() {
-        match app.state::<TokenManagerState>().take_pkce_state(state)? {
-            Some((state_provider_id, verifier)) => {
-                if state_provider_id != provider_id {
-                    return Err("OAuth state/provider mismatch".to_string());
-                }
-                Some(verifier)
-            }
-            None => {
-                return Err("Missing PKCE verifier for state".to_string());
-            }
-        }
-    } else {
-        app.state::<TokenManagerState>()
-            .take_pkce_verifier(&provider_id)?
-    };
-
-    exchange_authorization_code(app, &provider_id, code, code_verifier).await?;
-
-    let success_event_name = format!("{}-auth-callback", &provider_id);
-
-    app.emit(success_event_name.as_str(), ())
-        .map_err(|e| e.to_string())?;
     Ok(())
 }

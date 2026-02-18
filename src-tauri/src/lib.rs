@@ -6,21 +6,21 @@ use tauri_plugin_zustand::ManagerExt;
 
 pub mod auth;
 pub mod services;
+use crate::auth::anilist::{
+    AUTHORIZE_URL as ANILIST_AUTHORIZE_URL, CLIENT_ID as ANILIST_CLIENT_ID,
+    PROVIDER_ID as ANILIST_PROVIDER_ID, TOKEN_URL as ANILIST_TOKEN_URL,
+};
 use crate::auth::mal::{
     AUTHORIZE_URL as MAL_AUTHORIZE_URL, CLIENT_ID as MAL_CLIENT_ID, PROVIDER_ID as MAL_PROVIDER_ID,
     TOKEN_URL as MAL_TOKEN_URL,
 };
-use crate::auth::anilist::{
-    AUTHORIZE_URL as ANILIST_AUTHORIZE_URL, CLIENT_ID as ANILIST_CLIENT_ID, PROVIDER_ID as ANILIST_PROVIDER_ID,
-    TOKEN_URL as ANILIST_TOKEN_URL,
-};
 use crate::auth::{
-    authorize_myanimelist, authorize_anilist, authorize_provider, handle_oauth_callback, init_stronghold_key,
-    oauth_request, ProviderConfig, StrongholdKeyState, TokenManagerState,
+    authorize_anilist, authorize_myanimelist, authorize_provider, handle_oauth_callback,
+    init_stronghold_key, oauth_request, ProviderConfig, StrongholdKeyState, TokenManagerState,
 };
+use crate::services::anilist::synchronize_anilist;
 use crate::services::anime_list_updates::{enqueue_anime_list_update, AnimeListUpdateQueue};
 use crate::services::myanimelist::synchronize_myanimelist;
-use crate::services::anilist::synchronize_anilist;
 use crate::services::player_detection::{
     configure_playback_observer, detect_playing_anime, get_playback_observer_state,
     start_playback_observer, PlaybackObserverState, SupportedPlayer,
@@ -59,8 +59,7 @@ fn process_oauth_callback(app: tauri::AppHandle, url: String) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut builder = tauri::Builder::default()
-        .plugin(tauri_plugin_notification::init());
+    let mut builder = tauri::Builder::default().plugin(tauri_plugin_notification::init());
 
     #[cfg(desktop)]
     {
@@ -125,7 +124,11 @@ pub fn run() {
                 return Err(std::io::Error::new(std::io::ErrorKind::Other, err).into());
             }
 
-            let anilist_config = ProviderConfig::new(ANILIST_CLIENT_ID, ANILIST_AUTHORIZE_URL, ANILIST_TOKEN_URL);
+            let anilist_config =
+                ProviderConfig::new(ANILIST_CLIENT_ID, ANILIST_AUTHORIZE_URL, ANILIST_TOKEN_URL)
+                    .with_pkce(false)
+                    .with_authorize_param("redirect_uri", "kioku://anilist")
+                    .with_token_param("redirect_uri", "kioku://anilist");
 
             if let Err(err) = app
                 .state::<TokenManagerState>()
