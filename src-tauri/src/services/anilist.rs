@@ -423,8 +423,8 @@ fn pick_title(title: Option<&AniListTitle>) -> String {
         return "Unknown".to_string();
     };
 
-    normalize_text(title.english.as_deref())
-        .or_else(|| normalize_text(title.romaji.as_deref()))
+    normalize_text(title.romaji.as_deref())
+        .or_else(|| normalize_text(title.english.as_deref()))
         .or_else(|| normalize_text(title.native_title.as_deref()))
         .unwrap_or_else(|| "Unknown".to_string())
 }
@@ -436,11 +436,7 @@ fn build_alternative_titles(title: Option<&AniListTitle>, primary: &str) -> Stri
 
     let mut parts: Vec<String> = Vec::new();
 
-    for value in [
-        title.english.as_deref(),
-        title.romaji.as_deref(),
-        title.native_title.as_deref(),
-    ] {
+    for value in [title.english.as_deref(), title.native_title.as_deref()] {
         let Some(candidate) = normalize_text(value) else {
             continue;
         };
