@@ -72,7 +72,7 @@ export const updateAnimeListData = ({
     targetStatus = 'completed';
     updatedAnime.userStatus = 'completed';
 
-    if (animeToUpdate.startDate) {
+    if (animeToUpdate.userStartDate && !animeToUpdate.userFinishDate) {
       const now = new Date();
       updatedAnime.userFinishDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     }
