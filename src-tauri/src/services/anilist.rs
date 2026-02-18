@@ -140,14 +140,23 @@ struct SaveMediaListEntryRequest<'a> {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SaveMediaListEntryVariables {
+    #[serde(skip_serializing_if = "Option::is_none")]
     save_media_list_entry_id: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     media_id: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     score: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     progress: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     repeat: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     notes: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     started_at: Option<FuzzyDateInput>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     completed_at: Option<FuzzyDateInput>,
 }
 
