@@ -157,11 +157,13 @@ const useProfileMenu = () => {
         icon: <User />,
         renderDivider: false,
         handleClick: async () => {
-          await openUrl(
-            !!activeProvider && !!username
-              ? buildProfileUrl(activeProvider, username)
-              : ''
-          );
+          if (activeProvider && username) {
+            const profileUrl = buildProfileUrl(activeProvider, username);
+
+            if (profileUrl) {
+              await openUrl(profileUrl);
+            }
+          }
           handleCloseMainPopover();
         }
       },
