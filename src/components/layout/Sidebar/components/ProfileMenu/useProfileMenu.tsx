@@ -186,6 +186,7 @@ const useProfileMenu = () => {
       }
     },
     [
+      activeProvider,
       detection,
       myAnimeListAnimeData,
       aniListAnimeData,
