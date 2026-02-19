@@ -3,7 +3,7 @@ import { Fragment, type FC } from 'react';
 import { useLocation } from 'react-router';
 
 import NavButton from '@/components/NavButton';
-import { usePlayerDetectionStore } from '@/stores/playerDetection';
+import { usePlayerDetectionStore } from '@/stores/detection/playerDetection';
 import { useSidebarStore } from '@/stores/sidebar/sidebar';
 import { navLinks } from './configs';
 

@@ -5,6 +5,7 @@ import { RouterProvider } from 'react-router';
 import AppUpdateSnackbar from '@/components/AppUpdateSnackbar';
 import usePlaybackObserverEvents from '@/hooks/detection/usePlaybackObserverEvents';
 import useAppUpdater from '@/hooks/useAppUpdater';
+import useProviderMigration from '@/hooks/migrations/useProviderMigration';
 import AnimeInformations from './components/AnimeInformations';
 import { router } from './routes';
 import './styles/fonts.css';
@@ -13,6 +14,7 @@ import './styles/global.css';
 function App() {
   useAppUpdater();
   usePlaybackObserverEvents();
+  useProviderMigration();
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>

@@ -7,9 +7,14 @@ use serde_json;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_http::reqwest;
 
-use crate::auth::secure_store::{read_refresh_token, save_refresh_token};
+use crate::auth::secure_store::{
+    read_access_token, read_refresh_token, save_access_token, save_refresh_token,
+};
 
 const REFRESH_EARLY_SECS: u64 = 60;
+const DEFAULT_STATE_PARAM: &str = "state";
+const DEFAULT_CODE_PARAM: &str = "code";
+const DEFAULT_EXPIRES_IN_PARAM: &str = "expires_in";
 
 #[derive(Clone)]
 pub struct ProviderConfig {
@@ -17,6 +22,15 @@ pub struct ProviderConfig {
     pub authorize_url: String,
     pub token_url: String,
     pub use_pkce: bool,
+    pub authorize_response_type: String,
+    pub uses_state: bool,
+    pub supports_refresh_token: bool,
+    pub callback_provider_hint: Option<String>,
+    pub callback_state_param: String,
+    pub callback_code_param: Option<String>,
+    pub callback_access_token_param: Option<String>,
+    pub callback_expires_in_param: Option<String>,
+    pub default_access_token_ttl_secs: Option<u64>,
     pub authorize_extra_params: Vec<(String, String)>,
     pub token_extra_params: Vec<(String, String)>,
     pub refresh_extra_params: Vec<(String, String)>,
@@ -33,6 +47,15 @@ impl ProviderConfig {
             authorize_url: authorize_url.into(),
             token_url: token_url.into(),
             use_pkce: true,
+            authorize_response_type: "code".to_string(),
+            uses_state: true,
+            supports_refresh_token: true,
+            callback_provider_hint: None,
+            callback_state_param: DEFAULT_STATE_PARAM.to_string(),
+            callback_code_param: Some(DEFAULT_CODE_PARAM.to_string()),
+            callback_access_token_param: None,
+            callback_expires_in_param: Some(DEFAULT_EXPIRES_IN_PARAM.to_string()),
+            default_access_token_ttl_secs: None,
             authorize_extra_params: Vec::new(),
             token_extra_params: Vec::new(),
             refresh_extra_params: Vec::new(),
@@ -41,6 +64,66 @@ impl ProviderConfig {
 
     pub fn with_pkce(mut self, enabled: bool) -> Self {
         self.use_pkce = enabled;
+        self
+    }
+
+    pub fn with_authorize_response_type(mut self, response_type: impl Into<String>) -> Self {
+        self.authorize_response_type = response_type.into();
+        self
+    }
+
+    pub fn with_state(mut self, enabled: bool) -> Self {
+        self.uses_state = enabled;
+        self
+    }
+
+    pub fn with_callback_state_param(mut self, param: impl Into<String>) -> Self {
+        self.callback_state_param = param.into();
+        self
+    }
+
+    pub fn with_callback_code_param(mut self, param: impl Into<String>) -> Self {
+        self.callback_code_param = Some(param.into());
+        self
+    }
+
+    pub fn without_callback_code(mut self) -> Self {
+        self.callback_code_param = None;
+        self
+    }
+
+    pub fn with_callback_access_token_param(mut self, param: impl Into<String>) -> Self {
+        self.callback_access_token_param = Some(param.into());
+        self
+    }
+
+    pub fn without_callback_access_token(mut self) -> Self {
+        self.callback_access_token_param = None;
+        self
+    }
+
+    pub fn with_callback_expires_in_param(mut self, param: impl Into<String>) -> Self {
+        self.callback_expires_in_param = Some(param.into());
+        self
+    }
+
+    pub fn without_callback_expires_in(mut self) -> Self {
+        self.callback_expires_in_param = None;
+        self
+    }
+
+    pub fn with_default_access_token_ttl_secs(mut self, seconds: u64) -> Self {
+        self.default_access_token_ttl_secs = Some(seconds);
+        self
+    }
+
+    pub fn with_refresh_token(mut self, enabled: bool) -> Self {
+        self.supports_refresh_token = enabled;
+        self
+    }
+
+    pub fn with_callback_provider_hint(mut self, hint: impl Into<String>) -> Self {
+        self.callback_provider_hint = Some(hint.into());
         self
     }
 
@@ -62,6 +145,24 @@ impl ProviderConfig {
         self.refresh_extra_params.push((key.into(), value.into()));
         self
     }
+
+    fn matches_callback_payload(&self, params: &HashMap<String, String>) -> bool {
+        self.callback_access_token_param
+            .as_ref()
+            .is_some_and(|param| params.contains_key(param))
+            || self
+                .callback_code_param
+                .as_ref()
+                .is_some_and(|param| params.contains_key(param))
+    }
+
+    pub fn resolve_callback_expires_in(&self, params: &HashMap<String, String>) -> Option<u64> {
+        self.callback_expires_in_param
+            .as_ref()
+            .and_then(|param| params.get(param))
+            .and_then(|value| value.parse::<u64>().ok())
+            .or(self.default_access_token_ttl_secs)
+    }
 }
 
 #[derive(Default)]
@@ -72,13 +173,18 @@ struct TokenManagerInner {
     providers: HashMap<String, ProviderConfig>,
     tokens: HashMap<String, TokenState>,
     pkce_verifiers: HashMap<String, String>,
-    pkce_states: HashMap<String, (String, String)>,
+    oauth_states: HashMap<String, OAuthStateEntry>,
 }
 
 #[derive(Default)]
 struct TokenState {
     access_token: Option<String>,
     expires_at: Option<SystemTime>,
+}
+
+struct OAuthStateEntry {
+    provider_id: String,
+    code_verifier: Option<String>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -138,28 +244,94 @@ impl TokenManagerState {
         Ok(guard.pkce_verifiers.remove(provider_id))
     }
 
-    pub fn set_pkce_state(
+    pub fn set_oauth_state(
         &self,
         state: String,
         provider_id: &str,
-        code_verifier: String,
+        code_verifier: Option<String>,
     ) -> Result<(), String> {
         let mut guard = self
             .0
             .lock()
             .map_err(|_| "Token manager lock poisoned".to_string())?;
-        guard
-            .pkce_states
-            .insert(state, (provider_id.to_string(), code_verifier));
+        guard.oauth_states.insert(
+            state,
+            OAuthStateEntry {
+                provider_id: provider_id.to_string(),
+                code_verifier,
+            },
+        );
         Ok(())
     }
 
-    pub fn take_pkce_state(&self, state: &str) -> Result<Option<(String, String)>, String> {
+    pub fn take_oauth_state(
+        &self,
+        state: &str,
+    ) -> Result<Option<(String, Option<String>)>, String> {
         let mut guard = self
             .0
             .lock()
             .map_err(|_| "Token manager lock poisoned".to_string())?;
-        Ok(guard.pkce_states.remove(state))
+        Ok(guard
+            .oauth_states
+            .remove(state)
+            .map(|entry| (entry.provider_id, entry.code_verifier)))
+    }
+
+    pub fn get_oauth_state_provider(&self, state: &str) -> Result<Option<String>, String> {
+        let guard = self
+            .0
+            .lock()
+            .map_err(|_| "Token manager lock poisoned".to_string())?;
+        Ok(guard
+            .oauth_states
+            .get(state)
+            .map(|entry| entry.provider_id.clone()))
+    }
+
+    pub fn get_provider_from_callback_hint(&self, hint: &str) -> Result<Option<String>, String> {
+        let guard = self
+            .0
+            .lock()
+            .map_err(|_| "Token manager lock poisoned".to_string())?;
+
+        if guard.providers.contains_key(hint) {
+            return Ok(Some(hint.to_string()));
+        }
+
+        Ok(guard.providers.iter().find_map(|(provider_id, provider)| {
+            provider
+                .callback_provider_hint
+                .as_deref()
+                .filter(|configured| configured.eq_ignore_ascii_case(hint))
+                .map(|_| provider_id.clone())
+        }))
+    }
+
+    pub fn infer_provider_from_callback_params(
+        &self,
+        params: &HashMap<String, String>,
+    ) -> Result<Option<String>, String> {
+        let guard = self
+            .0
+            .lock()
+            .map_err(|_| "Token manager lock poisoned".to_string())?;
+
+        let mut matches = guard
+            .providers
+            .iter()
+            .filter_map(|(provider_id, provider)| {
+                provider
+                    .matches_callback_payload(params)
+                    .then_some(provider_id.clone())
+            })
+            .collect::<Vec<_>>();
+
+        if matches.len() == 1 {
+            return Ok(matches.pop());
+        }
+
+        Ok(None)
     }
 
     fn set_access_token(
@@ -217,9 +389,10 @@ pub fn store_tokens(
     provider_id: &str,
     response: &TokenResponse,
 ) -> Result<(), String> {
-    app.state::<TokenManagerState>().set_access_token(
+    store_access_token(
+        app,
         provider_id,
-        response.access_token.clone(),
+        &response.access_token,
         response.expires_in,
     )?;
 
@@ -230,12 +403,44 @@ pub fn store_tokens(
     Ok(())
 }
 
+pub fn store_access_token(
+    app: &AppHandle,
+    provider_id: &str,
+    access_token: &str,
+    expires_in: u64,
+) -> Result<(), String> {
+    app.state::<TokenManagerState>().set_access_token(
+        provider_id,
+        access_token.to_string(),
+        expires_in,
+    )?;
+
+    save_access_token(
+        app,
+        provider_id,
+        access_token,
+        compute_expires_at_unix_secs(expires_in)?,
+    )
+}
+
 pub async fn get_access_token(app: &AppHandle, provider_id: &str) -> Result<String, String> {
     if let Some(token) = app
         .state::<TokenManagerState>()
         .get_valid_access_token(provider_id)?
     {
         return Ok(token);
+    }
+
+    if let Some(token) = restore_access_token_from_store(app, provider_id)? {
+        return Ok(token);
+    }
+
+    let provider = app.state::<TokenManagerState>().get_provider(provider_id)?;
+
+    if !provider.supports_refresh_token {
+        return Err(format!(
+            "Access token expired or missing for {provider_id}; reauthorize this provider"
+        ));
     }
 
     refresh_access_token(app, provider_id).await
@@ -251,13 +456,21 @@ pub fn build_authorize_url(
         client_id,
         authorize_url,
         use_pkce,
+        authorize_response_type,
+        uses_state,
+        callback_state_param,
         authorize_extra_params,
         ..
     } = app.state::<TokenManagerState>().get_provider(provider_id)?;
 
-    let mut params: Vec<(String, String)> =
-        Vec::with_capacity(3 + authorize_extra_params.len() + 1);
-    params.push(("response_type".to_string(), "code".to_string()));
+    let mut params: Vec<(String, String)> = Vec::with_capacity(
+        2 + authorize_extra_params.len() + usize::from(use_pkce) + usize::from(uses_state),
+    );
+
+    if !authorize_response_type.trim().is_empty() {
+        params.push(("response_type".to_string(), authorize_response_type));
+    }
+
     params.push(("client_id".to_string(), client_id));
 
     if use_pkce {
@@ -265,8 +478,9 @@ pub fn build_authorize_url(
         params.push(("code_challenge".to_string(), challenge.to_string()));
     }
 
-    if let Some(state) = state {
-        params.push(("state".to_string(), state.to_string()));
+    if uses_state {
+        let state = state.ok_or_else(|| "Missing OAuth state".to_string())?;
+        params.push((callback_state_param, state.to_string()));
     }
 
     params.extend(authorize_extra_params);
@@ -286,9 +500,22 @@ pub async fn exchange_authorization_code(
         client_id,
         token_url,
         use_pkce,
+        callback_code_param,
         token_extra_params,
         ..
     } = app.state::<TokenManagerState>().get_provider(provider_id)?;
+
+    if callback_code_param.is_none() {
+        return Err(format!(
+            "Provider {provider_id} is not configured for authorization code exchange"
+        ));
+    }
+
+    if token_url.trim().is_empty() {
+        return Err(format!(
+            "Missing token URL configuration for provider {provider_id}"
+        ));
+    }
 
     if use_pkce && code_verifier.is_none() {
         return Err("Missing PKCE code verifier".to_string());
@@ -331,10 +558,24 @@ async fn refresh_access_token(app: &AppHandle, provider_id: &str) -> Result<Stri
         authorize_url: _,
         token_url,
         use_pkce: _,
+        supports_refresh_token,
         authorize_extra_params: _,
         token_extra_params: _,
         refresh_extra_params,
+        ..
     } = app.state::<TokenManagerState>().get_provider(provider_id)?;
+
+    if !supports_refresh_token {
+        return Err(format!(
+            "Provider {provider_id} does not support refresh tokens"
+        ));
+    }
+
+    if token_url.trim().is_empty() {
+        return Err(format!(
+            "Missing token URL configuration for provider {provider_id}"
+        ));
+    }
 
     let mut params: Vec<(String, String)> = Vec::with_capacity(3 + refresh_extra_params.len());
     params.push(("client_id".to_string(), client_id));
@@ -357,4 +598,53 @@ async fn refresh_access_token(app: &AppHandle, provider_id: &str) -> Result<Stri
     let access_token = token_response.access_token.clone();
     store_tokens(app, provider_id, &token_response)?;
     Ok(access_token)
+}
+
+fn compute_expires_at_unix_secs(expires_in: u64) -> Result<u64, String> {
+    let expires_at = SystemTime::now()
+        .checked_add(Duration::from_secs(expires_in))
+        .ok_or_else(|| "Failed to compute access token expiration".to_string())?;
+
+    expires_at
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_err(|_| "Computed access token expiration is before UNIX epoch".to_string())
+        .map(|value| value.as_secs())
+}
+
+fn restore_access_token_from_store(
+    app: &AppHandle,
+    provider_id: &str,
+) -> Result<Option<String>, String> {
+    let Some((token, expires_at_unix_secs)) = read_access_token(app, provider_id)? else {
+        return Ok(None);
+    };
+
+    let expires_at = SystemTime::UNIX_EPOCH
+        .checked_add(Duration::from_secs(expires_at_unix_secs))
+        .ok_or_else(|| "Stored access token expiration is invalid".to_string())?;
+    let refresh_at = expires_at
+        .checked_sub(Duration::from_secs(REFRESH_EARLY_SECS))
+        .unwrap_or(expires_at);
+    let now = SystemTime::now();
+
+    if now >= refresh_at {
+        return Ok(None);
+    }
+
+    let remaining_secs = expires_at
+        .duration_since(now)
+        .map_err(|_| "Stored access token is expired".to_string())?
+        .as_secs();
+
+    if remaining_secs == 0 {
+        return Ok(None);
+    }
+
+    app.state::<TokenManagerState>().set_access_token(
+        provider_id,
+        token.clone(),
+        remaining_secs,
+    )?;
+
+    Ok(Some(token))
 }

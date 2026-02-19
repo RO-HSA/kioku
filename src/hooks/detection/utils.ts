@@ -1,4 +1,7 @@
-import { IAnimeList } from '@/types/AnimeList';
+import { SynchronizedAnimeList } from '@/services/backend/types';
+import { NotificationService } from '@/services/Notification';
+import { AliasesByAnimeId } from '@/stores/detection/nowPlayingAliases';
+import { AnimeListUserStatus, IAnimeList } from '@/types/AnimeList';
 
 const SPLIT_ALTERNATIVE_TITLES_REGEX = /(?:\s\/\s|[,\n;|])+/;
 const COMBINING_MARKS_REGEX = /[\u0300-\u036f]/g;
@@ -7,6 +10,17 @@ const WHITESPACE_REGEX = /\s+/g;
 
 const DEFAULT_MAX_SUGGESTIONS = 10;
 const DEFAULT_MINIMUM_SCORE = 35;
+
+type CalculatePlaybackMatchesProps = {
+  animeListData: SynchronizedAnimeList | null;
+  animeTitle: string;
+  episodeNumber: number | null;
+  aliasesByAnimeId: AliasesByAnimeId;
+  setMatchingResult: (
+    matchedAnimeId: number | null,
+    suggestedAnimeIds: number[]
+  ) => void;
+};
 
 export const normalizeTitle = (value: string): string => {
   return value
@@ -86,7 +100,7 @@ const buildCandidateTitles = (
 export const findExactAnimeMatch = (
   animeList: IAnimeList[],
   detectedTitle: string,
-  aliasesByAnimeId: Record<string, string[]>
+  aliasesByAnimeId: AliasesByAnimeId
 ): IAnimeList | undefined => {
   const normalizedDetectedTitle = normalizeTitle(detectedTitle);
   if (!normalizedDetectedTitle) {
@@ -107,7 +121,7 @@ export const findExactAnimeMatch = (
 export const findSuggestedAnimeMatches = (
   animeList: IAnimeList[],
   detectedTitle: string,
-  aliasesByAnimeId: Record<string, string[]>,
+  aliasesByAnimeId: AliasesByAnimeId,
   options?: { maxSuggestions?: number; minimumScore?: number }
 ): IAnimeList[] => {
   const normalizedDetectedTitle = normalizeTitle(detectedTitle);
@@ -141,4 +155,81 @@ export const findSuggestedAnimeMatches = (
     )
     .slice(0, maxSuggestions)
     .map(({ anime }) => anime);
+};
+
+export const flattenAnimeListData = (
+  animeListData: SynchronizedAnimeList | null
+): IAnimeList[] => {
+  if (!animeListData) {
+    return [];
+  }
+
+  return [
+    ...animeListData.watching,
+    ...animeListData.completed,
+    ...animeListData.onHold,
+    ...animeListData.dropped,
+    ...animeListData.planToWatch
+  ];
+};
+
+export const resolveNextStatusFromDetectedEpisode = (
+  anime: IAnimeList,
+  nextEpisode: number
+): AnimeListUserStatus => {
+  if (anime.totalEpisodes > 0 && nextEpisode >= anime.totalEpisodes) {
+    return 'completed';
+  }
+
+  if (
+    anime.userStatus === 'planToWatch' ||
+    anime.userStatus === 'onHold' ||
+    anime.userStatus === 'dropped'
+  ) {
+    return 'watching';
+  }
+
+  return anime.userStatus;
+};
+
+export const calculatePlaybackMatches = ({
+  animeListData,
+  animeTitle,
+  episodeNumber,
+  aliasesByAnimeId,
+  setMatchingResult
+}: CalculatePlaybackMatchesProps) => {
+  const notification = new NotificationService();
+
+  const aggregatedData = flattenAnimeListData(animeListData);
+
+  const exactMatch = findExactAnimeMatch(
+    aggregatedData,
+    animeTitle,
+    aliasesByAnimeId
+  );
+
+  if (exactMatch) {
+    notification.sendNotification({
+      title: 'Now Playing',
+      body: `${exactMatch.title}\nEpisode ${episodeNumber ?? '?'}`
+    });
+    setMatchingResult(exactMatch.id, []);
+  } else {
+    notification.sendNotification({
+      title: 'Media not recognized',
+      body: `${animeTitle}\nEpisode ${episodeNumber ?? '?'}\nTry selecting the correct anime from the suggestions on Now Playing menu.`
+    });
+
+    const suggestions = findSuggestedAnimeMatches(
+      aggregatedData,
+      animeTitle,
+      aliasesByAnimeId
+    );
+
+    setMatchingResult(
+      null,
+      suggestions.map((anime) => anime.id)
+    );
+  }
 };

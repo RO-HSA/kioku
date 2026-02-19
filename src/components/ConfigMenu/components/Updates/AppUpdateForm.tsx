@@ -1,8 +1,8 @@
 import { Alert, Divider, LinearProgress, Typography } from '@mui/material';
 
 import Button from '@/components/ui/Button';
-import Section from '../Section';
 import { useAppUpdaterStore } from '@/stores/appUpdater';
+import Section from '../Section';
 
 const formatBytes = (bytes: number): string => {
   if (bytes <= 0) {

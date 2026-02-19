@@ -6,7 +6,13 @@
       "identifier": "opener:allow-open-url",
       "allow": [
         { "url": "https://myanimelist.net/anime/*" },
-        { "url": "https://myanimelist.net/manga/*" }
+        { "url": "https://myanimelist.net/manga/*" },
+        { "url": "https://myanimelist.net/register.php" },
+        { "url": "https://myanimelist.net/profile/*"},
+        { "url": "https://anilist.co/anime/*" },
+        { "url": "https://anilist.co/manga/*" },
+        { "url": "https://anilist.co/signup" },
+        { "url": "https://anilist.co/user/*" }
       ]
     }
   ]

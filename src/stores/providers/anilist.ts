@@ -7,7 +7,7 @@ import { AnimeListUserStatus, IAnimeList } from '@/types/AnimeList';
 import { Provider } from '@/types/List';
 import { updateAnimeListData } from './utils';
 
-type MyAnimeListStore = {
+type AniListStore = {
   username: string | null;
   profilePictureUrl: string | null;
   isAuthenticating: boolean;
@@ -38,7 +38,7 @@ type MyAnimeListStore = {
   ) => void;
 };
 
-export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
+export const useAniListStore = create<AniListStore>((set) => ({
   username: null,
   profilePictureUrl: null,
   isAuthenticating: false,
@@ -65,6 +65,10 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
     set((state) => {
       if (!state.animeListData) return {};
 
+      const anime = state.animeListData[status].find(
+        (item) => item.id === animeId
+      );
+
       const updatedAnimeListData = updateAnimeListData({
         animeId,
         status,
@@ -72,9 +76,13 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
         data: { userEpisodesWatched: newProgress }
       });
 
+      if (anime?.entryId === undefined) {
+        return { animeListData: updatedAnimeListData };
+      }
+
       AnimeListService.enqueueListUpdate({
-        providerId: Provider.MY_ANIME_LIST,
-        entryId: animeId,
+        providerId: Provider.ANILIST,
+        entryId: anime.entryId,
         userEpisodesWatched: newProgress
       });
 
@@ -84,6 +92,10 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
     set((state) => {
       if (!state.animeListData) return {};
 
+      const anime = state.animeListData[status].find(
+        (item) => item.id === animeId
+      );
+
       const updatedAnimeListData = updateAnimeListData({
         animeId,
         status,
@@ -91,9 +103,13 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
         data: { userScore: newScore }
       });
 
+      if (anime?.entryId === undefined) {
+        return { animeListData: updatedAnimeListData };
+      }
+
       AnimeListService.enqueueListUpdate({
-        providerId: Provider.MY_ANIME_LIST,
-        entryId: animeId,
+        providerId: Provider.ANILIST,
+        entryId: anime.entryId,
         userScore: newScore
       });
 
@@ -107,6 +123,10 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
     set((state) => {
       if (!state.animeListData) return {};
 
+      const anime = state.animeListData[currentStatus].find(
+        (item) => item.id === animeId
+      );
+
       const updatedAnimeListData = updateAnimeListData({
         animeId,
         state: state.animeListData,
@@ -115,9 +135,13 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
         isSingleUpdate: false
       });
 
+      if (anime?.entryId === undefined) {
+        return { animeListData: updatedAnimeListData };
+      }
+
       AnimeListService.enqueueListUpdate({
-        providerId: Provider.MY_ANIME_LIST,
-        entryId: animeId,
+        providerId: Provider.ANILIST,
+        entryId: anime.entryId,
         ...data
       });
 
@@ -125,8 +149,7 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
     })
 }));
 
-export const tauriHandler = createTauriStore(
-  'myanimelist',
-  useMyAnimeListStore,
-  { autoStart: true, saveOnChange: true }
-);
+export const tauriHandler = createTauriStore('anilist', useAniListStore, {
+  autoStart: true,
+  saveOnChange: true
+});

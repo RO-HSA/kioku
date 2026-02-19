@@ -9,7 +9,8 @@ export type SynchronizedAnimeList = Record<AnimeListUserStatus, IAnimeList[]>;
 
 export interface AnimeListUpdateRequest extends Partial<IAnimeUserList> {
   providerId: Provider;
-  entryId: number;
+  entryId?: number;
+  mediaId?: number;
 }
 
 export type SupportedPlayer = 'mpv' | 'mpc-hc' | 'mpc-be';

@@ -1,55 +1,22 @@
+import { PlayerDetectionService } from '@/services/backend/PlayerDetection';
+import { NotificationService } from '@/services/Notification';
+import { useNowPlayingAliasesStore } from '@/stores/detection/nowPlayingAliases';
+import { usePlayerDetectionStore } from '@/stores/detection/playerDetection';
+import { useAniListStore } from '@/stores/providers/anilist';
+import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
+import { useProviderStore } from '@/stores/providers/provider';
+import { IAnimeList } from '@/types/AnimeList';
+import { Provider } from '@/types/List';
+import { getTodayAsYmd } from '@/utils/date';
 import { UnlistenFn } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
-
 import {
-  findExactAnimeMatch,
-  findSuggestedAnimeMatches
-} from '@/components/NowPlaying/utils';
-import { PlayerDetectionService } from '@/services/backend/PlayerDetection';
-import { SynchronizedAnimeList } from '@/services/backend/types';
-import { NotificationService } from '@/services/Notification';
-import { useNowPlayingAliasesStore } from '@/stores/nowPlayingAliases';
-import { usePlayerDetectionStore } from '@/stores/playerDetection';
-import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
-import { AnimeListUserStatus, IAnimeList } from '@/types/AnimeList';
-import { getTodayAsYmd } from '@/utils/date';
+  calculatePlaybackMatches,
+  flattenAnimeListData,
+  resolveNextStatusFromDetectedEpisode
+} from './utils';
 
 const notification = new NotificationService();
-
-const flattenAnimeListData = (
-  animeListData: SynchronizedAnimeList | null
-): IAnimeList[] => {
-  if (!animeListData) {
-    return [];
-  }
-
-  return [
-    ...animeListData.watching,
-    ...animeListData.completed,
-    ...animeListData.onHold,
-    ...animeListData.dropped,
-    ...animeListData.planToWatch
-  ];
-};
-
-const resolveNextStatusFromDetectedEpisode = (
-  anime: IAnimeList,
-  nextEpisode: number
-): AnimeListUserStatus => {
-  if (anime.totalEpisodes > 0 && nextEpisode >= anime.totalEpisodes) {
-    return 'completed';
-  }
-
-  if (
-    anime.userStatus === 'planToWatch' ||
-    anime.userStatus === 'onHold' ||
-    anime.userStatus === 'dropped'
-  ) {
-    return 'watching';
-  }
-
-  return anime.userStatus;
-};
 
 const usePlaybackObserverEvents = () => {
   const setEpisodeDetected = usePlayerDetectionStore(
@@ -69,39 +36,55 @@ const usePlaybackObserverEvents = () => {
     const setupListeners = async () => {
       unlistenDetected = await PlayerDetectionService.listenEpisodeDetected(
         (detection) => {
-          const animeListData = useMyAnimeListStore.getState().animeListData;
-          const aliasesByAnimeId =
-            useNowPlayingAliasesStore.getState().aliasesByAnimeId;
-          const aggregatedData = flattenAnimeListData(animeListData);
+          const myAnimeListAnimeData =
+            useMyAnimeListStore.getState().animeListData;
+          const aniListAnimeData = useAniListStore.getState().animeListData;
 
-          const exactMatch = findExactAnimeMatch(
-            aggregatedData,
-            detection.animeTitle,
-            aliasesByAnimeId
-          );
+          switch (useProviderStore.getState().activeProvider) {
+            case Provider.MY_ANIME_LIST:
+              if (!myAnimeListAnimeData) {
+                notification.sendNotification({
+                  title: 'No anime list data',
+                  body: 'Please synchronize your anime list to enable playback detection.'
+                });
+                return;
+              }
 
-          if (exactMatch) {
-            notification.sendNotification({
-              title: 'Now Playing',
-              body: `${exactMatch.title}\nEpisode ${detection.episode ?? '?'}`
-            });
-            setMatchingResult(exactMatch.id, []);
-          } else {
-            notification.sendNotification({
-              title: 'Media not recognized',
-              body: `${detection.animeTitle}\nEpisode ${detection.episode ?? '?'}\nTry selecting the correct anime from the suggestions on Now Playing menu.`
-            });
+              calculatePlaybackMatches({
+                animeListData: myAnimeListAnimeData,
+                animeTitle: detection.animeTitle,
+                episodeNumber: detection.episode,
+                aliasesByAnimeId: useNowPlayingAliasesStore
+                  .getState()
+                  .getAliasesByProvider(Provider.MY_ANIME_LIST),
+                setMatchingResult
+              });
+              break;
+            case Provider.ANILIST:
+              if (!aniListAnimeData) {
+                notification.sendNotification({
+                  title: 'No anime list data',
+                  body: 'Please synchronize your anime list to enable playback detection.'
+                });
+                return;
+              }
 
-            const suggestions = findSuggestedAnimeMatches(
-              aggregatedData,
-              detection.animeTitle,
-              aliasesByAnimeId
-            );
-
-            setMatchingResult(
-              null,
-              suggestions.map((anime) => anime.id)
-            );
+              calculatePlaybackMatches({
+                animeListData: aniListAnimeData,
+                animeTitle: detection.animeTitle,
+                episodeNumber: detection.episode,
+                aliasesByAnimeId: useNowPlayingAliasesStore
+                  .getState()
+                  .getAliasesByProvider(Provider.ANILIST),
+                setMatchingResult
+              });
+              break;
+            default:
+              notification.sendNotification({
+                title: 'No provider selected',
+                body: 'Please select an anime list provider and synchronize your anime list to enable playback detection.'
+              });
+              return;
           }
 
           setEpisodeDetected(detection);
@@ -118,8 +101,27 @@ const usePlaybackObserverEvents = () => {
             return;
           }
 
-          const animeListData = useMyAnimeListStore.getState().animeListData;
-          const aggregatedData = flattenAnimeListData(animeListData);
+          let aggregatedData: IAnimeList[] = [];
+
+          const myAnimeListAnimeData =
+            useMyAnimeListStore.getState().animeListData;
+          const aniListAnimeData = useAniListStore.getState().animeListData;
+
+          switch (useProviderStore.getState().activeProvider) {
+            case Provider.MY_ANIME_LIST:
+              if (myAnimeListAnimeData) {
+                aggregatedData = flattenAnimeListData(myAnimeListAnimeData);
+              }
+              break;
+            case Provider.ANILIST:
+              if (aniListAnimeData) {
+                aggregatedData = flattenAnimeListData(aniListAnimeData);
+              }
+              break;
+            default:
+              break;
+          }
+
           const anime = aggregatedData.find(
             (item) => item.id === activeMatchedAnimeId
           );

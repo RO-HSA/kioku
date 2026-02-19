@@ -48,7 +48,7 @@ export const updateAnimeListData = ({
 }: UpdateAnimeListDataProps): SynchronizedAnimeList | null => {
   if (!state) return null;
 
-  let updatedState = { ...state };
+  const updatedState = { ...state };
 
   const animeToUpdate = updatedState[status].find(
     (anime) => anime.id === animeId
@@ -61,33 +61,31 @@ export const updateAnimeListData = ({
     ...data
   };
 
+  let targetStatus = data.userStatus ?? updatedAnime.userStatus;
+
   if (
     data.userEpisodesWatched !== undefined &&
     isSingleUpdate &&
     animeToUpdate.totalEpisodes > 0 &&
     data.userEpisodesWatched >= animeToUpdate.totalEpisodes
   ) {
+    targetStatus = 'completed';
     updatedAnime.userStatus = 'completed';
 
-    if (animeToUpdate.startDate) {
+    if (animeToUpdate.userStartDate && !animeToUpdate.userFinishDate) {
       const now = new Date();
       updatedAnime.userFinishDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     }
-
-    updatedState = moveAnimeBetweenStatuses({
-      state,
-      animeToMove: updatedAnime,
-      fromStatus: status,
-      toStatus: 'completed'
-    });
+  } else {
+    updatedAnime.userStatus = targetStatus;
   }
 
-  if (data.userStatus !== status || status !== updatedAnime.userStatus) {
-    updatedState = moveAnimeBetweenStatuses({
-      state,
+  if (animeToUpdate.userStatus !== targetStatus) {
+    return moveAnimeBetweenStatuses({
+      state: updatedState,
       animeToMove: updatedAnime,
       fromStatus: animeToUpdate.userStatus,
-      toStatus: data.userStatus ?? updatedAnime.userStatus
+      toStatus: targetStatus
     });
   }
 
@@ -96,7 +94,7 @@ export const updateAnimeListData = ({
     [updatedAnime.userStatus]: updatedState[updatedAnime.userStatus].map(
       (anime) => {
         if (anime.id === animeId) {
-          return { ...anime, ...data };
+          return updatedAnime;
         }
 
         return anime;

@@ -102,9 +102,8 @@ const PlayerDetectionForm = () => {
 
           <div className="flex flex-col max-h-70 overflow-y-auto">
             {PLAYER_OPTIONS.map(({ label, value }) => (
-              <div>
+              <div key={value}>
                 <FormControlLabel
-                  key={value}
                   control={
                     <Checkbox
                       size="small"

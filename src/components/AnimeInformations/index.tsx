@@ -13,8 +13,9 @@ import { X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 import { useAnimeDetailsStore } from '@/stores/animeDetails';
+import { useProviderStore } from '@/stores/providers/provider';
 import { Provider } from '@/types/List';
-import { buildUrl } from '@/utils/url';
+import { buildEntityUrl } from '@/utils/url';
 import AnimeCover from '../ui/AnimeCover';
 import Button from '../ui/Button';
 import AnimeListForm from './components/AnimeListForm';
@@ -33,6 +34,8 @@ const AnimeInformations = () => {
   const setSelectedAnime = useAnimeDetailsStore(
     (state) => state.setSelectedAnime
   );
+
+  const activeProvider = useProviderStore((state) => state.activeProvider);
 
   const handleSubmit = useCallback(() => {
     if (!formRef?.current) return;
@@ -72,15 +75,19 @@ const AnimeInformations = () => {
             <AnimeCover
               title={title}
               imageUrl={imageUrl}
-              url={buildUrl(Provider.MY_ANIME_LIST, 'anime', selectedAnime.id)}
+              url={buildEntityUrl(
+                Provider.MY_ANIME_LIST,
+                'anime',
+                selectedAnime.id
+              )}
             />
           </Grid>
 
           <Grid size={{ xs: 12, sm: 'grow' }} className="min-w-0">
             <div className="flex flex-col gap-1">
               <AnimeTitle
-                url={buildUrl(
-                  Provider.MY_ANIME_LIST,
+                url={buildEntityUrl(
+                  activeProvider || Provider.MY_ANIME_LIST,
                   'anime',
                   selectedAnime.id
                 )}>

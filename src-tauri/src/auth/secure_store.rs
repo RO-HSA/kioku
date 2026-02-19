@@ -4,6 +4,7 @@ use std::sync::Mutex;
 use base64::{engine::general_purpose, Engine as _};
 use rand::rngs::OsRng;
 use rand::RngCore;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_stronghold::stronghold::Stronghold;
 
@@ -12,6 +13,13 @@ const KEYRING_ENTRY: &str = "stronghold-master-key";
 const KEY_LENGTH: usize = 32;
 const CLIENT_ID: &[u8] = b"oauth";
 const REFRESH_TOKEN_KEY: &str = "refresh_token";
+const ACCESS_TOKEN_KEY: &str = "access_token";
+
+#[derive(Deserialize, Serialize)]
+struct AccessTokenRecord {
+    token: String,
+    expires_at_unix_secs: u64,
+}
 
 #[derive(Default)]
 pub struct StrongholdKeyState(Mutex<Option<Vec<u8>>>);
@@ -89,8 +97,16 @@ fn open_stronghold(app: &AppHandle, key: &[u8]) -> Result<Stronghold, String> {
     Stronghold::new(path, key.to_vec()).map_err(|e| e.to_string())
 }
 
+fn token_record_key(provider_id: &str, token_key: &str) -> String {
+    format!("{provider_id}:{token_key}")
+}
+
 fn refresh_record_key(provider_id: &str) -> String {
-    format!("{provider_id}:{REFRESH_TOKEN_KEY}")
+    token_record_key(provider_id, REFRESH_TOKEN_KEY)
+}
+
+fn access_record_key(provider_id: &str) -> String {
+    token_record_key(provider_id, ACCESS_TOKEN_KEY)
 }
 
 pub fn init_stronghold_key(app: &AppHandle) -> Result<(), String> {
@@ -104,6 +120,7 @@ pub fn save_refresh_token(
     refresh_token: &str,
 ) -> Result<(), String> {
     let key = app.state::<StrongholdKeyState>().get_key()?;
+
     let stronghold = open_stronghold(app, &key)?;
     let client = stronghold
         .load_client(CLIENT_ID)
@@ -119,7 +136,8 @@ pub fn save_refresh_token(
         )
         .map_err(|e| e.to_string())?;
 
-    stronghold.save().map_err(|e| e.to_string())
+    stronghold.save().map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 pub fn read_refresh_token(app: &AppHandle, provider_id: &str) -> Result<Option<String>, String> {
@@ -136,4 +154,59 @@ pub fn read_refresh_token(app: &AppHandle, provider_id: &str) -> Result<Option<S
         .map_err(|e| e.to_string())?;
 
     Ok(raw.and_then(|bytes| String::from_utf8(bytes).ok()))
+}
+
+pub fn save_access_token(
+    app: &AppHandle,
+    provider_id: &str,
+    access_token: &str,
+    expires_at_unix_secs: u64,
+) -> Result<(), String> {
+    let key = app.state::<StrongholdKeyState>().get_key()?;
+    let stronghold = open_stronghold(app, &key)?;
+    let client = stronghold
+        .load_client(CLIENT_ID)
+        .or_else(|_| stronghold.create_client(CLIENT_ID))
+        .map_err(|e| e.to_string())?;
+
+    let record = AccessTokenRecord {
+        token: access_token.to_string(),
+        expires_at_unix_secs,
+    };
+    let encoded = serde_json::to_vec(&record).map_err(|e| e.to_string())?;
+
+    client
+        .store()
+        .insert(
+            access_record_key(provider_id).as_bytes().to_vec(),
+            encoded,
+            None,
+        )
+        .map_err(|e| e.to_string())?;
+
+    stronghold.save().map_err(|e| e.to_string())
+}
+
+pub fn read_access_token(
+    app: &AppHandle,
+    provider_id: &str,
+) -> Result<Option<(String, u64)>, String> {
+    let key = app.state::<StrongholdKeyState>().get_key()?;
+    let stronghold = open_stronghold(app, &key)?;
+    let client = stronghold
+        .load_client(CLIENT_ID)
+        .or_else(|_| stronghold.create_client(CLIENT_ID))
+        .map_err(|e| e.to_string())?;
+
+    let raw = client
+        .store()
+        .get(access_record_key(provider_id).as_bytes())
+        .map_err(|e| e.to_string())?;
+
+    let Some(raw) = raw else {
+        return Ok(None);
+    };
+
+    let record = serde_json::from_slice::<AccessTokenRecord>(&raw).map_err(|e| e.to_string())?;
+    Ok(Some((record.token, record.expires_at_unix_secs)))
 }

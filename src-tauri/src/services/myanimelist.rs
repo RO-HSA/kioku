@@ -457,6 +457,9 @@ pub async fn update_myanimelist_list_entry(
     update: &AnimeListUpdateRequest,
 ) -> Result<(), String> {
     let token = get_access_token(app, MAL_PROVIDER_ID).await?;
+    let entry_id = update
+        .entry_id
+        .ok_or_else(|| "Missing entryId for MyAnimeList update".to_string())?;
 
     let mut params: Vec<(String, String)> = Vec::new();
 
@@ -505,7 +508,7 @@ pub async fn update_myanimelist_list_entry(
         return Err("No update fields provided".to_string());
     }
 
-    let url = format!("{}{}/my_list_status", UPDATE_BASE_URL, update.entry_id);
+    let url = format!("{}{}/my_list_status", UPDATE_BASE_URL, entry_id);
     let response = client
         .put(url)
         .bearer_auth(token)
