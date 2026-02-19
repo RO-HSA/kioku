@@ -13,6 +13,7 @@ import { X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 import { useAnimeDetailsStore } from '@/stores/animeDetails';
+import { useProviderStore } from '@/stores/providers/provider';
 import { Provider } from '@/types/List';
 import { buildEntityUrl } from '@/utils/url';
 import AnimeCover from '../ui/AnimeCover';
@@ -33,6 +34,8 @@ const AnimeInformations = () => {
   const setSelectedAnime = useAnimeDetailsStore(
     (state) => state.setSelectedAnime
   );
+
+  const activeProvider = useProviderStore((state) => state.activeProvider);
 
   const handleSubmit = useCallback(() => {
     if (!formRef?.current) return;
@@ -84,7 +87,7 @@ const AnimeInformations = () => {
             <div className="flex flex-col gap-1">
               <AnimeTitle
                 url={buildEntityUrl(
-                  Provider.MY_ANIME_LIST,
+                  activeProvider || Provider.MY_ANIME_LIST,
                   'anime',
                   selectedAnime.id
                 )}>
