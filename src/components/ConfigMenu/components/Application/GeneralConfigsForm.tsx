@@ -40,16 +40,17 @@ const GeneralConfigsForm = () => {
     <Section title="Startup">
       <Stack>
         <FormControlLabel
+          label="Start automatically on system startup"
           checked={configuration?.application?.enableAutoStartup ?? false}
           onChange={(_, checked) => toggleAutoStartup(checked)}
-          label="Start automatically on system startup"
-          control={<Checkbox />}
+          control={<Checkbox size="small" />}
         />
+
         <FormControlLabel
+          label="Start minimized"
           checked={configuration?.application?.startMinimized ?? false}
           onChange={(_, checked) => toggleStartMinimized(checked)}
-          label="Start minimized"
-          control={<Checkbox />}
+          control={<Checkbox size="small" />}
         />
       </Stack>
     </Section>
