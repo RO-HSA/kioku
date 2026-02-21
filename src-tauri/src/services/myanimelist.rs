@@ -8,6 +8,7 @@ use crate::services::anime_list_updates::AnimeListUpdateRequest;
 
 const BASE_URL: &str = "https://api.myanimelist.net/v2/users/";
 const UPDATE_BASE_URL: &str = "https://api.myanimelist.net/v2/anime/";
+const USER_INFO_FIELDS: &str = "anime_statistics";
 const FIELDS: &str = "list_status{comments,num_times_rewatched},synopsis,alternative_titles,source,num_episodes,nsfw,start_season,media_type,studios,mean,status,genres,broadcast,start_date";
 const LIMIT: u32 = 1000;
 
@@ -142,6 +143,14 @@ pub struct SynchronizedAnimeList {
     on_hold: Vec<AnimeListItem>,
     dropped: Vec<AnimeListItem>,
     plan_to_watch: Vec<AnimeListItem>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct MyAnimeListUserInfo {
+    pub id: u64,
+    pub name: String,
+    pub picture: Option<String>,
+    pub anime_statistics: Option<serde_json::Value>,
 }
 
 #[derive(Copy, Clone)]
@@ -524,6 +533,45 @@ pub async fn update_myanimelist_list_entry(
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn fetch_myanimelist_user_info(
+    app: tauri::AppHandle,
+) -> Result<MyAnimeListUserInfo, String> {
+    let token = get_access_token(&app, MAL_PROVIDER_ID).await?;
+    let mut url = reqwest::Url::parse(BASE_URL).map_err(|e| e.to_string())?;
+    {
+        let mut segments = url
+            .path_segments_mut()
+            .map_err(|_| "Invalid MyAnimeList base URL".to_string())?;
+        segments.push("@me");
+    }
+
+    url.query_pairs_mut().append_pair("fields", USER_INFO_FIELDS);
+
+    let client = reqwest::Client::new();
+    let response = client
+        .get(url)
+        .bearer_auth(token)
+        .timeout(std::time::Duration::from_secs(15))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.map_err(|e| e.to_string())?;
+        return Err(format!(
+            "MyAnimeList user info request failed: {} - {}",
+            status, body
+        ));
+    }
+
+    response
+        .json::<MyAnimeListUserInfo>()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
