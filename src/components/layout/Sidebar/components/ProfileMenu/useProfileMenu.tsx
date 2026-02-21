@@ -1,5 +1,5 @@
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { ArrowLeftRight, LogOut, User } from 'lucide-react';
+import { ArrowLeftRight, LogOut, RefreshCw, User } from 'lucide-react';
 import {
   ReactNode,
   useCallback,
@@ -9,6 +9,8 @@ import {
 } from 'react';
 
 import { calculatePlaybackMatches } from '@/hooks/detection/utils';
+import { AniListService } from '@/services/backend/AniList';
+import { MyAnimeListService } from '@/services/backend/MyAnimeList';
 import { useConfigMenuStore } from '@/stores/config/configMenu';
 import { useNowPlayingAliasesStore } from '@/stores/detection/nowPlayingAliases';
 import { usePlayerDetectionStore } from '@/stores/detection/playerDetection';
@@ -23,6 +25,7 @@ import { buildProfileUrl } from '@/utils/url';
 type MenuItem = {
   label: string;
   icon: ReactNode;
+  disabled: boolean;
   renderDivider: boolean;
   handleClick: (event: MouseEvent<HTMLElement>) => void;
 };
@@ -32,6 +35,7 @@ const useProfileMenu = () => {
   const [switchAccountEl, setSwitchAccountEl] = useState<null | HTMLElement>(
     null
   );
+  const [isFetchingProfile, setIsFetchingProfile] = useState(false);
 
   const activeProvider = useProviderStore((state) => state.activeProvider);
   const setActiveProvider = useProviderStore(
@@ -49,6 +53,16 @@ const useProfileMenu = () => {
     (state) => state.animeListData
   );
   const signOutMyAnimeList = useMyAnimeListStore((state) => state.signOut);
+  const setMyAnimeListId = useMyAnimeListStore((state) => state.setId);
+  const setMyAnimeListUsername = useMyAnimeListStore(
+    (state) => state.setUsername
+  );
+  const setMyAnimeListProfilePictureUrl = useMyAnimeListStore(
+    (state) => state.setProfilePictureUrl
+  );
+  const setMyAnimeListStatistics = useMyAnimeListStore(
+    (state) => state.setStatistics
+  );
 
   const isAniListAuthenticated = useAniListStore(
     (state) => state.isAuthenticated
@@ -59,6 +73,12 @@ const useProfileMenu = () => {
   );
   const aniListAnimeData = useAniListStore((state) => state.animeListData);
   const signOutAniList = useAniListStore((state) => state.signOut);
+  const setAniListId = useAniListStore((state) => state.setId);
+  const setAniListUsername = useAniListStore((state) => state.setUsername);
+  const setAniListProfilePictureUrl = useAniListStore(
+    (state) => state.setProfilePictureUrl
+  );
+  const setAniListStatistics = useAniListStore((state) => state.setStatistics);
 
   const detection = usePlayerDetectionStore((state) => state.activeEpisode);
   const setMatchingResult = usePlayerDetectionStore(
@@ -209,6 +229,33 @@ const useProfileMenu = () => {
     ]
   );
 
+  const handleRefreshProfile = useCallback(async () => {
+    setIsFetchingProfile(true);
+
+    switch (activeProvider) {
+      case Provider.MY_ANIME_LIST:
+        const myAnimeListUserInfo = await MyAnimeListService.fetchUserInfo();
+
+        setMyAnimeListId(myAnimeListUserInfo.id);
+        setMyAnimeListUsername(myAnimeListUserInfo.name);
+        setMyAnimeListProfilePictureUrl(myAnimeListUserInfo.picture);
+        setMyAnimeListStatistics(myAnimeListUserInfo.statistics);
+        break;
+      case Provider.ANILIST:
+        const aniListUserInfo = await AniListService.fetchUserInfo();
+
+        setAniListId(aniListUserInfo.id);
+        setAniListUsername(aniListUserInfo.name);
+        setAniListProfilePictureUrl(aniListUserInfo.picture);
+        setAniListStatistics(aniListUserInfo.statistics);
+        break;
+      default:
+        setIsFetchingProfile(false);
+    }
+
+    setIsFetchingProfile(false);
+  }, [activeProvider]);
+
   const connectedAccounts = useMemo(() => {
     const accounts = [];
 
@@ -228,6 +275,7 @@ const useProfileMenu = () => {
       {
         label: 'My Profile',
         icon: <User />,
+        disabled: false,
         renderDivider: false,
         handleClick: async () => {
           if (activeProvider && username) {
@@ -241,8 +289,16 @@ const useProfileMenu = () => {
         }
       },
       {
+        label: 'Refresh Profile Info',
+        icon: <RefreshCw />,
+        disabled: isFetchingProfile,
+        renderDivider: false,
+        handleClick: handleRefreshProfile
+      },
+      {
         label: 'Switch Account',
         icon: <ArrowLeftRight />,
+        disabled: connectedAccounts.length === 0,
         renderDivider: true,
         handleClick: (event: MouseEvent<HTMLElement>) => {
           if (connectedAccounts.length > 0) {
@@ -254,11 +310,19 @@ const useProfileMenu = () => {
       {
         label: 'Sign Out',
         icon: <LogOut />,
+        disabled: false,
         renderDivider: false,
         handleClick: handleSignOut
       }
     ];
-  }, [activeProvider, username, connectedAccounts, handleSignOut]);
+  }, [
+    activeProvider,
+    username,
+    connectedAccounts,
+    isFetchingProfile,
+    handleSignOut,
+    handleRefreshProfile
+  ]);
 
   return {
     mainPopoverEl,
@@ -270,12 +334,15 @@ const useProfileMenu = () => {
     username,
     menuItems,
     connectedAccounts,
+    isFetchingProfile,
+    setIsFetchingProfile,
     handleOpenMainPopover,
     handleCloseMainPopover,
     handleOpenSwitchAccountPopover,
     handleCloseSwitchAccountPopover,
     handleSwitchAccount,
-    handleSignOut
+    handleSignOut,
+    handleRefreshProfile
   };
 };
 
