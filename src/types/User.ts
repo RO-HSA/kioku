@@ -16,6 +16,13 @@ export interface Statistics {
   meanScore: number;
 }
 
+export interface ProviderUserInfo {
+  id: number;
+  name: string;
+  picture: string | null;
+  statistics: Statistics | null;
+}
+
 export interface IUser {
   id: number;
   username: string;

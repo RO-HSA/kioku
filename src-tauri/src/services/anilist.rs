@@ -90,6 +90,31 @@ query ($type: MediaType!, $userName: String) {
   }
 }
 "#;
+const VIEWER_QUERY: &str = r#"
+query Viewer {
+  Viewer {
+    avatar {
+      large
+    }
+    id
+    name
+    statistics {
+      anime {
+        count
+        episodesWatched
+        meanScore
+        minutesWatched
+        statuses {
+          count
+          meanScore
+          minutesWatched
+          status
+        }
+      }
+    }
+  }
+}
+"#;
 const SAVE_MEDIA_LIST_ENTRY_MUTATION: &str = r#"
 mutation Mutation(
   $saveMediaListEntryId: Int
@@ -129,6 +154,11 @@ struct GraphQlRequest<'a> {
 struct GraphQlVariables<'a> {
     r#type: &'a str,
     user_name: Option<&'a str>,
+}
+
+#[derive(Serialize)]
+struct ViewerRequest<'a> {
+    query: &'a str,
 }
 
 #[derive(Serialize)]
@@ -180,6 +210,18 @@ struct GraphQlData {
 }
 
 #[derive(Deserialize)]
+struct ViewerResponse {
+    data: Option<ViewerData>,
+    errors: Option<Vec<GraphQlError>>,
+}
+
+#[derive(Deserialize)]
+struct ViewerData {
+    #[serde(rename = "Viewer")]
+    viewer: Option<AniListViewer>,
+}
+
+#[derive(Deserialize)]
 struct SaveMediaListEntryMutationResponse {
     data: Option<SaveMediaListEntryMutationData>,
     errors: Option<Vec<GraphQlError>>,
@@ -199,6 +241,73 @@ struct SaveMediaListEntryMutationPayload {
 #[derive(Deserialize)]
 struct GraphQlError {
     message: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AniListViewer {
+    id: u64,
+    name: String,
+    avatar: Option<AniListViewerAvatar>,
+    statistics: Option<AniListViewerStatistics>,
+}
+
+#[derive(Deserialize)]
+struct AniListViewerAvatar {
+    large: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct AniListViewerStatistics {
+    anime: Option<AniListAnimeStatistics>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct AniListAnimeStatistics {
+    count: Option<u32>,
+    episodes_watched: Option<u32>,
+    mean_score: Option<f64>,
+    minutes_watched: Option<u64>,
+    #[serde(default)]
+    statuses: Vec<AniListAnimeStatisticsStatus>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct AniListAnimeStatisticsStatus {
+    count: Option<u32>,
+    minutes_watched: Option<u64>,
+    status: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserStatistics {
+    num_items_watching: u32,
+    num_items_completed: u32,
+    num_items_on_hold: u32,
+    num_items_dropped: u32,
+    num_items_plan_to_watch: u32,
+    num_items: u32,
+    num_days_watched: f64,
+    num_days_watching: f64,
+    num_days_completed: f64,
+    num_days_on_hold: f64,
+    num_days_dropped: f64,
+    num_days: f64,
+    num_episodes: u32,
+    num_times_rewatched: u32,
+    mean_score: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AniListUserInfo {
+    pub id: u64,
+    pub name: String,
+    pub picture: Option<String>,
+    pub statistics: Option<UserStatistics>,
 }
 
 #[derive(Deserialize, Default)]
@@ -634,6 +743,85 @@ fn normalize_score(value: Option<f64>) -> u32 {
     value.round() as u32
 }
 
+fn minutes_to_days(minutes: u64) -> f64 {
+    minutes as f64 / 1440.0
+}
+
+fn map_anilist_statistics(statistics: AniListAnimeStatistics) -> UserStatistics {
+    let mut num_items_watching = 0_u32;
+    let mut num_items_completed = 0_u32;
+    let mut num_items_on_hold = 0_u32;
+    let mut num_items_dropped = 0_u32;
+    let mut num_items_plan_to_watch = 0_u32;
+
+    let mut minutes_watching = 0_u64;
+    let mut minutes_completed = 0_u64;
+    let mut minutes_on_hold = 0_u64;
+    let mut minutes_dropped = 0_u64;
+
+    for status in statistics.statuses {
+        let count = status.count.unwrap_or(0);
+        let minutes = status.minutes_watched.unwrap_or(0);
+        let key = status.status.unwrap_or_default();
+
+        match key.as_str() {
+            "CURRENT" | "REPEATING" => {
+                num_items_watching = num_items_watching.saturating_add(count);
+                minutes_watching = minutes_watching.saturating_add(minutes);
+            }
+            "COMPLETED" => {
+                num_items_completed = num_items_completed.saturating_add(count);
+                minutes_completed = minutes_completed.saturating_add(minutes);
+            }
+            "PAUSED" => {
+                num_items_on_hold = num_items_on_hold.saturating_add(count);
+                minutes_on_hold = minutes_on_hold.saturating_add(minutes);
+            }
+            "DROPPED" => {
+                num_items_dropped = num_items_dropped.saturating_add(count);
+                minutes_dropped = minutes_dropped.saturating_add(minutes);
+            }
+            "PLANNING" => {
+                num_items_plan_to_watch = num_items_plan_to_watch.saturating_add(count);
+            }
+            _ => {}
+        }
+    }
+
+    let total_minutes = statistics
+        .minutes_watched
+        .unwrap_or_else(|| {
+            minutes_watching
+                .saturating_add(minutes_completed)
+                .saturating_add(minutes_on_hold)
+                .saturating_add(minutes_dropped)
+        });
+
+    UserStatistics {
+        num_items_watching,
+        num_items_completed,
+        num_items_on_hold,
+        num_items_dropped,
+        num_items_plan_to_watch,
+        num_items: statistics.count.unwrap_or(
+            num_items_watching
+                .saturating_add(num_items_completed)
+                .saturating_add(num_items_on_hold)
+                .saturating_add(num_items_dropped)
+                .saturating_add(num_items_plan_to_watch),
+        ),
+        num_days_watched: minutes_to_days(total_minutes),
+        num_days_watching: minutes_to_days(minutes_watching),
+        num_days_completed: minutes_to_days(minutes_completed),
+        num_days_on_hold: minutes_to_days(minutes_on_hold),
+        num_days_dropped: minutes_to_days(minutes_dropped),
+        num_days: minutes_to_days(total_minutes),
+        num_episodes: statistics.episodes_watched.unwrap_or(0),
+        num_times_rewatched: 0,
+        mean_score: statistics.mean_score.unwrap_or(0.0),
+    }
+}
+
 fn map_media_to_domain(
     media: AniListMedia,
     media_list_entry: AniListMediaListEntry,
@@ -733,6 +921,63 @@ async fn fetch_collection(
         .data
         .and_then(|data| data.media_list_collection)
         .ok_or_else(|| "AniList response missing MediaListCollection".to_string())
+}
+
+async fn fetch_viewer(client: &reqwest::Client, token: &str) -> Result<AniListUserInfo, String> {
+    let request = ViewerRequest {
+        query: VIEWER_QUERY,
+    };
+
+    let response = client
+        .post(GRAPHQL_URL)
+        .bearer_auth(token)
+        .json(&request)
+        .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    let status = response.status();
+
+    let body = response.text().await.map_err(|e| e.to_string())?;
+    if !status.is_success() {
+        return Err(format!("AniList request failed: {} - {}", status, body));
+    }
+
+    let parsed: ViewerResponse = serde_json::from_str(&body)
+        .map_err(|e| format!("Failed to parse AniList response: {e}"))?;
+
+    if let Some(errors) = parsed.errors {
+        if !errors.is_empty() {
+            let message = errors
+                .into_iter()
+                .map(|error| error.message)
+                .collect::<Vec<_>>()
+                .join("; ");
+            return Err(format!("AniList GraphQL error: {message}"));
+        }
+    }
+
+    let viewer = parsed
+        .data
+        .and_then(|data| data.viewer)
+        .ok_or_else(|| "AniList response missing Viewer".to_string())?;
+
+    Ok(AniListUserInfo {
+        id: viewer.id,
+        name: viewer.name,
+        picture: viewer.avatar.and_then(|avatar| avatar.large),
+        statistics: viewer
+            .statistics
+            .and_then(|statistics| statistics.anime)
+            .map(map_anilist_statistics),
+    })
+}
+
+#[tauri::command]
+pub async fn fetch_anilist_user_info(app: tauri::AppHandle) -> Result<AniListUserInfo, String> {
+    let token = get_access_token(&app, ANILIST_PROVIDER_ID).await?;
+    let client = reqwest::Client::new();
+    fetch_viewer(&client, &token).await
 }
 
 #[tauri::command]

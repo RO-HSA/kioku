@@ -145,12 +145,60 @@ pub struct SynchronizedAnimeList {
     plan_to_watch: Vec<AnimeListItem>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize)]
+struct MalUserInfoResponse {
+    id: u64,
+    name: String,
+    picture: Option<String>,
+    anime_statistics: Option<MalAnimeStatistics>,
+}
+
+#[derive(Deserialize)]
+struct MalAnimeStatistics {
+    num_items_watching: u32,
+    num_items_completed: u32,
+    num_items_on_hold: u32,
+    num_items_dropped: u32,
+    num_items_plan_to_watch: u32,
+    num_items: u32,
+    num_days_watched: f64,
+    num_days_watching: f64,
+    num_days_completed: f64,
+    num_days_on_hold: f64,
+    num_days_dropped: f64,
+    num_days: f64,
+    num_episodes: u32,
+    num_times_rewatched: u32,
+    mean_score: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserStatistics {
+    num_items_watching: u32,
+    num_items_completed: u32,
+    num_items_on_hold: u32,
+    num_items_dropped: u32,
+    num_items_plan_to_watch: u32,
+    num_items: u32,
+    num_days_watched: f64,
+    num_days_watching: f64,
+    num_days_completed: f64,
+    num_days_on_hold: f64,
+    num_days_dropped: f64,
+    num_days: f64,
+    num_episodes: u32,
+    num_times_rewatched: u32,
+    mean_score: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MyAnimeListUserInfo {
     pub id: u64,
     pub name: String,
     pub picture: Option<String>,
-    pub anime_statistics: Option<serde_json::Value>,
+    pub statistics: Option<UserStatistics>,
 }
 
 #[derive(Copy, Clone)]
@@ -417,6 +465,26 @@ fn map_entry_to_domain(entry: MalListEntry, status_key: UserStatusKey) -> AnimeL
     }
 }
 
+fn map_mal_statistics(statistics: MalAnimeStatistics) -> UserStatistics {
+    UserStatistics {
+        num_items_watching: statistics.num_items_watching,
+        num_items_completed: statistics.num_items_completed,
+        num_items_on_hold: statistics.num_items_on_hold,
+        num_items_dropped: statistics.num_items_dropped,
+        num_items_plan_to_watch: statistics.num_items_plan_to_watch,
+        num_items: statistics.num_items,
+        num_days_watched: statistics.num_days_watched,
+        num_days_watching: statistics.num_days_watching,
+        num_days_completed: statistics.num_days_completed,
+        num_days_on_hold: statistics.num_days_on_hold,
+        num_days_dropped: statistics.num_days_dropped,
+        num_days: statistics.num_days,
+        num_episodes: statistics.num_episodes,
+        num_times_rewatched: statistics.num_times_rewatched,
+        mean_score: statistics.mean_score,
+    }
+}
+
 async fn fetch_all_into(
     client: &reqwest::Client,
     token: &str,
@@ -568,10 +636,17 @@ pub async fn fetch_myanimelist_user_info(
         ));
     }
 
-    response
-        .json::<MyAnimeListUserInfo>()
+    let raw = response
+        .json::<MalUserInfoResponse>()
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    Ok(MyAnimeListUserInfo {
+        id: raw.id,
+        name: raw.name,
+        picture: raw.picture,
+        statistics: raw.anime_statistics.map(map_mal_statistics),
+    })
 }
 
 #[tauri::command]
