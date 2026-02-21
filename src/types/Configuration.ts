@@ -8,6 +8,7 @@ export interface DetectionConfig {
 export interface ApplicationConfig {
   enableAutoStartup: boolean;
   startMinimized: boolean;
+  checkForUpdates: boolean;
 }
 
 export interface ConfigurationState {

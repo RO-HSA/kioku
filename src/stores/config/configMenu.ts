@@ -23,7 +23,8 @@ const defaultConfiguration: ConfigurationState = {
   },
   application: {
     enableAutoStartup: false,
-    startMinimized: false
+    startMinimized: false,
+    checkForUpdates: true
   }
 };
 

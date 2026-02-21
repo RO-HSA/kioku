@@ -36,6 +36,16 @@ const GeneralConfigsForm = () => {
     });
   };
 
+  const toggleCheckForUpdates = (enabled: boolean) => {
+    setConfiguration({
+      ...configuration,
+      application: {
+        ...configuration?.application,
+        checkForUpdates: enabled
+      }
+    });
+  };
+
   return (
     <Section title="Startup">
       <Stack>
@@ -50,6 +60,13 @@ const GeneralConfigsForm = () => {
           label="Start minimized"
           checked={configuration?.application?.startMinimized ?? false}
           onChange={(_, checked) => toggleStartMinimized(checked)}
+          control={<Checkbox size="small" />}
+        />
+
+        <FormControlLabel
+          label="Check for updates automatically"
+          checked={configuration?.application?.checkForUpdates ?? true}
+          onChange={(_, checked) => toggleCheckForUpdates(checked)}
           control={<Checkbox size="small" />}
         />
       </Stack>
