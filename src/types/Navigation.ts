@@ -12,7 +12,7 @@ export interface INavLink {
 export enum ConfigMenuStep {
   INTEGRATIONS = 'INTEGRATIONS',
   DETECTION = 'DETECTION',
-  UPDATES = 'UPDATES'
+  APPLICATION = 'APPLICATION'
 }
 
 export interface MenuItem {

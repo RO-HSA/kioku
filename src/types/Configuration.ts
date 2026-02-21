@@ -5,6 +5,11 @@ export interface DetectionConfig {
   enabledPlayers: SupportedPlayer[];
 }
 
+export interface ApplicationConfig {
+  enableAutoStartup: boolean;
+}
+
 export interface ConfigurationState {
   detection: DetectionConfig;
+  application: ApplicationConfig;
 }

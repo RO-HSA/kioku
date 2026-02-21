@@ -20,6 +20,9 @@ const defaultConfiguration: ConfigurationState = {
   detection: {
     playerDetectionEnabled: false,
     enabledPlayers: []
+  },
+  application: {
+    enableAutoStartup: false
   }
 };
 

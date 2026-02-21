@@ -3,6 +3,10 @@ import { Alert, Button, Snackbar } from '@mui/material';
 import { useAppUpdaterStore } from '@/stores/appUpdater';
 import { useConfigMenuStore } from '@/stores/config/configMenu';
 import { ConfigMenuStep } from '@/types/Navigation';
+import {
+  ApplicationTab,
+  applicationTabs
+} from '../ConfigMenu/components/Application';
 
 const AppUpdateSnackbar = () => {
   const availableVersion = useAppUpdaterStore(
@@ -19,8 +23,8 @@ const AppUpdateSnackbar = () => {
   const setSelectedTab = useConfigMenuStore((state) => state.setSelectedTab);
 
   const handleOpenUpdates = () => {
-    setSelectedTab(0);
-    setStep(ConfigMenuStep.UPDATES);
+    setSelectedTab(applicationTabs.indexOf(ApplicationTab.UPDATE));
+    setStep(ConfigMenuStep.APPLICATION);
     openConfigMenu();
     closeSnackbar();
   };

@@ -1,0 +1,43 @@
+import { Checkbox, FormControlLabel, Stack } from '@mui/material';
+import { disable, enable } from '@tauri-apps/plugin-autostart';
+
+import { useConfigMenuStore } from '@/stores/config/configMenu';
+import Section from '../Section';
+
+const GeneralConfigsForm = () => {
+  const configuration = useConfigMenuStore((state) => state.configuration);
+  const setConfiguration = useConfigMenuStore(
+    (state) => state.setConfiguration
+  );
+
+  const toggleAutoStartup = async (enabled: boolean) => {
+    setConfiguration({
+      ...configuration,
+      application: {
+        ...configuration?.application,
+        enableAutoStartup: enabled
+      }
+    });
+
+    if (enabled) {
+      await enable();
+    } else {
+      await disable();
+    }
+  };
+
+  return (
+    <Section title="Startup">
+      <Stack>
+        <FormControlLabel
+          checked={configuration?.application?.enableAutoStartup ?? false}
+          onChange={(_, checked) => toggleAutoStartup(checked)}
+          label="Start automatically on system startup"
+          control={<Checkbox />}
+        />
+      </Stack>
+    </Section>
+  );
+};
+
+export default GeneralConfigsForm;
