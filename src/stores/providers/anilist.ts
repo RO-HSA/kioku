@@ -5,17 +5,22 @@ import { AnimeListService } from '@/services/backend/AnimeList';
 import { SynchronizedAnimeList } from '@/services/backend/types';
 import { AnimeListUserStatus, IAnimeList } from '@/types/AnimeList';
 import { Provider } from '@/types/List';
+import { Statistics } from '@/types/User';
 import { updateAnimeListData } from './utils';
 
 type AniListStore = {
+  id: number | null;
   username: string | null;
   profilePictureUrl: string | null;
+  statistics: Statistics | null;
   isAuthenticating: boolean;
   isAuthenticated: boolean;
   isReauthenticating: boolean;
   animeListData: SynchronizedAnimeList | null;
+  setId: (id: number | null) => void;
   setUsername: (username: string | null) => void;
   setProfilePictureUrl: (url: string | null) => void;
+  setStatistics: (statistics: Statistics | null) => void;
   setIsAuthenticating: (isAuthenticating: boolean) => void;
   setIsAuthenticated: (isAuthenticated: boolean) => void;
   setIsReauthenticating: (isReauthenticating: boolean) => void;
@@ -39,14 +44,18 @@ type AniListStore = {
 };
 
 export const useAniListStore = create<AniListStore>((set) => ({
+  id: null,
   username: null,
   profilePictureUrl: null,
+  statistics: null,
   isAuthenticating: false,
   isAuthenticated: false,
   isReauthenticating: false,
   animeListData: null,
+  setId: (id) => set(() => ({ id })),
   setUsername: (username) => set(() => ({ username })),
   setProfilePictureUrl: (url) => set(() => ({ profilePictureUrl: url })),
+  setStatistics: (statistics) => set(() => ({ statistics })),
   setIsAuthenticated: (isAuthenticated) => set(() => ({ isAuthenticated })),
   setIsAuthenticating: (isAuthenticating) => set(() => ({ isAuthenticating })),
   setIsReauthenticating: (isReauthenticating) =>
@@ -54,8 +63,10 @@ export const useAniListStore = create<AniListStore>((set) => ({
   setAnimeListData: (animeListData) => set(() => ({ animeListData })),
   signOut: () =>
     set(() => ({
+      id: null,
       username: null,
       profilePictureUrl: null,
+      statistics: null,
       isAuthenticated: false,
       isAuthenticating: false,
       isReauthenticating: false,

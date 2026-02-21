@@ -1,4 +1,5 @@
 import type { SynchronizedAnimeList } from '../types';
+import type { ProviderUserInfo } from '@/types/User';
 
 export type MyAnimeListUserStatus =
   | 'watching'
@@ -59,6 +60,8 @@ export enum MyAnimeListMediaTypeEnum {
   'ova' = 'OVA',
   'unknown' = 'Unknown'
 }
+
+export type MyAnimeListUserInfo = ProviderUserInfo;
 
 export interface MyAnimeListListEntry {
   node: {

@@ -90,20 +90,22 @@ const ProfileMenu = () => {
         anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
         transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}>
         <MenuList>
-          {menuItems.flatMap(({ label, icon, renderDivider, handleClick }) => {
-            const items = [
-              <MenuItem key={label} onClick={handleClick}>
-                <ListItemIcon>{icon}</ListItemIcon>
-                <ListItemText>{label}</ListItemText>
-              </MenuItem>
-            ];
+          {menuItems.flatMap(
+            ({ label, icon, disabled, renderDivider, handleClick }) => {
+              const items = [
+                <MenuItem key={label} onClick={handleClick} disabled={disabled}>
+                  <ListItemIcon>{icon}</ListItemIcon>
+                  <ListItemText>{label}</ListItemText>
+                </MenuItem>
+              ];
 
-            if (renderDivider) {
-              items.push(<Divider key={`${label}-divider`} />);
+              if (renderDivider) {
+                items.push(<Divider key={`${label}-divider`} />);
+              }
+
+              return items;
             }
-
-            return items;
-          })}
+          )}
 
           <Menu
             anchorEl={switchAccountEl}

@@ -16,7 +16,12 @@ const useAnilistCallback = () => {
   const setIsReauthenticating = useAniListStore(
     (state) => state.setIsReauthenticating
   );
-  const setAnimeListData = useAniListStore((state) => state.setAnimeListData);
+  const setId = useAniListStore((state) => state.setId);
+  const setUsername = useAniListStore((state) => state.setUsername);
+  const setProfilePictureUrl = useAniListStore(
+    (state) => state.setProfilePictureUrl
+  );
+  const setStatistics = useAniListStore((state) => state.setStatistics);
 
   useEffect(() => {
     let unlistenSuccessfull: UnlistenFn | null = null;
@@ -27,16 +32,21 @@ const useAnilistCallback = () => {
         setIsAuthenticated(true);
         setIsAuthenticating(false);
         setIsReauthenticating(false);
-        AniListService.synchronizeList().then((response) => {
-          setAnimeListData(response);
-          const activeProvider = useProviderStore.getState().activeProvider;
 
-          if (activeProvider === null) {
-            useProviderStore.setState({
-              activeProvider: Provider.ANILIST
-            });
-          }
+        AniListService.fetchUserInfo().then((userInfo) => {
+          setId(userInfo.id);
+          setUsername(userInfo.name);
+          setProfilePictureUrl(userInfo.picture);
+          setStatistics(userInfo.statistics);
         });
+
+        const activeProvider = useProviderStore.getState().activeProvider;
+
+        if (activeProvider === null) {
+          useProviderStore.setState({
+            activeProvider: Provider.ANILIST
+          });
+        }
       });
     };
 
@@ -66,7 +76,10 @@ const useAnilistCallback = () => {
     setIsAuthenticated,
     setIsAuthenticating,
     setIsReauthenticating,
-    setAnimeListData
+    setId,
+    setProfilePictureUrl,
+    setStatistics,
+    setUsername
   ]);
 };
 

@@ -8,6 +8,7 @@ use crate::services::anime_list_updates::AnimeListUpdateRequest;
 
 const BASE_URL: &str = "https://api.myanimelist.net/v2/users/";
 const UPDATE_BASE_URL: &str = "https://api.myanimelist.net/v2/anime/";
+const USER_INFO_FIELDS: &str = "anime_statistics";
 const FIELDS: &str = "list_status{comments,num_times_rewatched},synopsis,alternative_titles,source,num_episodes,nsfw,start_season,media_type,studios,mean,status,genres,broadcast,start_date";
 const LIMIT: u32 = 1000;
 
@@ -142,6 +143,62 @@ pub struct SynchronizedAnimeList {
     on_hold: Vec<AnimeListItem>,
     dropped: Vec<AnimeListItem>,
     plan_to_watch: Vec<AnimeListItem>,
+}
+
+#[derive(Deserialize)]
+struct MalUserInfoResponse {
+    id: u64,
+    name: String,
+    picture: Option<String>,
+    anime_statistics: Option<MalAnimeStatistics>,
+}
+
+#[derive(Deserialize)]
+struct MalAnimeStatistics {
+    num_items_watching: u32,
+    num_items_completed: u32,
+    num_items_on_hold: u32,
+    num_items_dropped: u32,
+    num_items_plan_to_watch: u32,
+    num_items: u32,
+    num_days_watched: f64,
+    num_days_watching: f64,
+    num_days_completed: f64,
+    num_days_on_hold: f64,
+    num_days_dropped: f64,
+    num_days: f64,
+    num_episodes: u32,
+    num_times_rewatched: u32,
+    mean_score: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserStatistics {
+    num_items_watching: u32,
+    num_items_completed: u32,
+    num_items_on_hold: u32,
+    num_items_dropped: u32,
+    num_items_plan_to_watch: u32,
+    num_items: u32,
+    num_days_watched: f64,
+    num_days_watching: f64,
+    num_days_completed: f64,
+    num_days_on_hold: f64,
+    num_days_dropped: f64,
+    num_days: f64,
+    num_episodes: u32,
+    num_times_rewatched: u32,
+    mean_score: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MyAnimeListUserInfo {
+    pub id: u64,
+    pub name: String,
+    pub picture: Option<String>,
+    pub statistics: Option<UserStatistics>,
 }
 
 #[derive(Copy, Clone)]
@@ -408,6 +465,26 @@ fn map_entry_to_domain(entry: MalListEntry, status_key: UserStatusKey) -> AnimeL
     }
 }
 
+fn map_mal_statistics(statistics: MalAnimeStatistics) -> UserStatistics {
+    UserStatistics {
+        num_items_watching: statistics.num_items_watching,
+        num_items_completed: statistics.num_items_completed,
+        num_items_on_hold: statistics.num_items_on_hold,
+        num_items_dropped: statistics.num_items_dropped,
+        num_items_plan_to_watch: statistics.num_items_plan_to_watch,
+        num_items: statistics.num_items,
+        num_days_watched: statistics.num_days_watched,
+        num_days_watching: statistics.num_days_watching,
+        num_days_completed: statistics.num_days_completed,
+        num_days_on_hold: statistics.num_days_on_hold,
+        num_days_dropped: statistics.num_days_dropped,
+        num_days: statistics.num_days,
+        num_episodes: statistics.num_episodes,
+        num_times_rewatched: statistics.num_times_rewatched,
+        mean_score: statistics.mean_score,
+    }
+}
+
 async fn fetch_all_into(
     client: &reqwest::Client,
     token: &str,
@@ -524,6 +601,52 @@ pub async fn update_myanimelist_list_entry(
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn fetch_myanimelist_user_info(
+    app: tauri::AppHandle,
+) -> Result<MyAnimeListUserInfo, String> {
+    let token = get_access_token(&app, MAL_PROVIDER_ID).await?;
+    let mut url = reqwest::Url::parse(BASE_URL).map_err(|e| e.to_string())?;
+    {
+        let mut segments = url
+            .path_segments_mut()
+            .map_err(|_| "Invalid MyAnimeList base URL".to_string())?;
+        segments.push("@me");
+    }
+
+    url.query_pairs_mut().append_pair("fields", USER_INFO_FIELDS);
+
+    let client = reqwest::Client::new();
+    let response = client
+        .get(url)
+        .bearer_auth(token)
+        .timeout(std::time::Duration::from_secs(15))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.map_err(|e| e.to_string())?;
+        return Err(format!(
+            "MyAnimeList user info request failed: {} - {}",
+            status, body
+        ));
+    }
+
+    let raw = response
+        .json::<MalUserInfoResponse>()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(MyAnimeListUserInfo {
+        id: raw.id,
+        name: raw.name,
+        picture: raw.picture,
+        statistics: raw.anime_statistics.map(map_mal_statistics),
+    })
 }
 
 #[tauri::command]

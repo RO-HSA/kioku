@@ -16,8 +16,11 @@ const useMyanimelistCallback = () => {
   const setIsReauthenticating = useMyAnimeListStore(
     (state) => state.setIsReauthenticating
   );
-  const setAnimeListData = useMyAnimeListStore(
-    (state) => state.setAnimeListData
+  const setId = useMyAnimeListStore((state) => state.setId);
+  const setStatistics = useMyAnimeListStore((state) => state.setStatistics);
+  const setUsername = useMyAnimeListStore((state) => state.setUsername);
+  const setProfilePictureUrl = useMyAnimeListStore(
+    (state) => state.setProfilePictureUrl
   );
 
   useEffect(() => {
@@ -29,8 +32,11 @@ const useMyanimelistCallback = () => {
         setIsAuthenticated(true);
         setIsAuthenticating(false);
         setIsReauthenticating(false);
-        MyAnimeListService.synchronizeList().then((response) => {
-          setAnimeListData(response);
+        MyAnimeListService.fetchUserInfo().then((response) => {
+          setId(response.id);
+          setUsername(response.name);
+          setProfilePictureUrl(response.picture);
+          setStatistics(response.statistics);
           const activeProvider = useProviderStore.getState().activeProvider;
 
           if (activeProvider === null) {
@@ -68,7 +74,10 @@ const useMyanimelistCallback = () => {
     setIsAuthenticated,
     setIsAuthenticating,
     setIsReauthenticating,
-    setAnimeListData
+    setId,
+    setProfilePictureUrl,
+    setStatistics,
+    setUsername
   ]);
 };
 
