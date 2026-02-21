@@ -86,6 +86,11 @@ pub fn run() {
     builder
         .manage(StrongholdKeyState::default())
         .manage(TokenManagerState::default())
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .arg("--from-autostart")
+                .build(),
+        )
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_deep_link::init())
@@ -101,6 +106,7 @@ pub fn run() {
             use tauri_plugin_deep_link::DeepLinkExt;
 
             let app_handle = app.handle().clone();
+            
             app.deep_link().on_open_url(move |event| {
                 for url in event.urls() {
                     if url.as_str().starts_with("kioku://") {
