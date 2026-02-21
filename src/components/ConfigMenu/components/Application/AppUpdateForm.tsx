@@ -2,6 +2,7 @@ import { Alert, Divider, LinearProgress, Typography } from '@mui/material';
 
 import Button from '@/components/ui/Button';
 import { useAppUpdaterStore } from '@/stores/appUpdater';
+import { formatDate } from '@/utils/date';
 import Section from '../Section';
 
 const formatBytes = (bytes: number): string => {
@@ -18,20 +19,6 @@ const formatBytes = (bytes: number): string => {
   const precision = exponent === 0 ? 0 : 1;
 
   return `${value.toFixed(precision)} ${units[exponent]}`;
-};
-
-const formatDate = (isoDate: string | null): string | null => {
-  if (!isoDate) {
-    return null;
-  }
-
-  const parsedDate = new Date(isoDate);
-
-  if (Number.isNaN(parsedDate.getTime())) {
-    return null;
-  }
-
-  return parsedDate.toLocaleString();
 };
 
 const AppUpdateForm = () => {

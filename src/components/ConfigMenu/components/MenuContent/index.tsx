@@ -1,8 +1,8 @@
 import { useConfigMenuStore } from '@/stores/config/configMenu';
 import { ConfigMenuStep } from '@/types/Navigation';
+import Application from '../Application';
 import Detection from '../Detection';
 import Integrations from '../Integrations';
-import Updates from '../Updates';
 
 const MenuContent = () => {
   const step = useConfigMenuStore((state) => state.step);
@@ -13,8 +13,8 @@ const MenuContent = () => {
         return <Integrations />;
       case ConfigMenuStep.DETECTION:
         return <Detection />;
-      case ConfigMenuStep.UPDATES:
-        return <Updates />;
+      case ConfigMenuStep.APPLICATION:
+        return <Application />;
       default:
         return null;
     }

@@ -1,7 +1,7 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use serde::Deserialize;
 use std::time::Duration;
-use tauri::Manager;
+use tauri::{Manager, WebviewWindowBuilder};
 use tauri_plugin_zustand::ManagerExt;
 
 pub mod auth;
@@ -31,6 +31,8 @@ use crate::services::player_detection::{
 struct StoredConfigurationState {
     #[serde(default)]
     detection: StoredDetectionConfig,
+    #[serde(default)]
+    application: StoredApplicationConfig,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -42,13 +44,18 @@ struct StoredDetectionConfig {
     enabled_players: Vec<SupportedPlayer>,
 }
 
-fn read_playback_observer_bootstrap_config(app: &tauri::AppHandle) -> StoredDetectionConfig {
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct StoredApplicationConfig {
+    #[serde(default)]
+    start_minimized: bool,
+}
+
+fn read_bootstrap_config(app: &tauri::AppHandle) -> StoredConfigurationState {
     let stored_configuration: Option<StoredConfigurationState> =
         app.zustand().get_or_default("configMenu", "configuration");
 
-    stored_configuration
-        .map(|configuration| configuration.detection)
-        .unwrap_or_default()
+    stored_configuration.unwrap_or_default()
 }
 
 fn process_oauth_callback(app: tauri::AppHandle, url: String) {
@@ -68,10 +75,11 @@ pub fn run() {
             .plugin(tauri_plugin_updater::Builder::new().build())
             .plugin(tauri_plugin_single_instance::init(
                 |app: &tauri::AppHandle<_>, args: Vec<String>, _cwd: String| {
-                    let _ = app
-                        .get_webview_window("main")
-                        .expect("no main window")
-                        .set_focus();
+                    if let Some(main_window) = app.get_webview_window("main") {
+                        let _ = main_window.unminimize();
+                        let _ = main_window.show();
+                        let _ = main_window.set_focus();
+                    }
 
                     let oauth_callback =
                         args.iter().find(|arg| arg.starts_with("kioku://")).cloned();
@@ -86,6 +94,7 @@ pub fn run() {
     builder
         .manage(StrongholdKeyState::default())
         .manage(TokenManagerState::default())
+        .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_deep_link::init())
@@ -101,6 +110,7 @@ pub fn run() {
             use tauri_plugin_deep_link::DeepLinkExt;
 
             let app_handle = app.handle().clone();
+
             app.deep_link().on_open_url(move |event| {
                 for url in event.urls() {
                     if url.as_str().starts_with("kioku://") {
@@ -108,6 +118,30 @@ pub fn run() {
                     }
                 }
             });
+
+            let bootstrap_config = read_bootstrap_config(&app.handle());
+            let main_window_config = app
+                .config()
+                .app
+                .windows
+                .iter()
+                .find(|window| window.label == "main")
+                .or_else(|| app.config().app.windows.first())
+                .ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::Other, "main window config not found")
+                })?;
+
+            let mut main_window_builder =
+                WebviewWindowBuilder::from_config(app.handle(), main_window_config)?;
+            if bootstrap_config.application.start_minimized {
+                main_window_builder = main_window_builder.visible(false);
+            }
+            let main_window = main_window_builder.build()?;
+
+            if bootstrap_config.application.start_minimized {
+                let _ = main_window.minimize();
+                let _ = main_window.show();
+            }
 
             if let Err(err) = init_stronghold_key(&app.handle()) {
                 return Err(std::io::Error::new(std::io::ErrorKind::Other, err).into());
@@ -145,7 +179,7 @@ pub fn run() {
             }
 
             app.manage(AnimeListUpdateQueue::new(app.handle().clone()));
-            let observer_config = read_playback_observer_bootstrap_config(&app.handle());
+            let observer_config = bootstrap_config.detection;
             app.manage(PlaybackObserverState::new(
                 observer_config.player_detection_enabled,
                 observer_config.enabled_players,

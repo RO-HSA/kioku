@@ -21,3 +21,17 @@ export const getTodayAsYmd = (): string => {
   const day = String(now.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
+
+export const formatDate = (isoDate: string | null): string | null => {
+  if (!isoDate) {
+    return null;
+  }
+
+  const parsedDate = new Date(isoDate);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return null;
+  }
+
+  return parsedDate.toLocaleString();
+};

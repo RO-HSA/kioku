@@ -1,4 +1,4 @@
-import { Blocks, Download, TvMinimalPlay } from 'lucide-react';
+import { AppWindow, Blocks, TvMinimalPlay } from 'lucide-react';
 
 import { ConfigMenuStep, MenuItem } from '@/types/Navigation';
 
@@ -14,8 +14,8 @@ export const configMenuItems: MenuItem[] = [
     icon: TvMinimalPlay
   },
   {
-    label: 'Updates',
-    step: ConfigMenuStep.UPDATES,
-    icon: Download
+    label: 'Application',
+    step: ConfigMenuStep.APPLICATION,
+    icon: AppWindow
   }
 ];

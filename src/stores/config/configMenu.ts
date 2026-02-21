@@ -16,10 +16,15 @@ type ConfigMenuStore = {
   setConfiguration: (configuration: ConfigurationState) => void;
 };
 
-const defaultConfiguration: ConfigurationState = {
+export const defaultConfiguration: ConfigurationState = {
   detection: {
     playerDetectionEnabled: false,
     enabledPlayers: []
+  },
+  application: {
+    enableAutoStartup: false,
+    startMinimized: false,
+    checkForUpdates: true
   }
 };
 
