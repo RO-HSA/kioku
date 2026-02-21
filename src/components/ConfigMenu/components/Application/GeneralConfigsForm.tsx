@@ -54,7 +54,10 @@ const GeneralConfigsForm = () => {
       <Stack>
         <FormControlLabel
           label="Start automatically on system startup"
-          checked={configuration?.application?.enableAutoStartup ?? false}
+          checked={
+            configuration?.application?.enableAutoStartup ??
+            defaultConfiguration.application.enableAutoStartup
+          }
           onChange={(_, checked) => toggleAutoStartup(checked)}
           control={<Checkbox size="small" />}
         />
