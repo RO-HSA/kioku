@@ -10,7 +10,15 @@ import MenuItem from '../MenuItem';
 import Section from '../Section';
 import OauthForm from './OauthForm';
 
-const tabs = ['MyAnimeList', 'AniList'];
+export enum IntegrationTab {
+  MYANIMELIST = 'MYANIMELIST',
+  ANILIST = 'ANILIST'
+}
+
+export const integrationTabs = [
+  IntegrationTab.MYANIMELIST,
+  IntegrationTab.ANILIST
+];
 
 const Integrations = () => {
   useMyanimelistCallback();
@@ -57,8 +65,8 @@ const Integrations = () => {
   );
 
   return (
-    <MenuItem tabs={tabs}>
-      {selectedTab === 0 && (
+    <MenuItem tabs={integrationTabs}>
+      {selectedTab === integrationTabs.indexOf(IntegrationTab.MYANIMELIST) && (
         <Section title="Account">
           <OauthForm
             provider={Provider.MY_ANIME_LIST}
@@ -74,7 +82,7 @@ const Integrations = () => {
         </Section>
       )}
 
-      {selectedTab === 1 && (
+      {selectedTab === integrationTabs.indexOf(IntegrationTab.ANILIST) && (
         <Section title="Account">
           <OauthForm
             provider={Provider.ANILIST}

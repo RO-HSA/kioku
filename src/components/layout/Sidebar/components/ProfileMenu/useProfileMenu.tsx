@@ -9,12 +9,14 @@ import {
 } from 'react';
 
 import { calculatePlaybackMatches } from '@/hooks/detection/utils';
+import { useConfigMenuStore } from '@/stores/config/configMenu';
 import { useNowPlayingAliasesStore } from '@/stores/detection/nowPlayingAliases';
 import { usePlayerDetectionStore } from '@/stores/detection/playerDetection';
 import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { useProviderStore } from '@/stores/providers/provider';
 import { Provider } from '@/types/List';
+import { ConfigMenuStep } from '@/types/Navigation';
 import { mapProviderToName } from '@/utils/provider';
 import { buildProfileUrl } from '@/utils/url';
 
@@ -66,6 +68,10 @@ const useProfileMenu = () => {
   const getAliasesByProvider = useNowPlayingAliasesStore(
     (state) => state.getAliasesByProvider
   );
+
+  const setStep = useConfigMenuStore((state) => state.setStep);
+  const setSelectedTab = useConfigMenuStore((state) => state.setSelectedTab);
+  const openConfigMenu = useConfigMenuStore((state) => state.openConfigMenu);
 
   const mainPopoverOpen = Boolean(mainPopoverEl);
   const switchAccountOpen = Boolean(switchAccountEl);
@@ -130,7 +136,12 @@ const useProfileMenu = () => {
   ]);
 
   const handleOpenMainPopover = (event: MouseEvent<HTMLElement>) => {
-    if (!activeProvider) return;
+    if (!activeProvider) {
+      setSelectedTab(0);
+      setStep(ConfigMenuStep.INTEGRATIONS);
+      openConfigMenu();
+      return;
+    }
     setMainPopoverEl(event.currentTarget);
   };
 
