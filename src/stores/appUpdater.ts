@@ -6,7 +6,7 @@ import {
   AvailableUpdate
 } from '@/services/backend/AppUpdater';
 import { NotificationService } from '@/services/Notification';
-import { useConfigMenuStore } from './config/configMenu';
+import { defaultConfiguration, useConfigMenuStore } from './config/configMenu';
 
 type AppUpdateStatus =
   | 'idle'
@@ -128,7 +128,8 @@ export const useAppUpdaterStore = create<AppUpdaterStore>((set, get) => ({
 
     const { configuration } = useConfigMenuStore.getState();
     const shouldCheckForUpdates =
-      configuration?.application?.checkForUpdates ?? true;
+      configuration?.application?.checkForUpdates ??
+      defaultConfiguration.application.checkForUpdates;
 
     if (!shouldCheckForUpdates) return;
 

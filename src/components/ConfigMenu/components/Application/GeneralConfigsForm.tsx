@@ -1,7 +1,10 @@
 import { Checkbox, FormControlLabel, Stack } from '@mui/material';
 import { disable, enable } from '@tauri-apps/plugin-autostart';
 
-import { useConfigMenuStore } from '@/stores/config/configMenu';
+import {
+  defaultConfiguration,
+  useConfigMenuStore
+} from '@/stores/config/configMenu';
 import Section from '../Section';
 
 const GeneralConfigsForm = () => {
@@ -58,14 +61,20 @@ const GeneralConfigsForm = () => {
 
         <FormControlLabel
           label="Start minimized"
-          checked={configuration?.application?.startMinimized ?? false}
+          checked={
+            configuration?.application?.startMinimized ??
+            defaultConfiguration.application.startMinimized
+          }
           onChange={(_, checked) => toggleStartMinimized(checked)}
           control={<Checkbox size="small" />}
         />
 
         <FormControlLabel
           label="Check for updates automatically"
-          checked={configuration?.application?.checkForUpdates ?? true}
+          checked={
+            configuration?.application?.checkForUpdates ??
+            defaultConfiguration.application.checkForUpdates
+          }
           onChange={(_, checked) => toggleCheckForUpdates(checked)}
           control={<Checkbox size="small" />}
         />
