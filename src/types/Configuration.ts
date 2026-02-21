@@ -7,6 +7,7 @@ export interface DetectionConfig {
 
 export interface ApplicationConfig {
   enableAutoStartup: boolean;
+  startMinimized: boolean;
 }
 
 export interface ConfigurationState {

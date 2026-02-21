@@ -22,7 +22,8 @@ const defaultConfiguration: ConfigurationState = {
     enabledPlayers: []
   },
   application: {
-    enableAutoStartup: false
+    enableAutoStartup: false,
+    startMinimized: false
   }
 };
 

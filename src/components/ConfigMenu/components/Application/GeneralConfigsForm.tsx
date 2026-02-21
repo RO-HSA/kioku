@@ -26,6 +26,16 @@ const GeneralConfigsForm = () => {
     }
   };
 
+  const toggleStartMinimized = (enabled: boolean) => {
+    setConfiguration({
+      ...configuration,
+      application: {
+        ...configuration?.application,
+        startMinimized: enabled
+      }
+    });
+  };
+
   return (
     <Section title="Startup">
       <Stack>
@@ -33,6 +43,12 @@ const GeneralConfigsForm = () => {
           checked={configuration?.application?.enableAutoStartup ?? false}
           onChange={(_, checked) => toggleAutoStartup(checked)}
           label="Start automatically on system startup"
+          control={<Checkbox />}
+        />
+        <FormControlLabel
+          checked={configuration?.application?.startMinimized ?? false}
+          onChange={(_, checked) => toggleStartMinimized(checked)}
+          label="Start minimized"
           control={<Checkbox />}
         />
       </Stack>
