@@ -11,7 +11,15 @@ export interface ApplicationConfig {
   checkForUpdates: boolean;
 }
 
+export interface SharingConfig {
+  enableRichPresence: boolean;
+  displayUsernameInPresence: boolean;
+  displayTimeElapsedInPresence: boolean;
+  preferAnimeTitleInPresence: boolean;
+}
+
 export interface ConfigurationState {
   detection: DetectionConfig;
   application: ApplicationConfig;
+  sharing: SharingConfig;
 }

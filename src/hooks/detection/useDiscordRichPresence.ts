@@ -2,6 +2,10 @@ import { useEffect, useMemo, useRef } from 'react';
 
 import { DiscordRpcService } from '@/services/backend/DiscordRpc';
 import { DiscordPresenceRequest } from '@/services/backend/types';
+import {
+  defaultConfiguration,
+  useConfigMenuStore
+} from '@/stores/config/configMenu';
 import { usePlayerDetectionStore } from '@/stores/detection/playerDetection';
 import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
@@ -63,6 +67,26 @@ const useDiscordRichPresence = () => {
       return;
     }
 
+    const { configuration } = useConfigMenuStore.getState();
+
+    const enableRichPresence =
+      configuration?.sharing?.enableRichPresence ??
+      defaultConfiguration.sharing.enableRichPresence;
+
+    if (!enableRichPresence) return;
+
+    const displayUsernameInPresence =
+      configuration?.sharing?.displayUsernameInPresence ??
+      defaultConfiguration.sharing.displayUsernameInPresence;
+
+    const displayTimeElapsedInPresence =
+      configuration?.sharing?.displayTimeElapsedInPresence ??
+      defaultConfiguration.sharing.displayTimeElapsedInPresence;
+
+    const preferAnimeTitleInPresence =
+      configuration?.sharing?.preferAnimeTitleInPresence ??
+      defaultConfiguration.sharing.preferAnimeTitleInPresence;
+
     const episodeKey = [
       activeEpisode.player,
       activeEpisode.animeTitle,
@@ -79,13 +103,37 @@ const useDiscordRichPresence = () => {
     const request: DiscordPresenceRequest = {
       details: matchedAnime?.title ?? activeEpisode.animeTitle,
       state: `Episode ${activeEpisode.episode ?? '?'}`,
-      startTimestamp: currentSessionRef.current.startTimestamp
+      endTimestamp: currentSessionRef.current.startTimestamp,
+      type: 3,
+      statusDisplayType: 0
     };
+
+    if (!displayTimeElapsedInPresence) {
+      request.startTimestamp = undefined;
+      request.endTimestamp = currentSessionRef.current.startTimestamp;
+    }
+
+    let providerText = '';
+    let username = '';
+
+    switch (activeProvider) {
+      case Provider.MY_ANIME_LIST:
+        providerText = 'MyAnimeList';
+        username = useMyAnimeListStore.getState().username ?? '';
+        break;
+      case Provider.ANILIST:
+        providerText = 'AniList';
+        username = useAniListStore.getState().username ?? '';
+        break;
+      default:
+        break;
+    }
 
     if (matchedAnime && activeProvider) {
       request.smallImage = activeProvider.toLowerCase();
-      request.smallText =
-        activeProvider === Provider.ANILIST ? 'AniList' : 'MyAnimeList';
+      request.smallText = displayUsernameInPresence
+        ? `${username} - ${providerText}`
+        : providerText;
 
       if (matchedAnime.imageUrl) {
         request.largeImage = matchedAnime.imageUrl;
@@ -95,6 +143,10 @@ const useDiscordRichPresence = () => {
           'anime',
           matchedAnime.id
         );
+      }
+
+      if (preferAnimeTitleInPresence) {
+        request.statusDisplayType = 2;
       }
     }
 

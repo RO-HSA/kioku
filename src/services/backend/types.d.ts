@@ -50,6 +50,8 @@ export interface DiscordPresenceButton {
 export interface DiscordPresenceRequest {
   details?: string;
   state?: string;
+  type?: number;
+  statusDisplayType?: number;
   largeImage?: string;
   largeText?: string;
   largeUrl?: string;

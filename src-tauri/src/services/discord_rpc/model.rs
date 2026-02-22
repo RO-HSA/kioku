@@ -9,6 +9,8 @@ const MAX_ASSET_URL_LEN: usize = 512;
 const MAX_BUTTON_LABEL_LEN: usize = 32;
 const MAX_BUTTON_URL_LEN: usize = 512;
 const MAX_BUTTONS: usize = 2;
+const MAX_ACTIVITY_TYPE: u8 = 5;
+const MAX_STATUS_DISPLAY_TYPE: u8 = 2;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,6 +24,8 @@ pub struct DiscordPresenceButton {
 pub struct DiscordPresenceRequest {
     pub details: Option<String>,
     pub state: Option<String>,
+    pub r#type: Option<u8>,
+    pub status_display_type: Option<u8>,
     pub large_image: Option<String>,
     pub large_text: Option<String>,
     pub large_url: Option<String>,
@@ -37,6 +41,8 @@ impl DiscordPresenceRequest {
         Self {
             details: normalize_optional_string(self.details, MAX_DETAILS_LEN),
             state: normalize_optional_string(self.state, MAX_STATE_LEN),
+            r#type: sanitize_activity_type(self.r#type),
+            status_display_type: sanitize_status_display_type(self.status_display_type),
             large_image: normalize_optional_string(self.large_image, MAX_DETAILS_LEN),
             large_text: normalize_optional_string(self.large_text, MAX_ASSET_TEXT_LEN),
             large_url: normalize_optional_string(self.large_url, MAX_ASSET_URL_LEN),
@@ -77,6 +83,8 @@ impl DiscordPresenceRequest {
 
         if self.details.is_none()
             && self.state.is_none()
+            && self.r#type.is_none()
+            && self.status_display_type.is_none()
             && assets.is_none()
             && timestamps.is_none()
             && self.buttons.is_none()
@@ -87,6 +95,8 @@ impl DiscordPresenceRequest {
         Some(DiscordActivity {
             details: self.details,
             state: self.state,
+            r#type: self.r#type,
+            status_display_type: self.status_display_type,
             assets,
             timestamps,
             buttons: self.buttons,
@@ -100,6 +110,10 @@ pub(crate) struct DiscordActivity {
     details: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     state: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
+    r#type: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    status_display_type: Option<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
     assets: Option<DiscordAssets>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -146,4 +160,12 @@ fn sanitize_buttons(
                 .collect::<Vec<_>>()
         })
         .filter(|items| !items.is_empty())
+}
+
+fn sanitize_activity_type(value: Option<u8>) -> Option<u8> {
+    value.filter(|item| *item <= MAX_ACTIVITY_TYPE)
+}
+
+fn sanitize_status_display_type(value: Option<u8>) -> Option<u8> {
+    value.filter(|item| *item <= MAX_STATUS_DISPLAY_TYPE)
 }
