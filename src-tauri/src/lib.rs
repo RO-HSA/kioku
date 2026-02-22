@@ -20,6 +20,9 @@ use crate::auth::{
 };
 use crate::services::anilist::{fetch_anilist_user_info, synchronize_anilist};
 use crate::services::anime_list_updates::{enqueue_anime_list_update, AnimeListUpdateQueue};
+use crate::services::discord_rpc::{
+    clear_discord_presence, configure_discord_rpc, set_discord_presence, DiscordRpcState,
+};
 use crate::services::myanimelist::{fetch_myanimelist_user_info, synchronize_myanimelist};
 use crate::services::player_detection::{
     configure_playback_observer, detect_playing_anime, get_playback_observer_state,
@@ -94,6 +97,7 @@ pub fn run() {
     builder
         .manage(StrongholdKeyState::default())
         .manage(TokenManagerState::default())
+        .manage(DiscordRpcState::from_env())
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_http::init())
@@ -204,7 +208,10 @@ pub fn run() {
             enqueue_anime_list_update,
             detect_playing_anime,
             get_playback_observer_state,
-            configure_playback_observer
+            configure_playback_observer,
+            configure_discord_rpc,
+            set_discord_presence,
+            clear_discord_presence
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

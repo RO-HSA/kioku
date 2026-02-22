@@ -3,6 +3,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { RouterProvider } from 'react-router';
 
 import AppUpdateSnackbar from '@/components/AppUpdateSnackbar';
+import useDiscordRichPresence from '@/hooks/detection/useDiscordRichPresence';
 import usePlaybackObserverEvents from '@/hooks/detection/usePlaybackObserverEvents';
 import useAppUpdater from '@/hooks/useAppUpdater';
 import useProviderMigration from '@/hooks/migrations/useProviderMigration';
@@ -14,6 +15,7 @@ import './styles/global.css';
 function App() {
   useAppUpdater();
   usePlaybackObserverEvents();
+  useDiscordRichPresence();
   useProviderMigration();
 
   return (

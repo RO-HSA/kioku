@@ -616,7 +616,8 @@ pub async fn fetch_myanimelist_user_info(
         segments.push("@me");
     }
 
-    url.query_pairs_mut().append_pair("fields", USER_INFO_FIELDS);
+    url.query_pairs_mut()
+        .append_pair("fields", USER_INFO_FIELDS);
 
     let client = reqwest::Client::new();
     let response = client
