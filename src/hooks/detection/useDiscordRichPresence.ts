@@ -103,9 +103,15 @@ const useDiscordRichPresence = () => {
     const request: DiscordPresenceRequest = {
       details: matchedAnime?.title ?? activeEpisode.animeTitle,
       state: `Episode ${activeEpisode.episode ?? '?'}`,
-      endTimestamp: currentSessionRef.current.startTimestamp,
+      startTimestamp: currentSessionRef.current.startTimestamp,
       type: 3,
-      statusDisplayType: 0
+      statusDisplayType: 0,
+      buttons: [
+        {
+          label: 'Download Kioku',
+          url: 'https://github.com/RO-HSA/kioku/releases'
+        }
+      ]
     };
 
     if (!displayTimeElapsedInPresence) {
