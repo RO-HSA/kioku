@@ -4,7 +4,7 @@ import { DiscordPresenceRequest } from '../types';
 
 export class DiscordRpcService {
   static async configure(clientId?: string): Promise<boolean> {
-    return invoke<boolean>('configure_discord_rpc', { clientId });
+    return invoke<boolean>('configure_discord_rpc', { client_id: clientId });
   }
 
   static async setPresence(request: DiscordPresenceRequest): Promise<void> {
