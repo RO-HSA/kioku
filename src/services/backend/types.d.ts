@@ -41,3 +41,23 @@ export interface PlaybackObserverSnapshot {
   pollIntervalMs: number;
   lastError: string | null;
 }
+
+export interface DiscordPresenceButton {
+  label: string;
+  url: string;
+}
+
+export interface DiscordPresenceRequest {
+  details?: string;
+  state?: string;
+  type?: number;
+  statusDisplayType?: number;
+  largeImage?: string;
+  largeText?: string;
+  largeUrl?: string;
+  smallImage?: string;
+  smallText?: string;
+  startTimestamp?: number;
+  endTimestamp?: number;
+  buttons?: DiscordPresenceButton[];
+}

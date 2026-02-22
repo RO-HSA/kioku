@@ -3,6 +3,7 @@ import { ConfigMenuStep } from '@/types/Navigation';
 import Application from '../Application';
 import Detection from '../Detection';
 import Integrations from '../Integrations';
+import Sharing from '../Sharing';
 
 const MenuContent = () => {
   const step = useConfigMenuStore((state) => state.step);
@@ -15,6 +16,8 @@ const MenuContent = () => {
         return <Detection />;
       case ConfigMenuStep.APPLICATION:
         return <Application />;
+      case ConfigMenuStep.SHARING:
+        return <Sharing />;
       default:
         return null;
     }

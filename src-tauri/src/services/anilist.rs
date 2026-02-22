@@ -788,14 +788,12 @@ fn map_anilist_statistics(statistics: AniListAnimeStatistics) -> UserStatistics 
         }
     }
 
-    let total_minutes = statistics
-        .minutes_watched
-        .unwrap_or_else(|| {
-            minutes_watching
-                .saturating_add(minutes_completed)
-                .saturating_add(minutes_on_hold)
-                .saturating_add(minutes_dropped)
-        });
+    let total_minutes = statistics.minutes_watched.unwrap_or_else(|| {
+        minutes_watching
+            .saturating_add(minutes_completed)
+            .saturating_add(minutes_on_hold)
+            .saturating_add(minutes_dropped)
+    });
 
     UserStatistics {
         num_items_watching,

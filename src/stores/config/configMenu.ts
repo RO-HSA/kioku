@@ -1,8 +1,9 @@
+import { createTauriStore } from '@tauri-store/zustand';
+import { create } from 'zustand';
+
 import { PlayerDetectionService } from '@/services/backend/PlayerDetection';
 import { ConfigurationState } from '@/types/Configuration';
 import { ConfigMenuStep } from '@/types/Navigation';
-import { createTauriStore } from '@tauri-store/zustand';
-import { create } from 'zustand';
 
 type ConfigMenuStore = {
   isOpen: boolean;
@@ -25,6 +26,12 @@ export const defaultConfiguration: ConfigurationState = {
     enableAutoStartup: false,
     startMinimized: false,
     checkForUpdates: true
+  },
+  sharing: {
+    enableRichPresence: false,
+    displayUsernameInPresence: true,
+    displayTimeElapsedInPresence: true,
+    preferAnimeTitleInPresence: false
   }
 };
 
