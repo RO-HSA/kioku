@@ -12,11 +12,13 @@ const DiscordSharingForm = () => {
     (state) => state.setConfiguration
   );
 
+  const sharingConfig = configuration?.sharing ?? defaultConfiguration.sharing;
+
   const toggleEnableRichPresence = (checked: boolean) => {
     setConfiguration({
       ...configuration,
       sharing: {
-        ...configuration.sharing,
+        ...sharingConfig,
         enableRichPresence: checked
       }
     });
@@ -26,7 +28,7 @@ const DiscordSharingForm = () => {
     setConfiguration({
       ...configuration,
       sharing: {
-        ...configuration.sharing,
+        ...sharingConfig,
         displayUsernameInPresence: checked
       }
     });
@@ -36,7 +38,7 @@ const DiscordSharingForm = () => {
     setConfiguration({
       ...configuration,
       sharing: {
-        ...configuration.sharing,
+        ...sharingConfig,
         displayTimeElapsedInPresence: checked
       }
     });
@@ -46,7 +48,7 @@ const DiscordSharingForm = () => {
     setConfiguration({
       ...configuration,
       sharing: {
-        ...configuration.sharing,
+        ...sharingConfig,
         preferAnimeTitleInPresence: checked
       }
     });
@@ -56,10 +58,7 @@ const DiscordSharingForm = () => {
     <div className="flex flex-col gap-2">
       <FormControlLabel
         label="Update rich presence"
-        checked={
-          configuration?.sharing?.enableRichPresence ??
-          defaultConfiguration.sharing.enableRichPresence
-        }
+        checked={sharingConfig.enableRichPresence}
         onChange={(_, checked) => toggleEnableRichPresence(checked)}
         control={<Checkbox size="small" />}
       />
@@ -68,30 +67,21 @@ const DiscordSharingForm = () => {
         <Stack>
           <FormControlLabel
             label="Display username in tooltip"
-            checked={
-              configuration?.sharing?.displayUsernameInPresence ??
-              defaultConfiguration.sharing.displayUsernameInPresence
-            }
+            checked={sharingConfig.displayUsernameInPresence}
             onChange={(_, checked) => toggleDisplayUsername(checked)}
             control={<Checkbox size="small" />}
           />
 
           <FormControlLabel
             label="Display elapsed time"
-            checked={
-              configuration?.sharing?.displayTimeElapsedInPresence ??
-              defaultConfiguration.sharing.displayTimeElapsedInPresence
-            }
+            checked={sharingConfig.displayTimeElapsedInPresence}
             onChange={(_, checked) => toggleDisplayTimeElapsed(checked)}
             control={<Checkbox size="small" />}
           />
 
           <FormControlLabel
             label="Prefer anime title over app name"
-            checked={
-              configuration?.sharing?.preferAnimeTitleInPresence ??
-              defaultConfiguration.sharing.preferAnimeTitleInPresence
-            }
+            checked={sharingConfig.preferAnimeTitleInPresence}
             onChange={(_, checked) => togglePreferAnimeTitle(checked)}
             control={<Checkbox size="small" />}
           />
