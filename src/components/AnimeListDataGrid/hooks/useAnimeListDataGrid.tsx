@@ -37,11 +37,15 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
   const columnVisibility = useAnimeListDataGridStore(
     (state) => state.columnVisibility
   );
+  const columnSizing = useAnimeListDataGridStore((state) => state.columnSizing);
   const onSortingChange = useAnimeListDataGridStore(
     (state) => state.onSortingChange
   );
   const onColumnVisibilityChange = useAnimeListDataGridStore(
     (state) => state.onColumnVisibilityChange
+  );
+  const onColumnSizingChange = useAnimeListDataGridStore(
+    (state) => state.onColumnSizingChange
   );
 
   const openAnimeDetails = useAnimeDetailsStore((state) => state.setIsOpen);
@@ -364,15 +368,17 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     enableColumnDragging: false,
     globalFilterFn: 'includesString',
     groupedColumnMode: 'remove',
-    onSortingChange,
-    onColumnVisibilityChange,
     state: {
       isLoading,
       globalFilter: searchValue,
       grouping,
       sorting,
-      columnVisibility
+      columnVisibility,
+      columnSizing
     },
+    onSortingChange,
+    onColumnVisibilityChange,
+    onColumnSizingChange,
     rowVirtualizerOptions: { overscan: 5 }
   });
 
