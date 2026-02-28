@@ -33,6 +33,21 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     (state) => state.selectedStatus
   );
   const searchValue = useAnimeListDataGridStore((state) => state.searchValue);
+  const sorting = useAnimeListDataGridStore((state) => state.sorting);
+  const columnVisibility = useAnimeListDataGridStore(
+    (state) => state.columnVisibility
+  );
+  const columnSizing = useAnimeListDataGridStore((state) => state.columnSizing);
+  const onSortingChange = useAnimeListDataGridStore(
+    (state) => state.onSortingChange
+  );
+  const onColumnVisibilityChange = useAnimeListDataGridStore(
+    (state) => state.onColumnVisibilityChange
+  );
+  const onColumnSizingChange = useAnimeListDataGridStore(
+    (state) => state.onColumnSizingChange
+  );
+
   const openAnimeDetails = useAnimeDetailsStore((state) => state.setIsOpen);
   const setSelectedAnime = useAnimeDetailsStore(
     (state) => state.setSelectedAnime
@@ -124,6 +139,7 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
         size: 60,
         enableSorting: false,
         enableGlobalFilter: false,
+        visibleInShowHideMenu: false,
         getGroupingValue: (row) => getUserStatusLabel(row.userStatus),
         Cell: ({ cell }) => {
           const value = cell.getValue<AnimeListUserStatus>();
@@ -236,6 +252,19 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
 
           return <StartSeason startSeason={value} />;
         }
+      },
+      {
+        accessorKey: 'genres',
+        header: 'Genres',
+        size: 200,
+        Cell: ({ cell }) => {
+          const value = cell.getValue<string[]>();
+          return (
+            <Tooltip title={value}>
+              <span className="truncate text-ellipsis">{value}</span>
+            </Tooltip>
+          );
+        }
       }
     ],
     [handleProgressChange, setScore]
@@ -302,9 +331,6 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     data,
     initialState: {
       density: 'compact',
-      columnVisibility: {
-        userStatus: false
-      },
       expanded: true
     },
     mrtTheme,
@@ -345,8 +371,14 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     state: {
       isLoading,
       globalFilter: searchValue,
-      grouping
+      grouping,
+      sorting,
+      columnVisibility,
+      columnSizing
     },
+    onSortingChange,
+    onColumnVisibilityChange,
+    onColumnSizingChange,
     rowVirtualizerOptions: { overscan: 5 }
   });
 
