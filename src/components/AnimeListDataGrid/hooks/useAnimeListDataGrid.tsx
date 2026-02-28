@@ -34,8 +34,14 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
   );
   const searchValue = useAnimeListDataGridStore((state) => state.searchValue);
   const sorting = useAnimeListDataGridStore((state) => state.sorting);
+  const columnVisibility = useAnimeListDataGridStore(
+    (state) => state.columnVisibility
+  );
   const onSortingChange = useAnimeListDataGridStore(
     (state) => state.onSortingChange
+  );
+  const onColumnVisibilityChange = useAnimeListDataGridStore(
+    (state) => state.onColumnVisibilityChange
   );
 
   const openAnimeDetails = useAnimeDetailsStore((state) => state.setIsOpen);
@@ -129,6 +135,7 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
         size: 60,
         enableSorting: false,
         enableGlobalFilter: false,
+        visibleInShowHideMenu: false,
         getGroupingValue: (row) => getUserStatusLabel(row.userStatus),
         Cell: ({ cell }) => {
           const value = cell.getValue<AnimeListUserStatus>();
@@ -241,6 +248,19 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
 
           return <StartSeason startSeason={value} />;
         }
+      },
+      {
+        accessorKey: 'genres',
+        header: 'Genres',
+        size: 200,
+        Cell: ({ cell }) => {
+          const value = cell.getValue<string[]>();
+          return (
+            <Tooltip title={value}>
+              <span className="truncate text-ellipsis">{value}</span>
+            </Tooltip>
+          );
+        }
       }
     ],
     [handleProgressChange, setScore]
@@ -307,9 +327,6 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     data,
     initialState: {
       density: 'compact',
-      columnVisibility: {
-        userStatus: false
-      },
       expanded: true
     },
     mrtTheme,
@@ -348,11 +365,13 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     globalFilterFn: 'includesString',
     groupedColumnMode: 'remove',
     onSortingChange,
+    onColumnVisibilityChange,
     state: {
       isLoading,
       globalFilter: searchValue,
       grouping,
-      sorting
+      sorting,
+      columnVisibility
     },
     rowVirtualizerOptions: { overscan: 5 }
   });
