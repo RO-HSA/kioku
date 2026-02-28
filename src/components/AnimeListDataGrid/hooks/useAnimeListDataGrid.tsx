@@ -33,6 +33,11 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     (state) => state.selectedStatus
   );
   const searchValue = useAnimeListDataGridStore((state) => state.searchValue);
+  const sorting = useAnimeListDataGridStore((state) => state.sorting);
+  const onSortingChange = useAnimeListDataGridStore(
+    (state) => state.onSortingChange
+  );
+
   const openAnimeDetails = useAnimeDetailsStore((state) => state.setIsOpen);
   const setSelectedAnime = useAnimeDetailsStore(
     (state) => state.setSelectedAnime
@@ -342,10 +347,12 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     enableColumnDragging: false,
     globalFilterFn: 'includesString',
     groupedColumnMode: 'remove',
+    onSortingChange,
     state: {
       isLoading,
       globalFilter: searchValue,
-      grouping
+      grouping,
+      sorting
     },
     rowVirtualizerOptions: { overscan: 5 }
   });
