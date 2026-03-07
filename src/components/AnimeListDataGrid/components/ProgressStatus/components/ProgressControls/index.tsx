@@ -27,7 +27,7 @@ const ProgressControls: FC<ProgressControlsProps> = ({
       top={0}
       left={0}
       display="flex"
-      justifyContent="space-between"
+      justifyContent={shouldShowMinus ? 'space-between' : 'flex-end'}
       width="100%">
       {shouldShowMinus && (
         <div className="bg-error-dark cursor-pointer">
