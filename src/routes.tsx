@@ -1,6 +1,6 @@
 import { createBrowserRouter } from 'react-router';
 import AnimeListDataGrid from './components/anime/AnimeListDataGrid';
-import NowPlaying from './components/NowPlaying';
+import NowPlaying from './components/anime/NowPlaying';
 import PageLayout from './layouts/PageLayout';
 
 export const router = createBrowserRouter([

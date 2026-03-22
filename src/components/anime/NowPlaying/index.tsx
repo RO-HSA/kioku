@@ -10,9 +10,9 @@ import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { useProviderStore } from '@/stores/providers/provider';
 import { Provider } from '@/types/List';
 import { buildEntityUrl } from '@/utils/url';
-import AnimeTitle from '../anime/AnimeInformations/components/AnimeTitle';
-import MainInformation from '../anime/AnimeInformations/components/MainInformation';
-import AnimeCover from '../ui/AnimeCover';
+import AnimeCover from '../../ui/AnimeCover';
+import AnimeTitle from '../AnimeInformations/components/AnimeTitle';
+import MainInformation from '../AnimeInformations/components/MainInformation';
 
 const NowPlaying = () => {
   const animePlaying = usePlayerDetectionStore((state) => state.activeEpisode);
