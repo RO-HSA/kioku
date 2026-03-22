@@ -10,8 +10,8 @@ import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { useProviderStore } from '@/stores/providers/provider';
 import { Provider } from '@/types/List';
 import { buildEntityUrl } from '@/utils/url';
-import AnimeTitle from '../AnimeInformations/components/AnimeTitle';
-import MainInformation from '../AnimeInformations/components/MainInformation';
+import AnimeTitle from '../anime/AnimeInformations/components/AnimeTitle';
+import MainInformation from '../anime/AnimeInformations/components/MainInformation';
 import AnimeCover from '../ui/AnimeCover';
 
 const NowPlaying = () => {
