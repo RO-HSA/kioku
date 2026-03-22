@@ -14,6 +14,14 @@ const ANIME_FIELDS: &str = "list_status{comments,num_times_rewatched},synopsis,a
 const MANGA_FIELDS: &str = "list_status{comments,num_times_reread},synopsis,alternative_titles,mean,media_type,status,genres,num_volumes,num_chapters,authors{first_name,last_name},serialization{name}";
 const LIMIT: u32 = 1000;
 
+#[derive(Copy, Clone, Default, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MyAnimeListListType {
+    #[default]
+    Anime,
+    Manga,
+}
+
 #[derive(Deserialize)]
 struct MalListResponse {
     data: Vec<MalListEntry>,
@@ -42,6 +50,8 @@ struct MalNode {
     mean: Option<f64>,
     source: Option<String>,
     num_episodes: Option<u32>,
+    num_volumes: Option<u32>,
+    num_chapters: Option<u32>,
     status: Option<String>,
     #[serde(default)]
     genres: Vec<MalGenre>,
@@ -51,6 +61,9 @@ struct MalNode {
     media_type: Option<String>,
     #[serde(default)]
     studios: Vec<MalStudio>,
+    #[serde(default)]
+    authors: Vec<MalAuthorRole>,
+    serialization: Option<MalSerialization>,
 }
 
 #[derive(Deserialize)]
@@ -77,6 +90,22 @@ struct MalStudio {
 }
 
 #[derive(Deserialize)]
+struct MalAuthorRole {
+    node: Option<MalAuthor>,
+}
+
+#[derive(Deserialize)]
+struct MalAuthor {
+    first_name: Option<String>,
+    last_name: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct MalSerialization {
+    name: Option<String>,
+}
+
+#[derive(Deserialize)]
 struct MalStartSeason {
     season: Option<String>,
     year: Option<u32>,
@@ -100,9 +129,13 @@ struct MalListStatus {
     status: Option<String>,
     score: Option<u32>,
     num_episodes_watched: Option<u32>,
+    num_volumes_read: Option<u32>,
+    num_chapters_read: Option<u32>,
     is_rewatching: Option<bool>,
+    is_rereading: Option<bool>,
     comments: Option<String>,
     num_times_rewatched: Option<u32>,
+    num_times_reread: Option<u32>,
     updated_at: Option<String>,
     start_date: Option<String>,
     finish_date: Option<String>,
@@ -213,14 +246,24 @@ enum UserStatusKey {
 }
 
 impl UserStatusKey {
-    fn from_mal(status: Option<&str>) -> Self {
-        match status {
-            Some("watching") => Self::Watching,
-            Some("completed") => Self::Completed,
-            Some("on_hold") => Self::OnHold,
-            Some("dropped") => Self::Dropped,
-            Some("plan_to_watch") => Self::PlanToWatch,
-            _ => Self::PlanToWatch,
+    fn from_mal(list_type: MyAnimeListListType, status: Option<&str>) -> Self {
+        match list_type {
+            MyAnimeListListType::Anime => match status {
+                Some("watching") => Self::Watching,
+                Some("completed") => Self::Completed,
+                Some("on_hold") => Self::OnHold,
+                Some("dropped") => Self::Dropped,
+                Some("plan_to_watch") => Self::PlanToWatch,
+                _ => Self::PlanToWatch,
+            },
+            MyAnimeListListType::Manga => match status {
+                Some("reading") => Self::Watching,
+                Some("completed") => Self::Completed,
+                Some("on_hold") => Self::OnHold,
+                Some("dropped") => Self::Dropped,
+                Some("plan_to_read") => Self::PlanToWatch,
+                _ => Self::PlanToWatch,
+            },
         }
     }
 
@@ -245,18 +288,38 @@ impl UserStatusKey {
     }
 }
 
-fn build_animelist_url(username: &str, offset: u32) -> Result<String, String> {
+impl MyAnimeListListType {
+    fn path_segment(self) -> &'static str {
+        match self {
+            Self::Anime => "animelist",
+            Self::Manga => "mangalist",
+        }
+    }
+
+    fn fields(self) -> &'static str {
+        match self {
+            Self::Anime => ANIME_FIELDS,
+            Self::Manga => MANGA_FIELDS,
+        }
+    }
+}
+
+fn build_user_list_url(
+    username: &str,
+    list_type: MyAnimeListListType,
+    offset: u32,
+) -> Result<String, String> {
     let mut url = reqwest::Url::parse(BASE_URL).map_err(|e| e.to_string())?;
     {
         let mut segments = url
             .path_segments_mut()
             .map_err(|_| "Invalid MyAnimeList base URL".to_string())?;
         segments.push(username);
-        segments.push("animelist");
+        segments.push(list_type.path_segment());
     }
 
     url.query_pairs_mut()
-        .append_pair("fields", ANIME_FIELDS)
+        .append_pair("fields", list_type.fields())
         .append_pair("nsfw", "true")
         .append_pair("limit", &LIMIT.to_string())
         .append_pair("offset", &offset.to_string());
@@ -291,6 +354,11 @@ fn map_status(status: Option<String>) -> String {
             "finished_airing" => "Finished Airing".to_string(),
             "not_yet_aired" => "Not Yet Aired".to_string(),
             "currently_airing" => "Currently Airing".to_string(),
+            "finished" => "Finished".to_string(),
+            "currently_publishing" => "Currently Publishing".to_string(),
+            "not_yet_published" => "Not Yet Published".to_string(),
+            "on_hiatus" => "On Hiatus".to_string(),
+            "discontinued" => "Discontinued".to_string(),
             _ => value,
         },
         None => "Unknown".to_string(),
@@ -306,6 +374,14 @@ fn map_media_type(media_type: Option<String>) -> String {
             "special" => "Special".to_string(),
             "ona" => "ONA".to_string(),
             "ova" => "OVA".to_string(),
+            "manga" => "Manga".to_string(),
+            "novel" => "Novel".to_string(),
+            "light_novel" => "Light Novel".to_string(),
+            "one_shot" => "One-shot".to_string(),
+            "doujinshi" => "Doujinshi".to_string(),
+            "manhwa" => "Manhwa".to_string(),
+            "manhua" => "Manhua".to_string(),
+            "oel" => "OEL".to_string(),
             "unknown" => "Unknown".to_string(),
             _ => value,
         },
@@ -414,7 +490,37 @@ fn format_start_season(start: Option<MalStartSeason>) -> String {
     format!("{season_part}{year_part}")
 }
 
-fn map_entry_to_domain(entry: MalListEntry, status_key: UserStatusKey) -> AnimeListItem {
+fn build_author_names(authors: Vec<MalAuthorRole>) -> String {
+    join_names(authors, |author_role| {
+        let Some(author) = author_role.node else {
+            return String::new();
+        };
+
+        let first_name = author.first_name.unwrap_or_default().trim().to_string();
+        let last_name = author.last_name.unwrap_or_default().trim().to_string();
+
+        match (first_name.is_empty(), last_name.is_empty()) {
+            (true, true) => String::new(),
+            (false, true) => first_name,
+            (true, false) => last_name,
+            (false, false) => format!("{first_name} {last_name}"),
+        }
+    })
+}
+
+fn build_manga_start_label(serialization: Option<MalSerialization>) -> String {
+    serialization
+        .and_then(|value| value.name)
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "Unknown".to_string())
+}
+
+fn map_entry_to_domain(
+    entry: MalListEntry,
+    status_key: UserStatusKey,
+    list_type: MyAnimeListListType,
+) -> AnimeListItem {
     let node = entry.node;
     let list_status = entry.list_status;
 
@@ -428,13 +534,36 @@ fn map_entry_to_domain(entry: MalListEntry, status_key: UserStatusKey) -> AnimeL
         .synopsis
         .unwrap_or_else(|| "No synopsis available.".to_string());
     let genres = join_names(node.genres, |genre| genre.name);
-    let studios = join_names(node.studios, |studio| studio.name);
-    let start_season = format_start_season(node.start_season);
-
-    let broadcast = node.broadcast.unwrap_or(MalBroadcast {
-        day_of_the_week: None,
-        start_time: None,
-    });
+    let (studios, start_season, total_episodes, user_episodes_watched, is_rewatching, user_num_times_rewatched, broadcast) =
+        match list_type {
+            MyAnimeListListType::Anime => (
+                join_names(node.studios, |studio| studio.name),
+                format_start_season(node.start_season),
+                node.num_episodes.unwrap_or(0),
+                list_status.num_episodes_watched.unwrap_or(0),
+                list_status.is_rewatching.unwrap_or(false),
+                list_status.num_times_rewatched.unwrap_or(0),
+                node.broadcast.unwrap_or(MalBroadcast {
+                    day_of_the_week: None,
+                    start_time: None,
+                }),
+            ),
+            MyAnimeListListType::Manga => (
+                build_author_names(node.authors),
+                build_manga_start_label(node.serialization),
+                node.num_chapters.or(node.num_volumes).unwrap_or(0),
+                list_status
+                    .num_chapters_read
+                    .or(list_status.num_volumes_read)
+                    .unwrap_or(0),
+                list_status.is_rereading.unwrap_or(false),
+                list_status.num_times_reread.unwrap_or(0),
+                MalBroadcast {
+                    day_of_the_week: None,
+                    start_time: None,
+                },
+            ),
+        };
 
     AnimeListItem {
         id: node.id,
@@ -445,7 +574,7 @@ fn map_entry_to_domain(entry: MalListEntry, status_key: UserStatusKey) -> AnimeL
         score: node.mean.unwrap_or(0.0),
         source: map_source(node.source),
         status: map_status(node.status),
-        total_episodes: node.num_episodes.unwrap_or(0),
+        total_episodes,
         genres,
         start_season,
         start_date: node.start_date.unwrap_or_default(),
@@ -457,10 +586,10 @@ fn map_entry_to_domain(entry: MalListEntry, status_key: UserStatusKey) -> AnimeL
         media_type: map_media_type(node.media_type),
         user_status: status_key.as_user_status_str().to_string(),
         user_score: list_status.score.unwrap_or(0),
-        user_episodes_watched: list_status.num_episodes_watched.unwrap_or(0),
-        is_rewatching: list_status.is_rewatching.unwrap_or(false),
+        user_episodes_watched,
+        is_rewatching,
         user_comments: list_status.comments.unwrap_or_default(),
-        user_num_times_rewatched: list_status.num_times_rewatched.unwrap_or(0),
+        user_num_times_rewatched,
         user_start_date: list_status.start_date,
         user_finish_date: list_status.finish_date,
         updated_at: list_status.updated_at,
@@ -491,12 +620,13 @@ async fn fetch_all_into(
     client: &reqwest::Client,
     token: &str,
     username: &str,
+    list_type: MyAnimeListListType,
     result: &mut SynchronizedAnimeList,
 ) -> Result<(), String> {
     let mut offset: u32 = 0;
 
     loop {
-        let url = build_animelist_url(username, offset)?;
+        let url = build_user_list_url(username, list_type, offset)?;
         let response = client
             .get(url)
             .bearer_auth(token)
@@ -517,8 +647,8 @@ async fn fetch_all_into(
         let parsed: MalListResponse = response.json().await.map_err(|e| e.to_string())?;
 
         for entry in parsed.data {
-            let status_key = UserStatusKey::from_mal(entry.list_status.status.as_deref());
-            let item = map_entry_to_domain(entry, status_key);
+            let status_key = UserStatusKey::from_mal(list_type, entry.list_status.status.as_deref());
+            let item = map_entry_to_domain(entry, status_key, list_type);
             status_key.push(result, item);
         }
 
@@ -655,8 +785,10 @@ pub async fn fetch_myanimelist_user_info(
 #[tauri::command]
 pub async fn synchronize_myanimelist(
     app: tauri::AppHandle,
+    list_type: Option<MyAnimeListListType>,
 ) -> Result<SynchronizedAnimeList, String> {
     let token = get_access_token(&app, MAL_PROVIDER_ID).await?;
+    let list_type = list_type.unwrap_or_default();
     let username: Option<String> = app.zustand().get_or_default("myanimelist", "username");
     let username = username
         .and_then(|value| {
@@ -671,7 +803,7 @@ pub async fn synchronize_myanimelist(
     let client = reqwest::Client::new();
 
     let mut result = SynchronizedAnimeList::default();
-    fetch_all_into(&client, &token, &username, &mut result).await?;
+    fetch_all_into(&client, &token, &username, list_type, &mut result).await?;
 
     Ok(result)
 }
