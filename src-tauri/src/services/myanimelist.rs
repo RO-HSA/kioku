@@ -7,9 +7,11 @@ use crate::auth::token_manager::get_access_token;
 use crate::services::anime_list_updates::AnimeListUpdateRequest;
 
 const BASE_URL: &str = "https://api.myanimelist.net/v2/users/";
-const UPDATE_BASE_URL: &str = "https://api.myanimelist.net/v2/anime/";
+const ANIME_UPDATE_BASE_URL: &str = "https://api.myanimelist.net/v2/anime/";
+const MANGA_UPDATE_BASE_URL: &str = "https://api.myanimelist.net/v2/manga/";
 const USER_INFO_FIELDS: &str = "anime_statistics";
-const FIELDS: &str = "list_status{comments,num_times_rewatched},synopsis,alternative_titles,source,num_episodes,nsfw,start_season,media_type,studios,mean,status,genres,broadcast,start_date";
+const ANIME_FIELDS: &str = "list_status{comments,num_times_rewatched},synopsis,alternative_titles,source,num_episodes,nsfw,start_season,media_type,studios,mean,status,genres,broadcast,start_date";
+const MANGA_FIELDS: &str = "list_status{comments,num_times_reread},synopsis,alternative_titles,mean,media_type,status,genres,num_volumes,num_chapters,authors{first_name,last_name},serialization{name}";
 const LIMIT: u32 = 1000;
 
 #[derive(Deserialize)]
@@ -254,7 +256,7 @@ fn build_animelist_url(username: &str, offset: u32) -> Result<String, String> {
     }
 
     url.query_pairs_mut()
-        .append_pair("fields", FIELDS)
+        .append_pair("fields", ANIME_FIELDS)
         .append_pair("nsfw", "true")
         .append_pair("limit", &LIMIT.to_string())
         .append_pair("offset", &offset.to_string());
@@ -585,7 +587,7 @@ pub async fn update_myanimelist_list_entry(
         return Err("No update fields provided".to_string());
     }
 
-    let url = format!("{}{}/my_list_status", UPDATE_BASE_URL, entry_id);
+    let url = format!("{}{}/my_list_status", ANIME_UPDATE_BASE_URL, entry_id);
     let response = client
         .put(url)
         .bearer_auth(token)
