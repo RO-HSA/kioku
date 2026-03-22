@@ -1,5 +1,5 @@
 import { createBrowserRouter } from 'react-router';
-import AnimeListDataGrid from './components/AnimeListDataGrid';
+import AnimeListDataGrid from './components/anime/AnimeListDataGrid';
 import NowPlaying from './components/NowPlaying';
 import PageLayout from './layouts/PageLayout';
 

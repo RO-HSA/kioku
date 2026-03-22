@@ -3,7 +3,7 @@ import { SquareCheck, SquarePlay, SquareStop } from 'lucide-react';
 import { MRT_ColumnDef, useMaterialReactTable } from 'material-react-table';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import ProgressStatus from '@/components/AnimeListDataGrid/components/ProgressStatus';
+import ProgressStatus from '@/components/anime/AnimeListDataGrid/components/ProgressStatus';
 import { SynchronizedAnimeList } from '@/services/backend/types';
 import { useAnimeDetailsStore } from '@/stores/animeDetails';
 import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
@@ -16,7 +16,7 @@ import {
   IAnimeList
 } from '@/types/AnimeList';
 import { Provider } from '@/types/List';
-import ScoreSelect from '../../ScoreSelect';
+import ScoreSelect from '../../../ScoreSelect';
 import CustomTopToolbar from '../components/CustomTopToolbar';
 import MediaType from '../components/MediaType';
 import StartSeason from '../components/StartSeason';
