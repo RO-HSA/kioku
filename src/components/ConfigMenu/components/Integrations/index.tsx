@@ -9,16 +9,7 @@ import { Provider } from '@/types/List';
 import MenuItem from '../MenuItem';
 import Section from '../Section';
 import OauthForm from './OauthForm';
-
-export enum IntegrationTab {
-  MYANIMELIST = 'MYANIMELIST',
-  ANILIST = 'ANILIST'
-}
-
-export const integrationTabs = [
-  IntegrationTab.MYANIMELIST,
-  IntegrationTab.ANILIST
-];
+import { IntegrationTab, integrationTabs } from './types';
 
 const Integrations = () => {
   useMyanimelistCallback();
