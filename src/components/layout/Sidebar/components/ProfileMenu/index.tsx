@@ -12,13 +12,13 @@ import {
 import { ChevronUp } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { useSidebarStore } from '@/stores/sidebar/sidebar';
 import ListTypeMenu from './ListTypeMenu';
 import SwitchAccountMenu from './SwitchAccountMenu';
 import useProfileMenu from './useProfileMenu';
 
 const ProfileMenu = () => {
   const {
+    isOpen,
     mainPopoverEl,
     mainPopoverOpen,
     switchListEl,
@@ -31,6 +31,7 @@ const ProfileMenu = () => {
     selectedListType,
     menuItems,
     connectedAccounts,
+    currentListTypeIcon,
     handleOpenMainPopover,
     handleCloseMainPopover,
     handleSwitchListType,
@@ -38,8 +39,6 @@ const ProfileMenu = () => {
     handleSwitchAccount,
     handleCloseSwitchAccountPopover
   } = useProfileMenu();
-
-  const isOpen = useSidebarStore((state) => state.isOpen);
 
   return (
     <>
@@ -74,7 +73,10 @@ const ProfileMenu = () => {
               {username}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {providerName}
+              <div className="flex gap-2 items-center">
+                <span>{providerName}</span>
+                <span>{currentListTypeIcon}</span>
+              </div>
             </Typography>
           </Box>
         </div>

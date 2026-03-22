@@ -1,9 +1,11 @@
 import { openUrl } from '@tauri-apps/plugin-opener';
 import {
   ArrowLeftRight,
+  BookOpenText,
   ListRestart,
   LogOut,
   RefreshCw,
+  Tv,
   User
 } from 'lucide-react';
 import {
@@ -23,6 +25,7 @@ import { usePlayerDetectionStore } from '@/stores/detection/playerDetection';
 import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { useProviderStore } from '@/stores/providers/provider';
+import { useSidebarStore } from '@/stores/sidebar/sidebar';
 import { ListType, Provider } from '@/types/List';
 import { ConfigMenuStep } from '@/types/Navigation';
 import { mapProviderToName } from '@/utils/provider';
@@ -43,6 +46,8 @@ const useProfileMenu = () => {
     null
   );
   const [isFetchingProfile, setIsFetchingProfile] = useState(false);
+
+  const isOpen = useSidebarStore((state) => state.isOpen);
 
   const activeProvider = useProviderStore((state) => state.activeProvider);
   const selectedListType = useProviderStore((state) => state.selectedListType);
@@ -375,7 +380,19 @@ const useProfileMenu = () => {
     handleRefreshProfile
   ]);
 
+  const currentListTypeIcon = useMemo(() => {
+    switch (selectedListType) {
+      case 'anime':
+        return <Tv size={16} />;
+      case 'manga':
+        return <BookOpenText size={16} />;
+      default:
+        return null;
+    }
+  }, [selectedListType]);
+
   return {
+    isOpen,
     mainPopoverEl,
     mainPopoverOpen,
     switchListEl,
@@ -389,6 +406,7 @@ const useProfileMenu = () => {
     menuItems,
     connectedAccounts,
     isFetchingProfile,
+    currentListTypeIcon,
     setIsFetchingProfile,
     handleOpenMainPopover,
     handleCloseMainPopover,
