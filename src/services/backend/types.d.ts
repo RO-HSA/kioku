@@ -4,8 +4,10 @@ import {
   IAnimeUserList
 } from '@/types/AnimeList';
 import { Provider } from '@/types/List';
+import { IMangaList, MangaListUserStatus } from '@/types/MangaList';
 
 export type SynchronizedAnimeList = Record<AnimeListUserStatus, IAnimeList[]>;
+export type SynchronizedMangaList = Record<MangaListUserStatus, IMangaList[]>;
 
 export interface AnimeListUpdateRequest extends Partial<IAnimeUserList> {
   providerId: Provider;
