@@ -3,54 +3,53 @@ import { SquareCheck, SquarePlay, SquareStop } from 'lucide-react';
 import { MRT_ColumnDef, useMaterialReactTable } from 'material-react-table';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import ProgressStatus from '@/components/anime/AnimeListDataGrid/components/ProgressStatus';
 import useMaterialTableTheme from '@/hooks/useMaterialTableTheme';
-import { SynchronizedAnimeList } from '@/services/backend/types';
-import { useAnimeDetailsStore } from '@/stores/animeDetails';
-import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
+import { SynchronizedMangaList } from '@/services/backend/types';
+import { useMangaDetailsStore } from '@/stores/mangaDetails';
+import { useMangaListDataGridStore } from '@/stores/mangaListDataGrid';
 import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { useProviderStore } from '@/stores/providers/provider';
-import {
-  AnimeListStatus,
-  AnimeListUserStatus,
-  IAnimeList
-} from '@/types/AnimeList';
 import { Provider } from '@/types/List';
+import {
+  IMangaList,
+  MangaListStatus,
+  MangaListUserStatus
+} from '@/types/MangaList';
 import ScoreSelect from '../../../ScoreSelect';
 import CustomTopToolbar from '../components/CustomTopToolbar';
 import MediaType from '../components/MediaType';
-import StartSeason from '../components/StartSeason';
+import ProgressStatus from '../components/ProgressStatus';
 
-interface UseAnimeListDataGridProps {
-  listData: SynchronizedAnimeList | null;
+interface UseMangaListDataGridProps {
+  listData: SynchronizedMangaList | null;
 }
 
-const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
+const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
   const [isLoading, setIsLoading] = useState(true);
 
-  const selectedUserStatus = useAnimeListDataGridStore(
+  const selectedUserStatus = useMangaListDataGridStore(
     (state) => state.selectedStatus
   );
-  const searchValue = useAnimeListDataGridStore((state) => state.searchValue);
-  const sorting = useAnimeListDataGridStore((state) => state.sorting);
-  const columnVisibility = useAnimeListDataGridStore(
+  const searchValue = useMangaListDataGridStore((state) => state.searchValue);
+  const sorting = useMangaListDataGridStore((state) => state.sorting);
+  const columnVisibility = useMangaListDataGridStore(
     (state) => state.columnVisibility
   );
-  const columnSizing = useAnimeListDataGridStore((state) => state.columnSizing);
-  const onSortingChange = useAnimeListDataGridStore(
+  const columnSizing = useMangaListDataGridStore((state) => state.columnSizing);
+  const onSortingChange = useMangaListDataGridStore(
     (state) => state.onSortingChange
   );
-  const onColumnVisibilityChange = useAnimeListDataGridStore(
+  const onColumnVisibilityChange = useMangaListDataGridStore(
     (state) => state.onColumnVisibilityChange
   );
-  const onColumnSizingChange = useAnimeListDataGridStore(
+  const onColumnSizingChange = useMangaListDataGridStore(
     (state) => state.onColumnSizingChange
   );
 
-  const openAnimeDetails = useAnimeDetailsStore((state) => state.setIsOpen);
-  const setSelectedAnime = useAnimeDetailsStore(
-    (state) => state.setSelectedAnime
+  const openMangaDetails = useMangaDetailsStore((state) => state.setIsOpen);
+  const setSelectedManga = useMangaDetailsStore(
+    (state) => state.setSelectedManga
   );
 
   const activeProvider = useProviderStore((state) => state.activeProvider);
@@ -64,18 +63,18 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
   const setAniListProgress = useAniListStore((state) => state.setProgress);
 
   const setScore = useCallback(
-    (animeId: number, status: AnimeListUserStatus, newScore: number) => {
+    (animeId: number, status: MangaListUserStatus, newScore: number) => {
       switch (activeProvider) {
         case Provider.MY_ANIME_LIST:
           return setMyAnimeListScore(
             animeId,
-            { type: 'anime', value: status },
+            { type: 'manga', value: status },
             newScore
           );
         case Provider.ANILIST:
           return setAniListScore(
             animeId,
-            { type: 'anime', value: status },
+            { type: 'manga', value: status },
             newScore
           );
         default:
@@ -86,18 +85,18 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
   );
 
   const handleProgressChange = useCallback(
-    (animeId: number, status: AnimeListUserStatus, newProgress: number) => {
+    (animeId: number, status: MangaListUserStatus, newProgress: number) => {
       switch (activeProvider) {
         case Provider.MY_ANIME_LIST:
           return setMyAnimeListProgress(
             animeId,
-            { type: 'anime', value: status },
+            { type: 'manga', value: status },
             newProgress
           );
         case Provider.ANILIST:
           return setAniListProgress(
             animeId,
-            { type: 'anime', value: status },
+            { type: 'manga', value: status },
             newProgress
           );
         default:
@@ -117,37 +116,37 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     muiTopToolbarProps
   } = useMaterialTableTheme();
 
-  const getStatusIcon = (status: AnimeListStatus) => {
+  const getStatusIcon = (status: MangaListStatus) => {
     switch (status) {
-      case 'Currently Airing':
+      case 'Currently Publishing':
         return <SquarePlay className="text-green-500" />;
-      case 'Finished Airing':
+      case 'Finished':
         return <SquareCheck className="text-blue-500" />;
-      case 'Not Yet Aired':
+      case 'Not Yet Published':
         return <SquareStop className="text-red-500" />;
       default:
         return <SquarePlay className="text-green-500" />;
     }
   };
 
-  const getUserStatusLabel = (status: AnimeListUserStatus) => {
+  const getUserStatusLabel = (status: MangaListUserStatus) => {
     switch (status) {
-      case 'watching':
-        return 'Watching';
+      case 'reading':
+        return 'Reading';
       case 'completed':
         return 'Completed';
       case 'onHold':
         return 'On Hold';
       case 'dropped':
         return 'Dropped';
-      case 'planToWatch':
-        return 'Plan To Watch';
+      case 'planToRead':
+        return 'Plan To Read';
       default:
         return status;
     }
   };
 
-  const columns = useMemo<MRT_ColumnDef<IAnimeList>[]>(
+  const columns = useMemo<MRT_ColumnDef<IMangaList>[]>(
     () => [
       {
         accessorKey: 'userStatus',
@@ -158,7 +157,7 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
         visibleInShowHideMenu: false,
         getGroupingValue: (row) => getUserStatusLabel(row.userStatus),
         Cell: ({ cell }) => {
-          const value = cell.getValue<AnimeListUserStatus>();
+          const value = cell.getValue<MangaListUserStatus>();
           return value ? getUserStatusLabel(value) : '';
         }
       },
@@ -170,21 +169,21 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
         enableHiding: false,
         sortingFn: (rowA, rowB, columnId) => {
           const order = [
-            'Currently Airing',
-            'Finished Airing',
-            'Not Yet Aired'
+            'Currently Publishing',
+            'Finished',
+            'Not Yet Published'
           ];
 
-          const v1 = rowA.getValue<AnimeListStatus>(columnId);
-          const v2 = rowB.getValue<AnimeListStatus>(columnId);
+          const v1 = rowA.getValue<MangaListStatus>(columnId);
+          const v2 = rowB.getValue<MangaListStatus>(columnId);
 
           return order.indexOf(v1) - order.indexOf(v2);
         },
         Cell: ({ cell }) => {
           return (
             <div className="flex justify-center items-center h-full w-full">
-              <Tooltip title={cell.getValue<AnimeListStatus>() || ''}>
-                {getStatusIcon(cell.getValue<AnimeListStatus>())}
+              <Tooltip title={cell.getValue<MangaListStatus>() || ''}>
+                {getStatusIcon(cell.getValue<MangaListStatus>())}
               </Tooltip>
             </div>
           );
@@ -205,7 +204,7 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
         }
       },
       {
-        accessorKey: 'userEpisodesWatched',
+        accessorKey: 'userChaptersRead',
         header: 'Progress',
         size: 200,
         enableGlobalFilter: false,
@@ -214,9 +213,7 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
           return (
             <ProgressStatus
               progress={watched}
-              total={row.original.totalEpisodes}
-              startDate={row.original.startDate}
-              broadcast={row.original.broadcast}
+              total={row.original.totalChapters}
               status={row.original.userStatus}
               onProgressChange={(newProgress) => {
                 handleProgressChange(
@@ -260,16 +257,6 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
         }
       },
       {
-        accessorKey: 'startSeason',
-        header: 'Season',
-        size: 100,
-        Cell: ({ cell }) => {
-          const value = cell.getValue<string>();
-
-          return <StartSeason startSeason={value} />;
-        }
-      },
-      {
         accessorKey: 'genres',
         header: 'Genres',
         size: 200,
@@ -292,11 +279,11 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     }
 
     return [
-      ...listData.watching,
+      ...listData.reading,
       ...listData.completed,
       ...listData.onHold,
       ...listData.dropped,
-      ...listData.planToWatch
+      ...listData.planToRead
     ];
   }, [listData]);
 
@@ -308,16 +295,16 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     }
 
     switch (selectedUserStatus) {
-      case 'watching':
-        return listData?.watching || [];
+      case 'reading':
+        return listData?.reading || [];
       case 'completed':
         return listData?.completed || [];
       case 'onHold':
         return listData?.onHold || [];
       case 'dropped':
         return listData?.dropped || [];
-      case 'planToWatch':
-        return listData?.planToWatch || [];
+      case 'planToRead':
+        return listData?.planToRead || [];
       default:
         return [];
     }
@@ -328,12 +315,12 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     [shouldGroupByStatus]
   );
 
-  const handleOpenAnimeDetails = useCallback(
-    (anime: IAnimeList) => {
-      setSelectedAnime(anime);
-      openAnimeDetails(true);
+  const handleOpenMangaDetails = useCallback(
+    (manga: IMangaList) => {
+      setSelectedManga(manga);
+      openMangaDetails(true);
     },
-    [openAnimeDetails, setSelectedAnime]
+    [openMangaDetails, setSelectedManga]
   );
 
   useEffect(() => {
@@ -362,7 +349,7 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
           return;
         }
 
-        handleOpenAnimeDetails(cell.row.original);
+        handleOpenMangaDetails(cell.row.original);
       }
     }),
     renderTopToolbar: () => (
@@ -401,4 +388,4 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
   return { table };
 };
 
-export default useAnimeListDataGrid;
+export default useMangaListDataGrid;

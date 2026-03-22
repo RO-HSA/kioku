@@ -82,14 +82,14 @@ const useAnimeListForm = ({ selectedAnime }: UseAnimeListFormProps) => {
       case Provider.MY_ANIME_LIST:
         updateMyAnimeListAnimeList(
           selectedAnime.id,
-          selectedAnime.userStatus,
+          { type: 'anime', value: selectedAnime.userStatus },
           payload
         );
         break;
       case Provider.ANILIST:
         updateAniListAnimeList(
           selectedAnime.id,
-          selectedAnime.userStatus,
+          { type: 'anime', value: selectedAnime.userStatus },
           payload
         );
         break;

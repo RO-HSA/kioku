@@ -1,6 +1,6 @@
 import { createBrowserRouter } from 'react-router';
-import AnimeListDataGrid from './components/anime/AnimeListDataGrid';
 import NowPlaying from './components/anime/NowPlaying';
+import ListDataGrid from './layouts/ListDataGrid';
 import PageLayout from './layouts/PageLayout';
 
 export const router = createBrowserRouter([
@@ -10,7 +10,7 @@ export const router = createBrowserRouter([
     children: [
       {
         path: '/',
-        element: <AnimeListDataGrid />
+        element: <ListDataGrid />
       },
       {
         path: '/now-playing',

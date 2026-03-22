@@ -1,4 +1,4 @@
-import type { SynchronizedAnimeList } from '../types';
+import type { SynchronizedAnimeList, SynchronizedMangaList } from '../types';
 import type { ProviderUserInfo } from '@/types/User';
 
 export type MyAnimeListUserStatus =
@@ -167,6 +167,8 @@ export interface MyAnimeListMangaListEntry {
     media_type?: MyAnimeListMangaMediaType;
     num_volumes?: number;
     num_chapters?: number;
+    start_date?: string;
+    end_date?: string;
     authors?: {
       node?: {
         first_name?: string;
@@ -191,4 +193,6 @@ export interface MyAnimeListMangaListEntry {
   };
 }
 
-export type SynchronizeMyAnimeListResult = SynchronizedAnimeList;
+export type SynchronizeMyAnimeListResult =
+  | SynchronizedAnimeList
+  | SynchronizedMangaList;

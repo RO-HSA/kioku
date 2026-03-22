@@ -6,11 +6,12 @@ use tauri_plugin_zustand::ManagerExt;
 
 use crate::auth::anilist::PROVIDER_ID as ANILIST_PROVIDER_ID;
 use crate::auth::token_manager::get_access_token;
-use crate::services::anime_list_updates::AnimeListUpdateRequest;
+use crate::services::anime_list_updates::{AnimeListUpdateRequest, ListType};
 
 const GRAPHQL_URL: &str = "https://graphql.anilist.co";
 const REQUEST_TIMEOUT_SECS: u64 = 15;
 const MEDIA_TYPE_ANIME: &str = "ANIME";
+const MEDIA_TYPE_MANGA: &str = "MANGA";
 const MEDIA_LIST_COLLECTION_QUERY: &str = r#"
 query ($type: MediaType!, $userName: String) {
   MediaListCollection(type: $type, userName: $userName) {
@@ -43,6 +44,7 @@ query ($type: MediaType!, $userName: String) {
             }
             notes
             progress
+            progressVolumes
             repeat
             startedAt {
               day
@@ -62,6 +64,8 @@ query ($type: MediaType!, $userName: String) {
           seasonYear
           season
           episodes
+          chapters
+          volumes
           description
           nextAiringEpisode {
             episode
@@ -70,6 +74,16 @@ query ($type: MediaType!, $userName: String) {
           studios {
             nodes {
               name
+            }
+          }
+          staff {
+            edges {
+              role
+              node {
+                name {
+                  full
+                }
+              }
             }
           }
           type
@@ -122,6 +136,7 @@ mutation Mutation(
   $status: MediaListStatus
   $score: Float
   $progress: Int
+  $progressVolumes: Int
   $repeat: Int
   $notes: String
   $startedAt: FuzzyDateInput
@@ -133,6 +148,7 @@ mutation Mutation(
     status: $status
     score: $score
     progress: $progress
+    progressVolumes: $progressVolumes
     repeat: $repeat
     notes: $notes
     startedAt: $startedAt
@@ -180,6 +196,8 @@ struct SaveMediaListEntryVariables {
     score: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     progress: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    progress_volumes: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     repeat: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -341,14 +359,18 @@ struct AniListMedia {
     mean_score: Option<u32>,
     media_list_entry: Option<AniListMediaListEntry>,
     start_date: Option<AniListFuzzyDate>,
+    end_date: Option<AniListFuzzyDate>,
     source: Option<String>,
     season_year: Option<u32>,
     season: Option<String>,
     episodes: Option<u32>,
+    chapters: Option<u32>,
+    volumes: Option<u32>,
     description: Option<String>,
     next_airing_episode: Option<AniListNextAiringEpisode>,
     status: Option<String>,
     studios: Option<AniListStudios>,
+    staff: Option<AniListStaff>,
     #[serde(default)]
     genres: Vec<String>,
     format: Option<String>,
@@ -377,6 +399,7 @@ struct AniListMediaListEntry {
     completed_at: Option<AniListFuzzyDate>,
     notes: Option<String>,
     progress: Option<u32>,
+    progress_volumes: Option<u32>,
     repeat: Option<u32>,
     started_at: Option<AniListFuzzyDate>,
     status: Option<String>,
@@ -392,6 +415,29 @@ struct AniListStudios {
 #[derive(Deserialize, Default)]
 struct AniListStudio {
     name: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+struct AniListStaff {
+    #[serde(default)]
+    edges: Vec<AniListStaffEdge>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct AniListStaffEdge {
+    role: Option<String>,
+    node: Option<AniListStaffNode>,
+}
+
+#[derive(Deserialize, Default)]
+struct AniListStaffNode {
+    name: Option<AniListStaffName>,
+}
+
+#[derive(Deserialize, Default)]
+struct AniListStaffName {
+    full: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -454,44 +500,120 @@ pub struct SynchronizedAnimeList {
     plan_to_watch: Vec<AnimeListItem>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MangaListItem {
+    id: u64,
+    entry_id: u64,
+    title: String,
+    image_url: String,
+    synopsis: String,
+    alternative_titles: String,
+    score: f64,
+    status: String,
+    total_volumes: u32,
+    total_chapters: u32,
+    genres: String,
+    start_date: Option<String>,
+    end_date: Option<String>,
+    authors: String,
+    serialization: String,
+    media_type: String,
+    user_status: String,
+    user_score: u32,
+    user_volumes_read: u32,
+    user_chapters_read: u32,
+    is_rereading: bool,
+    user_comments: String,
+    user_num_times_reread: u32,
+    user_start_date: Option<String>,
+    user_finish_date: Option<String>,
+    updated_at: Option<String>,
+}
+
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SynchronizedMangaList {
+    reading: Vec<MangaListItem>,
+    completed: Vec<MangaListItem>,
+    on_hold: Vec<MangaListItem>,
+    dropped: Vec<MangaListItem>,
+    plan_to_read: Vec<MangaListItem>,
+}
+
+#[derive(Serialize)]
+#[serde(untagged)]
+pub enum SynchronizedListResult {
+    Anime(SynchronizedAnimeList),
+    Manga(SynchronizedMangaList),
+}
+
 #[derive(Copy, Clone)]
 enum UserStatusKey {
+    Reading,
     Watching,
     Completed,
     OnHold,
     Dropped,
     PlanToWatch,
+    PlanToRead,
 }
 
 impl UserStatusKey {
-    fn from_anilist(status: Option<&str>) -> Self {
-        match status {
-            Some("CURRENT") | Some("REPEATING") => Self::Watching,
-            Some("COMPLETED") => Self::Completed,
-            Some("PAUSED") => Self::OnHold,
-            Some("DROPPED") => Self::Dropped,
-            Some("PLANNING") => Self::PlanToWatch,
-            _ => Self::PlanToWatch,
+    fn from_anilist(list_type: ListType, status: Option<&str>) -> Self {
+        match list_type {
+            ListType::Anime => match status {
+                Some("CURRENT") | Some("REPEATING") => Self::Watching,
+                Some("COMPLETED") => Self::Completed,
+                Some("PAUSED") => Self::OnHold,
+                Some("DROPPED") => Self::Dropped,
+                Some("PLANNING") => Self::PlanToWatch,
+                _ => Self::PlanToWatch,
+            },
+            ListType::Manga => match status {
+                Some("CURRENT") | Some("REPEATING") => Self::Reading,
+                Some("COMPLETED") => Self::Completed,
+                Some("PAUSED") => Self::OnHold,
+                Some("DROPPED") => Self::Dropped,
+                Some("PLANNING") => Self::PlanToRead,
+                _ => Self::PlanToRead,
+            },
         }
     }
 
     fn as_user_status_str(self) -> &'static str {
         match self {
+            Self::Reading => "reading",
             Self::Watching => "watching",
             Self::Completed => "completed",
             Self::OnHold => "onHold",
             Self::Dropped => "dropped",
             Self::PlanToWatch => "planToWatch",
+            Self::PlanToRead => "planToRead",
         }
     }
 
-    fn push(self, result: &mut SynchronizedAnimeList, item: AnimeListItem) {
+    fn push_anime(self, result: &mut SynchronizedAnimeList, item: AnimeListItem) {
         match self {
             Self::Watching => result.watching.push(item),
             Self::Completed => result.completed.push(item),
             Self::OnHold => result.on_hold.push(item),
             Self::Dropped => result.dropped.push(item),
             Self::PlanToWatch => result.plan_to_watch.push(item),
+            Self::Reading => result.watching.push(item),
+            Self::PlanToRead => result.plan_to_watch.push(item),
+        }
+    }
+
+    fn push_manga(self, result: &mut SynchronizedMangaList, item: MangaListItem) {
+        match self {
+            Self::Reading => result.reading.push(item),
+            Self::Completed => result.completed.push(item),
+            Self::OnHold => result.on_hold.push(item),
+            Self::Dropped => result.dropped.push(item),
+            Self::PlanToRead => result.plan_to_read.push(item),
+            Self::Watching => result.reading.push(item),
+            Self::PlanToWatch => result.plan_to_read.push(item),
         }
     }
 }
@@ -580,13 +702,23 @@ fn map_source(source: Option<String>) -> String {
     }
 }
 
-fn map_status(status: Option<String>) -> String {
+fn map_status(list_type: ListType, status: Option<String>) -> String {
     match status {
-        Some(value) => match value.as_str() {
-            "FINISHED" => "Finished Airing".to_string(),
-            "NOT_YET_RELEASED" => "Not Yet Aired".to_string(),
-            "RELEASING" => "Currently Airing".to_string(),
-            _ => format_upper_snake(&value),
+        Some(value) => match list_type {
+            ListType::Anime => match value.as_str() {
+                "FINISHED" => "Finished Airing".to_string(),
+                "NOT_YET_RELEASED" => "Not Yet Aired".to_string(),
+                "RELEASING" => "Currently Airing".to_string(),
+                _ => format_upper_snake(&value),
+            },
+            ListType::Manga => match value.as_str() {
+                "FINISHED" => "Finished".to_string(),
+                "NOT_YET_RELEASED" => "Not Yet Published".to_string(),
+                "RELEASING" => "Currently Publishing".to_string(),
+                "HIATUS" => "On Hiatus".to_string(),
+                "CANCELLED" => "Discontinued".to_string(),
+                _ => format_upper_snake(&value),
+            },
         },
         None => "Unknown".to_string(),
     }
@@ -612,14 +744,24 @@ fn map_media_type(media_type: Option<String>) -> String {
     }
 }
 
-fn map_user_status_to_anilist(status: &str) -> Result<&'static str, String> {
-    match status {
-        "watching" => Ok("CURRENT"),
-        "completed" => Ok("COMPLETED"),
-        "onHold" | "on_hold" => Ok("PAUSED"),
-        "dropped" => Ok("DROPPED"),
-        "planToWatch" | "plan_to_watch" => Ok("PLANNING"),
-        _ => Err(format!("Invalid AniList status: {status}")),
+fn map_user_status_to_anilist(list_type: ListType, status: &str) -> Result<&'static str, String> {
+    match list_type {
+        ListType::Anime => match status {
+            "watching" => Ok("CURRENT"),
+            "completed" => Ok("COMPLETED"),
+            "onHold" | "on_hold" => Ok("PAUSED"),
+            "dropped" => Ok("DROPPED"),
+            "planToWatch" | "plan_to_watch" => Ok("PLANNING"),
+            _ => Err(format!("Invalid AniList status: {status}")),
+        },
+        ListType::Manga => match status {
+            "reading" => Ok("CURRENT"),
+            "completed" => Ok("COMPLETED"),
+            "onHold" | "on_hold" => Ok("PAUSED"),
+            "dropped" => Ok("DROPPED"),
+            "planToRead" | "plan_to_read" => Ok("PLANNING"),
+            _ => Err(format!("Invalid AniList status: {status}")),
+        },
     }
 }
 
@@ -723,6 +865,37 @@ fn join_studio_names(studios: Option<AniListStudios>) -> String {
     "Unknown".to_string()
 }
 
+fn join_author_names(staff: Option<AniListStaff>) -> String {
+    let Some(staff) = staff else {
+        return "Unknown".to_string();
+    };
+
+    let mut names: Vec<String> = Vec::new();
+
+    for edge in staff.edges {
+        let _role = edge.role.as_deref();
+        let Some(node) = edge.node else {
+            continue;
+        };
+        let Some(name) = node.name else {
+            continue;
+        };
+        let Some(full_name) = normalize_text(name.full.as_deref()) else {
+            continue;
+        };
+
+        if !names.iter().any(|existing| existing == &full_name) {
+            names.push(full_name);
+        }
+    }
+
+    if names.is_empty() {
+        "Unknown".to_string()
+    } else {
+        names.join(", ")
+    }
+}
+
 fn normalize_score(value: Option<f64>) -> u32 {
     let Some(value) = value else {
         return 0;
@@ -820,7 +993,7 @@ fn map_anilist_statistics(statistics: AniListAnimeStatistics) -> UserStatistics 
     }
 }
 
-fn map_media_to_domain(
+fn map_anime_to_domain(
     media: AniListMedia,
     media_list_entry: AniListMediaListEntry,
     status_key: UserStatusKey,
@@ -849,7 +1022,7 @@ fn map_media_to_domain(
         alternative_titles,
         score: media.mean_score.unwrap_or(0) as f64,
         source: map_source(media.source),
-        status: map_status(media.status),
+        status: map_status(ListType::Anime, media.status),
         total_episodes: media.episodes.unwrap_or(0),
         genres: join_genres(media.genres),
         start_season: format_start_season(media.season, media.season_year),
@@ -873,15 +1046,64 @@ fn map_media_to_domain(
     }
 }
 
+fn map_manga_to_domain(
+    media: AniListMedia,
+    media_list_entry: AniListMediaListEntry,
+    status_key: UserStatusKey,
+) -> MangaListItem {
+    let title = pick_title(media.title.as_ref());
+    let alternative_titles = build_alternative_titles(media.title.as_ref(), &title);
+    let image_url = media
+        .cover_image
+        .and_then(|cover| cover.extra_large.or(cover.large))
+        .unwrap_or_default();
+    let repeat = media_list_entry.repeat.unwrap_or(0);
+
+    MangaListItem {
+        id: media.id,
+        entry_id: media_list_entry.id,
+        title,
+        image_url,
+        synopsis: media
+            .description
+            .unwrap_or_else(|| "No synopsis available.".to_string()),
+        alternative_titles,
+        score: media.mean_score.unwrap_or(0) as f64,
+        status: map_status(ListType::Manga, media.status),
+        total_volumes: media.volumes.unwrap_or(0),
+        total_chapters: media.chapters.unwrap_or(0),
+        genres: join_genres(media.genres),
+        start_date: format_fuzzy_date(media.start_date),
+        end_date: format_fuzzy_date(media.end_date),
+        authors: join_author_names(media.staff),
+        serialization: "Unknown".to_string(),
+        media_type: map_media_type(media.format.or(media.r#type)),
+        user_status: status_key.as_user_status_str().to_string(),
+        user_score: normalize_score(media_list_entry.score),
+        user_volumes_read: media_list_entry.progress_volumes.unwrap_or(0),
+        user_chapters_read: media_list_entry.progress.unwrap_or(0),
+        is_rereading: repeat > 0,
+        user_comments: media_list_entry.notes.unwrap_or_default(),
+        user_num_times_reread: repeat,
+        user_start_date: format_fuzzy_date(media_list_entry.started_at),
+        user_finish_date: format_fuzzy_date(media_list_entry.completed_at),
+        updated_at: None,
+    }
+}
+
 async fn fetch_collection(
     client: &reqwest::Client,
     token: &str,
     username: Option<&str>,
+    list_type: ListType,
 ) -> Result<AniListCollection, String> {
     let request = GraphQlRequest {
         query: MEDIA_LIST_COLLECTION_QUERY,
         variables: GraphQlVariables {
-            r#type: MEDIA_TYPE_ANIME,
+            r#type: match list_type {
+                ListType::Anime => MEDIA_TYPE_ANIME,
+                ListType::Manga => MEDIA_TYPE_MANGA,
+            },
             user_name: username,
         },
     };
@@ -979,8 +1201,12 @@ pub async fn fetch_anilist_user_info(app: tauri::AppHandle) -> Result<AniListUse
 }
 
 #[tauri::command]
-pub async fn synchronize_anilist(app: tauri::AppHandle) -> Result<SynchronizedAnimeList, String> {
+pub async fn synchronize_anilist(
+    app: tauri::AppHandle,
+    list_type: Option<ListType>,
+) -> Result<SynchronizedListResult, String> {
     let token = get_access_token(&app, ANILIST_PROVIDER_ID).await?;
+    let list_type = list_type.unwrap_or_default();
     let username: Option<String> = app.zustand().get_or_default("anilist", "username");
     let username = username.and_then(|value| {
         let trimmed = value.trim();
@@ -992,8 +1218,9 @@ pub async fn synchronize_anilist(app: tauri::AppHandle) -> Result<SynchronizedAn
     });
 
     let client = reqwest::Client::new();
-    let collection = fetch_collection(&client, &token, username.as_deref()).await?;
-    let mut result = SynchronizedAnimeList::default();
+    let collection = fetch_collection(&client, &token, username.as_deref(), list_type).await?;
+    let mut anime_result = SynchronizedAnimeList::default();
+    let mut manga_result = SynchronizedMangaList::default();
 
     if collection.has_next_chunk {
         eprintln!(
@@ -1010,6 +1237,7 @@ pub async fn synchronize_anilist(app: tauri::AppHandle) -> Result<SynchronizedAn
             };
 
             let status_key = UserStatusKey::from_anilist(
+                list_type,
                 media
                     .media_list_entry
                     .as_ref()
@@ -1025,12 +1253,23 @@ pub async fn synchronize_anilist(app: tauri::AppHandle) -> Result<SynchronizedAn
                 continue;
             };
 
-            let item = map_media_to_domain(media, media_list_entry, status_key);
-            status_key.push(&mut result, item);
+            match list_type {
+                ListType::Anime => {
+                    let item = map_anime_to_domain(media, media_list_entry, status_key);
+                    status_key.push_anime(&mut anime_result, item);
+                }
+                ListType::Manga => {
+                    let item = map_manga_to_domain(media, media_list_entry, status_key);
+                    status_key.push_manga(&mut manga_result, item);
+                }
+            }
         }
     }
 
-    Ok(result)
+    match list_type {
+        ListType::Anime => Ok(SynchronizedListResult::Anime(anime_result)),
+        ListType::Manga => Ok(SynchronizedListResult::Manga(manga_result)),
+    }
 }
 
 pub async fn update_anilist_list_entry(
@@ -1039,20 +1278,36 @@ pub async fn update_anilist_list_entry(
     update: &AnimeListUpdateRequest,
 ) -> Result<(), String> {
     let token = get_access_token(app, ANILIST_PROVIDER_ID).await?;
+    let list_type = update.list_type.unwrap_or_default();
 
     let status = update
         .user_status
         .as_deref()
-        .map(map_user_status_to_anilist)
+        .map(|value| map_user_status_to_anilist(list_type, value))
         .transpose()?
         .map(|value| value.to_string());
     let score = update.user_score.map(|value| value as f64);
-    let progress = update.user_episodes_watched;
-    let repeat = match (update.user_num_times_rewatched, update.is_rewatching) {
-        (Some(value), _) => Some(value),
-        (None, Some(true)) => Some(1),
-        (None, Some(false)) => Some(0),
-        (None, None) => None,
+    let (progress, progress_volumes, repeat) = match list_type {
+        ListType::Anime => {
+            let repeat = match (update.user_num_times_rewatched, update.is_rewatching) {
+                (Some(value), _) => Some(value),
+                (None, Some(true)) => Some(1),
+                (None, Some(false)) => Some(0),
+                (None, None) => None,
+            };
+
+            (update.user_episodes_watched, None, repeat)
+        }
+        ListType::Manga => {
+            let repeat = match (update.user_num_times_reread, update.is_rereading) {
+                (Some(value), _) => Some(value),
+                (None, Some(true)) => Some(1),
+                (None, Some(false)) => Some(0),
+                (None, None) => None,
+            };
+
+            (update.user_chapters_read, update.user_volumes_read, repeat)
+        }
     };
     let notes = update.user_comments.as_ref().and_then(|value| {
         let trimmed = value.trim();
@@ -1069,6 +1324,7 @@ pub async fn update_anilist_list_entry(
     if status.is_none()
         && score.is_none()
         && progress.is_none()
+        && progress_volumes.is_none()
         && repeat.is_none()
         && notes.is_none()
         && started_at.is_none()
@@ -1096,6 +1352,7 @@ pub async fn update_anilist_list_entry(
             status,
             score,
             progress,
+            progress_volumes,
             repeat,
             notes,
             started_at,

@@ -1,5 +1,11 @@
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { ArrowLeftRight, LogOut, RefreshCw, User } from 'lucide-react';
+import {
+  ArrowLeftRight,
+  ListRestart,
+  LogOut,
+  RefreshCw,
+  User
+} from 'lucide-react';
 import {
   ReactNode,
   useCallback,
@@ -17,7 +23,7 @@ import { usePlayerDetectionStore } from '@/stores/detection/playerDetection';
 import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { useProviderStore } from '@/stores/providers/provider';
-import { Provider } from '@/types/List';
+import { ListType, Provider } from '@/types/List';
 import { ConfigMenuStep } from '@/types/Navigation';
 import { mapProviderToName } from '@/utils/provider';
 import { buildProfileUrl } from '@/utils/url';
@@ -32,14 +38,19 @@ type MenuItem = {
 
 const useProfileMenu = () => {
   const [mainPopoverEl, setMainPopoverEl] = useState<null | HTMLElement>(null);
+  const [switchListEl, setSwitchListEl] = useState<null | HTMLElement>(null);
   const [switchAccountEl, setSwitchAccountEl] = useState<null | HTMLElement>(
     null
   );
   const [isFetchingProfile, setIsFetchingProfile] = useState(false);
 
   const activeProvider = useProviderStore((state) => state.activeProvider);
+  const selectedListType = useProviderStore((state) => state.selectedListType);
   const setActiveProvider = useProviderStore(
     (state) => state.setActiveProvider
+  );
+  const setSelectedListType = useProviderStore(
+    (state) => state.setSelectedListType
   );
 
   const isMyAnimeListAuthenticated = useMyAnimeListStore(
@@ -94,6 +105,7 @@ const useProfileMenu = () => {
   const openConfigMenu = useConfigMenuStore((state) => state.openConfigMenu);
 
   const mainPopoverOpen = Boolean(mainPopoverEl);
+  const switchListOpen = Boolean(switchListEl);
   const switchAccountOpen = Boolean(switchAccountEl);
 
   const profileImage = useMemo(() => {
@@ -167,15 +179,45 @@ const useProfileMenu = () => {
 
   const handleCloseMainPopover = () => {
     setMainPopoverEl(null);
+    setSwitchListEl(null);
+    setSwitchAccountEl(null);
+  };
+
+  const handleOpenSwitchListPopover = (event: MouseEvent<HTMLElement>) => {
+    setSwitchAccountEl(null);
+    setSwitchListEl(event.currentTarget);
+  };
+
+  const handleCloseSwitchListPopover = () => {
+    setSwitchListEl(null);
   };
 
   const handleOpenSwitchAccountPopover = (event: MouseEvent<HTMLElement>) => {
+    setSwitchListEl(null);
     setSwitchAccountEl(event.currentTarget);
   };
 
   const handleCloseSwitchAccountPopover = () => {
     setSwitchAccountEl(null);
   };
+
+  const handleSwitchListType = useCallback(
+    (listType: ListType) => {
+      if (listType === selectedListType) {
+        return handleCloseSwitchListPopover();
+      }
+
+      setSelectedListType(listType);
+      handleCloseSwitchListPopover();
+      handleCloseMainPopover();
+    },
+    [
+      selectedListType,
+      setSelectedListType,
+      handleCloseSwitchListPopover,
+      handleCloseMainPopover
+    ]
+  );
 
   const handleSwitchAccount = useCallback(
     (provider: Provider) => {
@@ -296,6 +338,15 @@ const useProfileMenu = () => {
         handleClick: handleRefreshProfile
       },
       {
+        label: 'Switch List',
+        icon: <ListRestart />,
+        disabled: false,
+        renderDivider: false,
+        handleClick: (event: MouseEvent<HTMLElement>) => {
+          handleOpenSwitchListPopover(event);
+        }
+      },
+      {
         label: 'Switch Account',
         icon: <ArrowLeftRight />,
         disabled: connectedAccounts.length === 0,
@@ -327,19 +378,25 @@ const useProfileMenu = () => {
   return {
     mainPopoverEl,
     mainPopoverOpen,
+    switchListEl,
+    switchListOpen,
     switchAccountEl,
     switchAccountOpen,
     profileImage,
     providerName,
     username,
+    selectedListType,
     menuItems,
     connectedAccounts,
     isFetchingProfile,
     setIsFetchingProfile,
     handleOpenMainPopover,
     handleCloseMainPopover,
+    handleOpenSwitchListPopover,
+    handleCloseSwitchListPopover,
     handleOpenSwitchAccountPopover,
     handleCloseSwitchAccountPopover,
+    handleSwitchListType,
     handleSwitchAccount,
     handleSignOut,
     handleRefreshProfile

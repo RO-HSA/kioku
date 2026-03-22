@@ -15,10 +15,10 @@ const RefreshListButton = () => {
   const activeProvider = useProviderStore((state) => state.activeProvider);
 
   const setMyAnimeListData = useMyAnimeListStore(
-    (state) => state.setAnimeListData
+    (state) => state.setMangaListData
   );
 
-  const setAniListData = useAniListStore((state) => state.setAnimeListData);
+  const setAniListData = useAniListStore((state) => state.setMangaListData);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -26,7 +26,7 @@ const RefreshListButton = () => {
     switch (activeProvider) {
       case Provider.MY_ANIME_LIST:
         try {
-          const result = await MyAnimeListService.synchronizeList();
+          const result = await MyAnimeListService.synchronizeList('manga');
           setMyAnimeListData(result);
         } finally {
           setIsRefreshing(false);
@@ -34,7 +34,7 @@ const RefreshListButton = () => {
         break;
       case Provider.ANILIST:
         try {
-          const result = await AniListService.synchronizeList();
+          const result = await AniListService.synchronizeList('manga');
           setAniListData(result);
         } finally {
           setIsRefreshing(false);
