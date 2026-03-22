@@ -170,12 +170,19 @@ export const updateMangaListData = ({
   };
 
   let targetStatus = data.userStatus ?? updatedManga.userStatus;
+  const hasReachedChapterTotal =
+    data.userChaptersRead !== undefined &&
+    mangaToUpdate.totalChapters > 0 &&
+    data.userChaptersRead >= mangaToUpdate.totalChapters;
+  const hasReachedVolumeTotal =
+    data.userVolumesRead !== undefined &&
+    mangaToUpdate.totalVolumes > 0 &&
+    data.userVolumesRead >= mangaToUpdate.totalVolumes;
 
   if (
-    data.userChaptersRead !== undefined &&
     isSingleUpdate &&
-    mangaToUpdate.totalChapters > 0 &&
-    data.userChaptersRead >= mangaToUpdate.totalChapters
+    (hasReachedChapterTotal ||
+      (hasReachedVolumeTotal && mangaToUpdate.totalChapters === 0))
   ) {
     targetStatus = 'completed';
     updatedManga.userStatus = 'completed';

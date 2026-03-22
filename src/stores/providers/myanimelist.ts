@@ -16,6 +16,8 @@ type ListStatus =
   | { type: 'anime'; value: AnimeListUserStatus }
   | { type: 'manga'; value: MangaListUserStatus };
 
+type MangaProgressType = 'chapters' | 'volumes';
+
 type MyAnimeListStore = {
   id: number | null;
   username: string | null;
@@ -39,7 +41,8 @@ type MyAnimeListStore = {
   setProgress: (
     entryId: number,
     status: ListStatus,
-    newProgress: number
+    newProgress: number,
+    progressType?: MangaProgressType
   ) => void;
   setScore: (entryId: number, status: ListStatus, newScore: number) => void;
   updateAnimeList: (
@@ -81,7 +84,7 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
       animeListData: null,
       mangaListData: null
     })),
-  setProgress: (entryId, status, newProgress) =>
+  setProgress: (entryId, status, newProgress, progressType = 'chapters') =>
     set((state) => {
       switch (status.type) {
         case 'anime':
@@ -105,18 +108,23 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
         case 'manga':
           if (!state.mangaListData) return {};
 
+          const progressData =
+            progressType === 'volumes'
+              ? { userVolumesRead: newProgress }
+              : { userChaptersRead: newProgress };
+
           AnimeListService.enqueueListUpdate({
             providerId: Provider.MY_ANIME_LIST,
             listType: 'manga',
             entryId,
-            userChaptersRead: newProgress
+            ...progressData
           });
 
           const updatedMangaListData = updateMangaListData({
             mangaId: entryId,
             status: status.value,
             state: state.mangaListData,
-            data: { userChaptersRead: newProgress }
+            data: progressData
           });
 
           return { mangaListData: updatedMangaListData };

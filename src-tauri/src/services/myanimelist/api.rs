@@ -127,11 +127,11 @@ pub async fn update_myanimelist_list_entry(
         }
         MyAnimeListListType::Manga => {
             if let Some(volumes) = update.user_volumes_read {
-                params.push(("num_read_volumes".to_string(), volumes.to_string()));
+                params.push(("num_volumes_read".to_string(), volumes.to_string()));
             }
 
             if let Some(chapters) = update.user_chapters_read {
-                params.push(("num_read_chapters".to_string(), chapters.to_string()));
+                params.push(("num_chapters_read".to_string(), chapters.to_string()));
             }
 
             if let Some(is_rereading) = update.is_rereading {

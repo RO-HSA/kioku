@@ -91,13 +91,15 @@ const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
           return setMyAnimeListProgress(
             entryId,
             { type: 'manga', value: status },
-            newProgress
+            newProgress,
+            'chapters'
           );
         case Provider.ANILIST:
           return setAniListProgress(
             entryId,
             { type: 'manga', value: status },
-            newProgress
+            newProgress,
+            'chapters'
           );
         default:
           return () => {};
@@ -113,13 +115,15 @@ const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
           return setMyAnimeListProgress(
             entryId,
             { type: 'manga', value: status },
-            newProgress
+            newProgress,
+            'volumes'
           );
         case Provider.ANILIST:
           return setAniListProgress(
             entryId,
             { type: 'manga', value: status },
-            newProgress
+            newProgress,
+            'volumes'
           );
         default:
           return () => {};

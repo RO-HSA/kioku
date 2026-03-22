@@ -16,6 +16,8 @@ type ListStatus =
   | { type: 'anime'; value: AnimeListUserStatus }
   | { type: 'manga'; value: MangaListUserStatus };
 
+type MangaProgressType = 'chapters' | 'volumes';
+
 type AniListStore = {
   id: number | null;
   username: string | null;
@@ -39,7 +41,8 @@ type AniListStore = {
   setProgress: (
     animeId: number,
     status: ListStatus,
-    newProgress: number
+    newProgress: number,
+    progressType?: MangaProgressType
   ) => void;
   setScore: (animeId: number, status: ListStatus, newScore: number) => void;
   updateAnimeList: (
@@ -81,7 +84,7 @@ export const useAniListStore = create<AniListStore>((set) => ({
       animeListData: null,
       mangaListData: null
     })),
-  setProgress: (animeId, status, newProgress) =>
+  setProgress: (animeId, status, newProgress, progressType = 'chapters') =>
     set((state) => {
       switch (status.type) {
         case 'anime':
@@ -113,6 +116,11 @@ export const useAniListStore = create<AniListStore>((set) => ({
         case 'manga':
           if (!state.mangaListData) return {};
 
+          const progressData =
+            progressType === 'volumes'
+              ? { userVolumesRead: newProgress }
+              : { userChaptersRead: newProgress };
+
           const manga = state.mangaListData[status.value].find(
             (item) => item.id === animeId
           );
@@ -121,7 +129,7 @@ export const useAniListStore = create<AniListStore>((set) => ({
             mangaId: animeId,
             status: status.value,
             state: state.mangaListData,
-            data: { userChaptersRead: newProgress }
+            data: progressData
           });
 
           if (manga?.entryId === undefined) {
@@ -132,7 +140,7 @@ export const useAniListStore = create<AniListStore>((set) => ({
             providerId: Provider.ANILIST,
             listType: 'manga',
             entryId: manga.entryId,
-            userChaptersRead: newProgress
+            ...progressData
           });
 
           return { mangaListData: updatedMangaListData };
