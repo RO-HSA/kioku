@@ -63,17 +63,17 @@ const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
   const setAniListProgress = useAniListStore((state) => state.setProgress);
 
   const setScore = useCallback(
-    (animeId: number, status: MangaListUserStatus, newScore: number) => {
+    (entryId: number, status: MangaListUserStatus, newScore: number) => {
       switch (activeProvider) {
         case Provider.MY_ANIME_LIST:
           return setMyAnimeListScore(
-            animeId,
+            entryId,
             { type: 'manga', value: status },
             newScore
           );
         case Provider.ANILIST:
           return setAniListScore(
-            animeId,
+            entryId,
             { type: 'manga', value: status },
             newScore
           );
@@ -84,18 +84,40 @@ const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
     [activeProvider, setAniListScore, setMyAnimeListScore]
   );
 
-  const handleProgressChange = useCallback(
-    (animeId: number, status: MangaListUserStatus, newProgress: number) => {
+  const handleChaptersProgressChange = useCallback(
+    (entryId: number, status: MangaListUserStatus, newProgress: number) => {
       switch (activeProvider) {
         case Provider.MY_ANIME_LIST:
           return setMyAnimeListProgress(
-            animeId,
+            entryId,
             { type: 'manga', value: status },
             newProgress
           );
         case Provider.ANILIST:
           return setAniListProgress(
-            animeId,
+            entryId,
+            { type: 'manga', value: status },
+            newProgress
+          );
+        default:
+          return () => {};
+      }
+    },
+    [activeProvider, setMyAnimeListProgress, setAniListProgress]
+  );
+
+  const handleVolumesProgressChange = useCallback(
+    (entryId: number, status: MangaListUserStatus, newProgress: number) => {
+      switch (activeProvider) {
+        case Provider.MY_ANIME_LIST:
+          return setMyAnimeListProgress(
+            entryId,
+            { type: 'manga', value: status },
+            newProgress
+          );
+        case Provider.ANILIST:
+          return setAniListProgress(
+            entryId,
             { type: 'manga', value: status },
             newProgress
           );
@@ -205,18 +227,41 @@ const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
       },
       {
         accessorKey: 'userChaptersRead',
-        header: 'Progress',
-        size: 200,
+        header: 'Chapters',
+        size: 150,
         enableGlobalFilter: false,
         Cell: ({ cell, row }) => {
-          const watched = cell.getValue<number>();
+          const read = cell.getValue<number>();
           return (
             <ProgressStatus
-              progress={watched}
+              progress={read}
               total={row.original.totalChapters}
               status={row.original.userStatus}
               onProgressChange={(newProgress) => {
-                handleProgressChange(
+                handleChaptersProgressChange(
+                  row.original.id,
+                  row.original.userStatus,
+                  newProgress
+                );
+              }}
+            />
+          );
+        }
+      },
+      {
+        accessorKey: 'userVolumesRead',
+        header: 'Volumes',
+        size: 150,
+        enableGlobalFilter: false,
+        Cell: ({ cell, row }) => {
+          const read = cell.getValue<number>();
+          return (
+            <ProgressStatus
+              progress={read}
+              total={row.original.totalVolumes}
+              status={row.original.userStatus}
+              onProgressChange={(newProgress) => {
+                handleVolumesProgressChange(
                   row.original.id,
                   row.original.userStatus,
                   newProgress
@@ -270,7 +315,7 @@ const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
         }
       }
     ],
-    [handleProgressChange, setScore]
+    [handleVolumesProgressChange, handleChaptersProgressChange, setScore]
   );
 
   const allData = useMemo(() => {
