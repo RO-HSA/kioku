@@ -8,7 +8,7 @@ import {
 } from '@/services/backend/types';
 import { AnimeListUserStatus, IAnimeList } from '@/types/AnimeList';
 import { Provider } from '@/types/List';
-import { MangaListUserStatus } from '@/types/MangaList';
+import { IMangaList, MangaListUserStatus } from '@/types/MangaList';
 import { Statistics } from '@/types/User';
 import { updateAnimeListData, updateMangaListData } from './utils';
 
@@ -47,8 +47,13 @@ type MyAnimeListStore = {
   setScore: (entryId: number, status: ListStatus, newScore: number) => void;
   updateAnimeList: (
     entryId: number,
-    status: ListStatus,
+    status: AnimeListUserStatus,
     data: Partial<IAnimeList>
+  ) => void;
+  updateMangaList: (
+    entryId: number,
+    status: MangaListUserStatus,
+    data: Partial<IMangaList>
   ) => void;
 };
 
@@ -177,11 +182,19 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
     }),
   updateAnimeList: (
     entryId: number,
-    currentStatus: ListStatus,
+    currentStatus: AnimeListUserStatus,
     data: Partial<IAnimeList>
   ) =>
     set((state) => {
       if (!state.animeListData) return {};
+
+      const updatedAnimeListData = updateAnimeListData({
+        animeId: entryId,
+        state: state.animeListData,
+        status: currentStatus,
+        data,
+        isSingleUpdate: false
+      });
 
       AnimeListService.enqueueListUpdate({
         providerId: Provider.MY_ANIME_LIST,
@@ -190,20 +203,32 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
         ...data
       });
 
-      switch (currentStatus.type) {
-        case 'anime':
-          const updatedAnimeListData = updateAnimeListData({
-            animeId: entryId,
-            state: state.animeListData,
-            status: currentStatus.value,
-            data,
-            isSingleUpdate: false
-          });
+      return { animeListData: updatedAnimeListData };
+    }),
+  updateMangaList: (
+    entryId: number,
+    currentStatus: MangaListUserStatus,
+    data: Partial<IMangaList>
+  ) =>
+    set((state) => {
+      if (!state.mangaListData) return {};
 
-          return { animeListData: updatedAnimeListData };
-        default:
-          return {};
-      }
+      const updatedMangaListData = updateMangaListData({
+        mangaId: entryId,
+        state: state.mangaListData,
+        status: currentStatus,
+        data,
+        isSingleUpdate: false
+      });
+
+      AnimeListService.enqueueListUpdate({
+        providerId: Provider.MY_ANIME_LIST,
+        listType: 'manga',
+        entryId,
+        ...data
+      });
+
+      return { mangaListData: updatedMangaListData };
     })
 }));
 

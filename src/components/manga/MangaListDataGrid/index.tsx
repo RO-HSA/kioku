@@ -28,7 +28,6 @@ const MangaListDataGrid = () => {
   const { table } = useMangaListDataGrid({
     listData: mangaListDataByProvider
   });
-  console.log({ mangaListDataByProvider });
 
   return (
     <Box sx={{ height: '100%', width: '100%', minHeight: 0 }}>

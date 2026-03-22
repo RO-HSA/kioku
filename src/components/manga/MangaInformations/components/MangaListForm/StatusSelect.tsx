@@ -2,12 +2,12 @@ import { FormControl, InputLabel, MenuItem, Select } from '@mui/material';
 import { FC } from 'react';
 import { Control, useWatch } from 'react-hook-form';
 
-import { AnimeListUserStatus } from '@/types/AnimeList';
-import { AnimeListFormData } from './hooks/types';
+import { MangaListUserStatus } from '@/types/MangaList';
+import { MangaListFormData } from './hooks/types';
 
 interface StatusSelectProps {
-  control: Control<AnimeListFormData>;
-  onChange: (status: AnimeListUserStatus) => void;
+  control: Control<MangaListFormData>;
+  onChange: (status: MangaListUserStatus) => void;
 }
 
 const StatusSelect: FC<StatusSelectProps> = ({ control, onChange }) => {
@@ -21,12 +21,12 @@ const StatusSelect: FC<StatusSelectProps> = ({ control, onChange }) => {
         label="Status"
         size="small"
         value={status}
-        onChange={(e) => onChange(e.target.value as AnimeListUserStatus)}>
-        <MenuItem value="watching">Watching</MenuItem>
+        onChange={(e) => onChange(e.target.value as MangaListUserStatus)}>
+        <MenuItem value="reading">Reading</MenuItem>
         <MenuItem value="completed">Completed</MenuItem>
         <MenuItem value="onHold">On Hold</MenuItem>
         <MenuItem value="dropped">Dropped</MenuItem>
-        <MenuItem value="planToWatch">Plan to Watch</MenuItem>
+        <MenuItem value="planToRead">Plan to Read</MenuItem>
       </Select>
     </FormControl>
   );

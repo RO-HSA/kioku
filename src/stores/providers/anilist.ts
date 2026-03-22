@@ -8,7 +8,7 @@ import {
 } from '@/services/backend/types';
 import { AnimeListUserStatus, IAnimeList } from '@/types/AnimeList';
 import { Provider } from '@/types/List';
-import { MangaListUserStatus } from '@/types/MangaList';
+import { IMangaList, MangaListUserStatus } from '@/types/MangaList';
 import { Statistics } from '@/types/User';
 import { updateAnimeListData, updateMangaListData } from './utils';
 
@@ -46,9 +46,14 @@ type AniListStore = {
   ) => void;
   setScore: (animeId: number, status: ListStatus, newScore: number) => void;
   updateAnimeList: (
-    animeId: number,
-    status: ListStatus,
+    entryId: number,
+    status: AnimeListUserStatus,
     data: Partial<IAnimeList>
+  ) => void;
+  updateMangaList: (
+    entryId: number,
+    status: MangaListUserStatus,
+    data: Partial<IMangaList>
   ) => void;
 };
 
@@ -208,42 +213,70 @@ export const useAniListStore = create<AniListStore>((set) => ({
       }
     }),
   updateAnimeList: (
-    animeId: number,
-    currentStatus: ListStatus,
+    entryId: number,
+    currentStatus: AnimeListUserStatus,
     data: Partial<IAnimeList>
   ) =>
     set((state) => {
       if (!state.animeListData) return {};
 
-      switch (currentStatus.type) {
-        case 'anime':
-          const anime = state.animeListData[currentStatus.value].find(
-            (item) => item.id === animeId
-          );
+      const anime = state.animeListData[currentStatus].find(
+        (item) => item.id === entryId
+      );
 
-          const updatedAnimeListData = updateAnimeListData({
-            animeId,
-            state: state.animeListData,
-            status: currentStatus.value,
-            data,
-            isSingleUpdate: false
-          });
+      const updatedAnimeListData = updateAnimeListData({
+        animeId: entryId,
+        state: state.animeListData,
+        status: currentStatus,
+        data,
+        isSingleUpdate: false
+      });
 
-          if (anime?.entryId === undefined) {
-            return { animeListData: updatedAnimeListData };
-          }
-
-          AnimeListService.enqueueListUpdate({
-            providerId: Provider.ANILIST,
-            listType: 'anime',
-            entryId: anime.entryId,
-            ...data
-          });
-
-          return { animeListData: updatedAnimeListData };
-        default:
-          return {};
+      if (anime?.entryId === undefined) {
+        return { animeListData: updatedAnimeListData };
       }
+
+      AnimeListService.enqueueListUpdate({
+        providerId: Provider.ANILIST,
+        listType: 'anime',
+        entryId: anime.entryId,
+        ...data
+      });
+
+      return { animeListData: updatedAnimeListData };
+    }),
+  updateMangaList: (
+    entryId: number,
+    currentStatus: MangaListUserStatus,
+    data: Partial<IMangaList>
+  ) =>
+    set((state) => {
+      if (!state.mangaListData) return {};
+
+      const manga = state.mangaListData[currentStatus].find(
+        (item) => item.id === entryId
+      );
+
+      const updatedMangaListData = updateMangaListData({
+        mangaId: entryId,
+        state: state.mangaListData,
+        status: currentStatus,
+        data,
+        isSingleUpdate: false
+      });
+
+      if (manga?.entryId === undefined) {
+        return { mangaListData: updatedMangaListData };
+      }
+
+      AnimeListService.enqueueListUpdate({
+        providerId: Provider.ANILIST,
+        listType: 'manga',
+        entryId: manga.entryId,
+        ...data
+      });
+
+      return { mangaListData: updatedMangaListData };
     })
 }));
 

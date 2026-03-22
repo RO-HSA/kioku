@@ -1,24 +1,25 @@
 import { useWatch } from 'react-hook-form';
 
 import DatePicker from '@/components/DatePicker';
-import { useAnimeDetailsStore } from '@/stores/animeDetails';
+import { useMangaDetailsStore } from '@/stores/mangaDetails';
 import { formatDateValue, parseDateValue } from '@/utils/date';
-import EpisodesWatched from './EpisodesWatched';
-import useAnimeListForm from './hooks/useAnimeListForm';
-import Rewatching from './Rewatching';
+import ChaptersRead from './ChaptersRead';
+import useMangaListForm from './hooks/useMangaListForm';
+import Rereading from './Rereading';
 import ScoreSelector from './ScoreSelector';
 import StatusSelect from './StatusSelect';
-import TimesWatched from './TimesWatched';
+import TimesRead from './TimesRead';
 import UserNote from './UserNote';
+import VolumesRead from './VolumesRead';
 
-const AnimeListForm = () => {
-  const formRef = useAnimeDetailsStore((state) => state.formRef);
-  const selectedAnime = useAnimeDetailsStore((state) => state.selectedAnime);
+const MangaListForm = () => {
+  const formRef = useMangaDetailsStore((state) => state.formRef);
+  const selectedManga = useMangaDetailsStore((state) => state.selectedManga);
 
-  if (!selectedAnime) return null;
+  if (!selectedManga) return null;
 
-  const { control, setValue, handleSubmit, onSubmit } = useAnimeListForm({
-    selectedAnime
+  const { control, setValue, handleSubmit, onSubmit } = useMangaListForm({
+    selectedManga
   });
 
   const startDate = useWatch({
@@ -37,25 +38,35 @@ const AnimeListForm = () => {
       className="flex flex-col gap-5"
       onSubmit={handleSubmit(onSubmit)}>
       <div className="flex flex-wrap gap-3">
-        <EpisodesWatched
+        <ChaptersRead
           control={control}
-          totalEpisodes={selectedAnime.totalEpisodes}
+          totalChapters={selectedManga.totalChapters}
           onChange={(value) =>
-            setValue('userEpisodesWatched', value, { shouldDirty: true })
+            setValue('userChaptersRead', value, { shouldDirty: true })
           }
         />
 
-        <TimesWatched
+        <VolumesRead
+          control={control}
+          totalVolumes={selectedManga.totalVolumes}
+          onChange={(value) =>
+            setValue('userVolumesRead', value, { shouldDirty: true })
+          }
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <TimesRead
           control={control}
           onChange={(value) =>
-            setValue('userNumTimesRewatched', value, { shouldDirty: true })
+            setValue('userNumTimesReread', value, { shouldDirty: true })
           }
         />
 
-        <Rewatching
+        <Rereading
           control={control}
           onChange={(value) =>
-            setValue('isRewatching', value, { shouldDirty: true })
+            setValue('isRereading', value, { shouldDirty: true })
           }
         />
       </div>
@@ -110,4 +121,4 @@ const AnimeListForm = () => {
   );
 };
 
-export default AnimeListForm;
+export default MangaListForm;

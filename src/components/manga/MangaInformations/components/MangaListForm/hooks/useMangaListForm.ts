@@ -2,71 +2,75 @@ import { useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 
 import { useAnimeDetailsStore } from '@/stores/animeDetails';
+import { useMangaDetailsStore } from '@/stores/mangaDetails';
 import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { useProviderStore } from '@/stores/providers/provider';
-import { IAnimeList } from '@/types/AnimeList';
 import { Provider } from '@/types/List';
-import { AnimeListFormData } from './types';
+import { IMangaList } from '@/types/MangaList';
+import { MangaListFormData } from './types';
 
-interface UseAnimeListFormProps {
-  selectedAnime: IAnimeList;
+interface UseMangaListFormProps {
+  selectedManga: IMangaList;
 }
+1;
 
-const useAnimeListForm = ({ selectedAnime }: UseAnimeListFormProps) => {
+const useMangaListForm = ({ selectedManga }: UseMangaListFormProps) => {
   const setIsOpen = useAnimeDetailsStore((state) => state.setIsOpen);
-  const setSelectedAnime = useAnimeDetailsStore(
-    (state) => state.setSelectedAnime
+  const setSelectedManga = useMangaDetailsStore(
+    (state) => state.setSelectedManga
   );
 
   const activeProvider = useProviderStore((state) => state.activeProvider);
 
-  const updateMyAnimeListAnimeList = useMyAnimeListStore(
-    (state) => state.updateAnimeList
+  const updateMyAnimeListMangaList = useMyAnimeListStore(
+    (state) => state.updateMangaList
   );
-  const updateAniListAnimeList = useAniListStore(
-    (state) => state.updateAnimeList
+  const updateAniListMangaList = useAniListStore(
+    (state) => state.updateMangaList
   );
 
   const {
     userStatus,
-    userEpisodesWatched,
+    userChaptersRead,
+    userVolumesRead,
     userScore,
-    isRewatching,
+    isRereading,
     userFinishDate,
     userStartDate,
     userComments,
-    userNumTimesRewatched
-  } = selectedAnime;
+    userNumTimesReread
+  } = selectedManga;
 
   const { control, formState, setValue, handleSubmit, getValues } =
-    useForm<AnimeListFormData>({
+    useForm<MangaListFormData>({
       defaultValues: {
-        userEpisodesWatched,
+        userChaptersRead,
+        userVolumesRead,
         userScore,
         userStatus,
-        isRewatching,
+        isRereading,
         userStartDate,
         userFinishDate,
         userComments,
-        userNumTimesRewatched
+        userNumTimesReread
       }
     });
 
   const getDirtyPayload = useCallback(() => {
-    const payload: Partial<AnimeListFormData> = {};
+    const payload: Partial<MangaListFormData> = {};
     const dirtyFields = formState.dirtyFields as Partial<
-      Record<keyof AnimeListFormData, boolean>
+      Record<keyof MangaListFormData, boolean>
     >;
     const values = getValues();
 
-    const setDirtyValue = <K extends keyof AnimeListFormData>(key: K) => {
+    const setDirtyValue = <K extends keyof MangaListFormData>(key: K) => {
       if (!dirtyFields[key]) return;
 
-      payload[key] = values[key] as AnimeListFormData[K];
+      payload[key] = values[key] as MangaListFormData[K];
     };
 
-    (Object.keys(dirtyFields) as Array<keyof AnimeListFormData>).forEach(
+    (Object.keys(dirtyFields) as Array<keyof MangaListFormData>).forEach(
       setDirtyValue
     );
 
@@ -80,16 +84,16 @@ const useAnimeListForm = ({ selectedAnime }: UseAnimeListFormProps) => {
 
     switch (activeProvider) {
       case Provider.MY_ANIME_LIST:
-        updateMyAnimeListAnimeList(
-          selectedAnime.id,
-          selectedAnime.userStatus,
+        updateMyAnimeListMangaList(
+          selectedManga.id,
+          selectedManga.userStatus,
           payload
         );
         break;
       case Provider.ANILIST:
-        updateAniListAnimeList(
-          selectedAnime.id,
-          selectedAnime.userStatus,
+        updateAniListMangaList(
+          selectedManga.id,
+          selectedManga.userStatus,
           payload
         );
         break;
@@ -98,15 +102,15 @@ const useAnimeListForm = ({ selectedAnime }: UseAnimeListFormProps) => {
     }
 
     setIsOpen(false);
-    setSelectedAnime(null);
+    setSelectedManga(null);
   }, [
-    selectedAnime,
+    selectedManga,
     activeProvider,
     getDirtyPayload,
     setIsOpen,
-    setSelectedAnime,
-    updateMyAnimeListAnimeList,
-    updateAniListAnimeList
+    setSelectedManga,
+    updateMyAnimeListMangaList,
+    updateAniListMangaList
   ]);
 
   return {
@@ -118,4 +122,4 @@ const useAnimeListForm = ({ selectedAnime }: UseAnimeListFormProps) => {
   };
 };
 
-export default useAnimeListForm;
+export default useMangaListForm;
