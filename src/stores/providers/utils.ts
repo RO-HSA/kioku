@@ -43,13 +43,23 @@ interface UpdateMangaListDataProps {
   data: Partial<IMangaUserList>;
 }
 
+interface UpdateAnimeListReturn {
+  updatedAnimeList: SynchronizedAnimeList | null;
+  updatedAnime?: IAnimeList;
+}
+
+interface UpdateMangaListReturn {
+  updatedMangaList: SynchronizedMangaList | null;
+  updatedManga?: IMangaList;
+}
+
 export const moveAnimeBetweenStatuses = ({
   state,
   animeToMove,
   fromStatus,
   toStatus
-}: MoveAnimeBetweenStatusesProps): SynchronizedAnimeList => {
-  if (!animeToMove || !state) return {} as SynchronizedAnimeList;
+}: MoveAnimeBetweenStatusesProps): UpdateAnimeListReturn => {
+  if (!animeToMove || !state) return {} as UpdateAnimeListReturn;
 
   const updatedState = { ...state };
 
@@ -59,7 +69,7 @@ export const moveAnimeBetweenStatuses = ({
 
   updatedState[toStatus] = [...updatedState[toStatus], animeToMove];
 
-  return updatedState;
+  return { updatedAnimeList: updatedState, updatedAnime: animeToMove };
 };
 
 export const updateAnimeListData = ({
@@ -68,7 +78,7 @@ export const updateAnimeListData = ({
   status,
   isSingleUpdate = true,
   data
-}: UpdateAnimeListDataProps): SynchronizedAnimeList | null => {
+}: UpdateAnimeListDataProps): UpdateAnimeListReturn | null => {
   if (!state) return null;
 
   const updatedState = { ...state };
@@ -77,7 +87,7 @@ export const updateAnimeListData = ({
     (anime) => anime.id === animeId
   );
 
-  if (!animeToUpdate) return updatedState;
+  if (!animeToUpdate) return { updatedAnimeList: updatedState };
 
   const updatedAnime: IAnimeList = {
     ...animeToUpdate,
@@ -125,7 +135,10 @@ export const updateAnimeListData = ({
     )
   };
 
-  return updatedAnimeListData;
+  return {
+    updatedAnimeList: updatedAnimeListData,
+    updatedAnime: updatedAnime
+  };
 };
 
 export const moveMangaBetweenStatuses = ({
@@ -133,8 +146,8 @@ export const moveMangaBetweenStatuses = ({
   mangaToMove,
   fromStatus,
   toStatus
-}: MoveMangaBetweenStatusesProps): SynchronizedMangaList => {
-  if (!mangaToMove || !state) return {} as SynchronizedMangaList;
+}: MoveMangaBetweenStatusesProps): UpdateMangaListReturn => {
+  if (!mangaToMove || !state) return {} as UpdateMangaListReturn;
 
   const updatedState = { ...state };
 
@@ -144,7 +157,7 @@ export const moveMangaBetweenStatuses = ({
 
   updatedState[toStatus] = [...updatedState[toStatus], mangaToMove];
 
-  return updatedState;
+  return { updatedMangaList: updatedState, updatedManga: mangaToMove };
 };
 
 export const updateMangaListData = ({
@@ -153,7 +166,7 @@ export const updateMangaListData = ({
   status,
   isSingleUpdate = true,
   data
-}: UpdateMangaListDataProps): SynchronizedMangaList | null => {
+}: UpdateMangaListDataProps): UpdateMangaListReturn | null => {
   if (!state) return null;
 
   const updatedState = { ...state };
@@ -162,7 +175,7 @@ export const updateMangaListData = ({
     (manga) => manga.id === mangaId
   );
 
-  if (!mangaToUpdate) return updatedState;
+  if (!mangaToUpdate) return { updatedMangaList: updatedState };
 
   const updatedManga: IMangaList = {
     ...mangaToUpdate,
@@ -217,5 +230,5 @@ export const updateMangaListData = ({
     )
   };
 
-  return updatedMangaListData;
+  return { updatedMangaList: updatedMangaListData, updatedManga: updatedManga };
 };

@@ -95,13 +95,6 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
         case 'anime':
           if (!state.animeListData) return {};
 
-          AnimeListService.enqueueListUpdate({
-            providerId: Provider.MY_ANIME_LIST,
-            listType: 'anime',
-            entryId,
-            userEpisodesWatched: newProgress
-          });
-
           const updatedAnimeListData = updateAnimeListData({
             animeId: entryId,
             status: status.value,
@@ -109,7 +102,17 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
             data: { userEpisodesWatched: newProgress }
           });
 
-          return { animeListData: updatedAnimeListData };
+          const { updatedAnimeList, updatedAnime } = updatedAnimeListData || {};
+
+          AnimeListService.enqueueListUpdate({
+            providerId: Provider.MY_ANIME_LIST,
+            listType: 'anime',
+            entryId,
+            userEpisodesWatched: newProgress,
+            userStatus: updatedAnime ? updatedAnime.userStatus : undefined
+          });
+
+          return { animeListData: updatedAnimeList || null };
         case 'manga':
           if (!state.mangaListData) return {};
 
@@ -118,13 +121,6 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
               ? { userVolumesRead: newProgress }
               : { userChaptersRead: newProgress };
 
-          AnimeListService.enqueueListUpdate({
-            providerId: Provider.MY_ANIME_LIST,
-            listType: 'manga',
-            entryId,
-            ...progressData
-          });
-
           const updatedMangaListData = updateMangaListData({
             mangaId: entryId,
             status: status.value,
@@ -132,7 +128,17 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
             data: progressData
           });
 
-          return { mangaListData: updatedMangaListData };
+          const { updatedMangaList, updatedManga } = updatedMangaListData || {};
+
+          AnimeListService.enqueueListUpdate({
+            providerId: Provider.MY_ANIME_LIST,
+            listType: 'manga',
+            entryId,
+            userStatus: updatedManga ? updatedManga.userStatus : undefined,
+            ...progressData
+          });
+
+          return { mangaListData: updatedMangaList || null };
         default:
           return {};
       }
@@ -157,7 +163,9 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
             data: { userScore: newScore }
           });
 
-          return { animeListData: updatedAnimeListData };
+          const { updatedAnimeList } = updatedAnimeListData || {};
+
+          return { animeListData: updatedAnimeList || null };
         case 'manga':
           if (!state.mangaListData) return {};
 
@@ -175,7 +183,9 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
             data: { userScore: newScore }
           });
 
-          return { mangaListData: updatedMangaListData };
+          const { updatedMangaList } = updatedMangaListData || {};
+
+          return { mangaListData: updatedMangaList || null };
         default:
           return {};
       }
@@ -196,6 +206,8 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
         isSingleUpdate: false
       });
 
+      const { updatedAnimeList } = updatedAnimeListData || {};
+
       AnimeListService.enqueueListUpdate({
         providerId: Provider.MY_ANIME_LIST,
         listType: 'anime',
@@ -203,7 +215,7 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
         ...data
       });
 
-      return { animeListData: updatedAnimeListData };
+      return { animeListData: updatedAnimeList || null };
     }),
   updateMangaList: (
     entryId: number,
@@ -221,6 +233,8 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
         isSingleUpdate: false
       });
 
+      const { updatedMangaList } = updatedMangaListData || {};
+
       AnimeListService.enqueueListUpdate({
         providerId: Provider.MY_ANIME_LIST,
         listType: 'manga',
@@ -228,7 +242,7 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
         ...data
       });
 
-      return { mangaListData: updatedMangaListData };
+      return { mangaListData: updatedMangaList };
     })
 }));
 
