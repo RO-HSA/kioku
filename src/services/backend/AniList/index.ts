@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
-import { SynchronizedAnimeList } from '../types';
+import { ListType } from '@/types/List';
+import { SynchronizedAnimeList, SynchronizedMangaList } from '../types';
 import { AniListUserInfo } from './types';
 
 export class AniListService {
@@ -7,8 +8,19 @@ export class AniListService {
     return invoke('authorize_anilist');
   }
 
-  static async synchronizeList(): Promise<SynchronizedAnimeList> {
-    return invoke<SynchronizedAnimeList>('synchronize_anilist');
+  static async synchronizeList(
+    listType?: 'anime'
+  ): Promise<SynchronizedAnimeList>;
+  static async synchronizeList(
+    listType: 'manga'
+  ): Promise<SynchronizedMangaList>;
+  static async synchronizeList(
+    listType: ListType = 'anime'
+  ): Promise<SynchronizedAnimeList | SynchronizedMangaList> {
+    return invoke<SynchronizedAnimeList | SynchronizedMangaList>(
+      'synchronize_anilist',
+      { listType }
+    );
   }
 
   static async fetchUserInfo(): Promise<AniListUserInfo> {

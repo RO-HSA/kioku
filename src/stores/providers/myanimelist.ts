@@ -2,11 +2,21 @@ import { createTauriStore } from '@tauri-store/zustand';
 import { create } from 'zustand';
 
 import { AnimeListService } from '@/services/backend/AnimeList';
-import { SynchronizedAnimeList } from '@/services/backend/types';
+import {
+  SynchronizedAnimeList,
+  SynchronizedMangaList
+} from '@/services/backend/types';
 import { AnimeListUserStatus, IAnimeList } from '@/types/AnimeList';
 import { Provider } from '@/types/List';
+import { IMangaList, MangaListUserStatus } from '@/types/MangaList';
 import { Statistics } from '@/types/User';
-import { updateAnimeListData } from './utils';
+import { updateAnimeListData, updateMangaListData } from './utils';
+
+type ListStatus =
+  | { type: 'anime'; value: AnimeListUserStatus }
+  | { type: 'manga'; value: MangaListUserStatus };
+
+type MangaProgressType = 'chapters' | 'volumes';
 
 type MyAnimeListStore = {
   id: number | null;
@@ -17,6 +27,7 @@ type MyAnimeListStore = {
   isAuthenticated: boolean;
   isReauthenticating: boolean;
   animeListData: SynchronizedAnimeList | null;
+  mangaListData: SynchronizedMangaList | null;
   setId: (id: number | null) => void;
   setUsername: (username: string | null) => void;
   setProfilePictureUrl: (url: string | null) => void;
@@ -25,21 +36,24 @@ type MyAnimeListStore = {
   setIsAuthenticated: (isAuthenticated: boolean) => void;
   setIsReauthenticating: (isReauthenticating: boolean) => void;
   setAnimeListData: (animeListData: SynchronizedAnimeList | null) => void;
+  setMangaListData: (mangaListData: SynchronizedMangaList | null) => void;
   signOut: () => void;
   setProgress: (
-    animeId: number,
-    status: AnimeListUserStatus,
-    newProgress: number
+    entryId: number,
+    status: ListStatus,
+    newProgress: number,
+    progressType?: MangaProgressType
   ) => void;
-  setScore: (
-    animeId: number,
-    status: AnimeListUserStatus,
-    newScore: number
-  ) => void;
+  setScore: (entryId: number, status: ListStatus, newScore: number) => void;
   updateAnimeList: (
-    animeId: number,
+    entryId: number,
     status: AnimeListUserStatus,
     data: Partial<IAnimeList>
+  ) => void;
+  updateMangaList: (
+    entryId: number,
+    status: MangaListUserStatus,
+    data: Partial<IMangaList>
   ) => void;
 };
 
@@ -52,6 +66,7 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
   isAuthenticated: false,
   isReauthenticating: false,
   animeListData: null,
+  mangaListData: null,
   setId: (id) => set(() => ({ id })),
   setUsername: (username) => set(() => ({ username })),
   setProfilePictureUrl: (url) => set(() => ({ profilePictureUrl: url })),
@@ -61,6 +76,7 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
   setIsReauthenticating: (isReauthenticating) =>
     set(() => ({ isReauthenticating })),
   setAnimeListData: (animeListData) => set(() => ({ animeListData })),
+  setMangaListData: (mangaListData) => set(() => ({ mangaListData })),
   signOut: () =>
     set(() => ({
       id: null,
@@ -70,48 +86,102 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
       isAuthenticated: false,
       isAuthenticating: false,
       isReauthenticating: false,
-      animeListData: null
+      animeListData: null,
+      mangaListData: null
     })),
-  setProgress: (animeId, status, newProgress) =>
+  setProgress: (entryId, status, newProgress, progressType = 'chapters') =>
     set((state) => {
-      if (!state.animeListData) return {};
+      switch (status.type) {
+        case 'anime':
+          if (!state.animeListData) return {};
 
-      const updatedAnimeListData = updateAnimeListData({
-        animeId,
-        status,
-        state: state.animeListData,
-        data: { userEpisodesWatched: newProgress }
-      });
+          AnimeListService.enqueueListUpdate({
+            providerId: Provider.MY_ANIME_LIST,
+            listType: 'anime',
+            entryId,
+            userEpisodesWatched: newProgress
+          });
 
-      AnimeListService.enqueueListUpdate({
-        providerId: Provider.MY_ANIME_LIST,
-        entryId: animeId,
-        userEpisodesWatched: newProgress
-      });
+          const updatedAnimeListData = updateAnimeListData({
+            animeId: entryId,
+            status: status.value,
+            state: state.animeListData,
+            data: { userEpisodesWatched: newProgress }
+          });
 
-      return { animeListData: updatedAnimeListData };
+          return { animeListData: updatedAnimeListData };
+        case 'manga':
+          if (!state.mangaListData) return {};
+
+          const progressData =
+            progressType === 'volumes'
+              ? { userVolumesRead: newProgress }
+              : { userChaptersRead: newProgress };
+
+          AnimeListService.enqueueListUpdate({
+            providerId: Provider.MY_ANIME_LIST,
+            listType: 'manga',
+            entryId,
+            ...progressData
+          });
+
+          const updatedMangaListData = updateMangaListData({
+            mangaId: entryId,
+            status: status.value,
+            state: state.mangaListData,
+            data: progressData
+          });
+
+          return { mangaListData: updatedMangaListData };
+        default:
+          return {};
+      }
     }),
-  setScore: (animeId, status, newScore) =>
+  setScore: (entryId, status, newScore) =>
     set((state) => {
-      if (!state.animeListData) return {};
+      switch (status.type) {
+        case 'anime':
+          if (!state.animeListData) return {};
 
-      const updatedAnimeListData = updateAnimeListData({
-        animeId,
-        status,
-        state: state.animeListData,
-        data: { userScore: newScore }
-      });
+          AnimeListService.enqueueListUpdate({
+            providerId: Provider.MY_ANIME_LIST,
+            listType: 'anime',
+            entryId,
+            userScore: newScore
+          });
 
-      AnimeListService.enqueueListUpdate({
-        providerId: Provider.MY_ANIME_LIST,
-        entryId: animeId,
-        userScore: newScore
-      });
+          const updatedAnimeListData = updateAnimeListData({
+            animeId: entryId,
+            status: status.value,
+            state: state.animeListData,
+            data: { userScore: newScore }
+          });
 
-      return { animeListData: updatedAnimeListData };
+          return { animeListData: updatedAnimeListData };
+        case 'manga':
+          if (!state.mangaListData) return {};
+
+          AnimeListService.enqueueListUpdate({
+            providerId: Provider.MY_ANIME_LIST,
+            listType: 'manga',
+            entryId,
+            userScore: newScore
+          });
+
+          const updatedMangaListData = updateMangaListData({
+            mangaId: entryId,
+            status: status.value,
+            state: state.mangaListData,
+            data: { userScore: newScore }
+          });
+
+          return { mangaListData: updatedMangaListData };
+        default:
+          return {};
+      }
     }),
   updateAnimeList: (
-    animeId: number,
+    entryId: number,
     currentStatus: AnimeListUserStatus,
     data: Partial<IAnimeList>
   ) =>
@@ -119,7 +189,7 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
       if (!state.animeListData) return {};
 
       const updatedAnimeListData = updateAnimeListData({
-        animeId,
+        animeId: entryId,
         state: state.animeListData,
         status: currentStatus,
         data,
@@ -128,11 +198,37 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
 
       AnimeListService.enqueueListUpdate({
         providerId: Provider.MY_ANIME_LIST,
-        entryId: animeId,
+        listType: 'anime',
+        entryId,
         ...data
       });
 
       return { animeListData: updatedAnimeListData };
+    }),
+  updateMangaList: (
+    entryId: number,
+    currentStatus: MangaListUserStatus,
+    data: Partial<IMangaList>
+  ) =>
+    set((state) => {
+      if (!state.mangaListData) return {};
+
+      const updatedMangaListData = updateMangaListData({
+        mangaId: entryId,
+        state: state.mangaListData,
+        status: currentStatus,
+        data,
+        isSingleUpdate: false
+      });
+
+      AnimeListService.enqueueListUpdate({
+        providerId: Provider.MY_ANIME_LIST,
+        listType: 'manga',
+        entryId,
+        ...data
+      });
+
+      return { mangaListData: updatedMangaListData };
     })
 }));
 

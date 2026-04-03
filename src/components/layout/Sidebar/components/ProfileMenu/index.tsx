@@ -4,37 +4,41 @@ import {
   Divider,
   ListItemIcon,
   ListItemText,
-  Menu,
   MenuItem,
   MenuList,
   Popover,
   Typography
 } from '@mui/material';
-import { ArrowRightToLine, ChevronUp } from 'lucide-react';
+import { ChevronUp } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { useSidebarStore } from '@/stores/sidebar/sidebar';
-import { mapProviderToName } from '@/utils/provider';
+import ListTypeMenu from './ListTypeMenu';
+import SwitchAccountMenu from './SwitchAccountMenu';
 import useProfileMenu from './useProfileMenu';
 
 const ProfileMenu = () => {
   const {
+    isOpen,
     mainPopoverEl,
     mainPopoverOpen,
+    switchListEl,
+    switchListOpen,
     switchAccountEl,
     switchAccountOpen,
     profileImage,
     providerName,
     username,
+    selectedListType,
     menuItems,
     connectedAccounts,
+    currentListTypeIcon,
     handleOpenMainPopover,
     handleCloseMainPopover,
+    handleSwitchListType,
+    handleCloseSwitchListPopover,
     handleSwitchAccount,
     handleCloseSwitchAccountPopover
   } = useProfileMenu();
-
-  const isOpen = useSidebarStore((state) => state.isOpen);
 
   return (
     <>
@@ -69,7 +73,10 @@ const ProfileMenu = () => {
               {username}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {providerName}
+              <div className="flex gap-2 items-center">
+                <span>{providerName}</span>
+                <span>{currentListTypeIcon}</span>
+              </div>
             </Typography>
           </Box>
         </div>
@@ -107,48 +114,21 @@ const ProfileMenu = () => {
             }
           )}
 
-          <Menu
+          <ListTypeMenu
+            anchorEl={switchListEl}
+            open={switchListOpen}
+            selectedListType={selectedListType}
+            onClose={handleCloseSwitchListPopover}
+            onSwitchListType={handleSwitchListType}
+          />
+
+          <SwitchAccountMenu
             anchorEl={switchAccountEl}
             open={switchAccountOpen}
+            connectedAccounts={connectedAccounts}
             onClose={handleCloseSwitchAccountPopover}
-            anchorOrigin={{
-              vertical: 'top',
-              horizontal: 'right'
-            }}
-            transformOrigin={{
-              vertical: 'top',
-              horizontal: 'left'
-            }}
-            slotProps={{
-              paper: {
-                sx: {
-                  mt: 1.5,
-                  '&::before': {
-                    content: '""',
-                    display: 'block',
-                    position: 'absolute',
-                    top: 0,
-                    right: 14,
-                    width: 10,
-                    height: 10,
-                    bgcolor: 'background.paper',
-                    transform: 'translateY(-50%) rotate(45deg)',
-                    zIndex: 0
-                  }
-                }
-              }
-            }}>
-            {connectedAccounts.map((account) => (
-              <MenuItem
-                key={account}
-                onClick={() => handleSwitchAccount(account)}>
-                <ListItemIcon>
-                  <ArrowRightToLine />
-                </ListItemIcon>
-                <ListItemText>{`Switch to ${mapProviderToName(account)}`}</ListItemText>
-              </MenuItem>
-            ))}
-          </Menu>
+            onSwitchAccount={handleSwitchAccount}
+          />
         </MenuList>
       </Popover>
     </>

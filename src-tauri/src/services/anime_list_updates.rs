@@ -13,10 +13,20 @@ use crate::services::myanimelist::update_myanimelist_list_entry;
 const UPDATE_INTERVAL_MS: u64 = 1000;
 const UPDATE_QUEUE_CAPACITY: usize = 256;
 
+#[derive(Debug, Copy, Clone, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ListType {
+    #[default]
+    Anime,
+    Manga,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AnimeListUpdateRequest {
     pub provider_id: String,
+    #[serde(default)]
+    pub list_type: Option<ListType>,
     #[serde(alias = "id")]
     pub entry_id: Option<u64>,
     #[serde(default, alias = "mediaId")]
@@ -24,9 +34,13 @@ pub struct AnimeListUpdateRequest {
     pub user_status: Option<String>,
     pub user_score: Option<u32>,
     pub user_episodes_watched: Option<u32>,
+    pub user_volumes_read: Option<u32>,
+    pub user_chapters_read: Option<u32>,
     pub is_rewatching: Option<bool>,
+    pub is_rereading: Option<bool>,
     pub user_comments: Option<String>,
     pub user_num_times_rewatched: Option<u32>,
+    pub user_num_times_reread: Option<u32>,
     pub user_start_date: Option<String>,
     pub user_finish_date: Option<String>,
 }

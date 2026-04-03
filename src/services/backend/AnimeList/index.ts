@@ -1,11 +1,9 @@
 import { invoke } from '@tauri-apps/api/core';
 
-import { AnimeListUpdateRequest } from '../types';
+import { ListUpdateRequest } from '../types';
 
 export class AnimeListService {
-  static async enqueueListUpdate(
-    update: AnimeListUpdateRequest
-  ): Promise<void> {
+  static async enqueueListUpdate(update: ListUpdateRequest): Promise<void> {
     return invoke('enqueue_anime_list_update', { update });
   }
 }

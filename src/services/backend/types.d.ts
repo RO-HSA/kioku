@@ -4,14 +4,33 @@ import {
   IAnimeUserList
 } from '@/types/AnimeList';
 import { Provider } from '@/types/List';
+import {
+  IMangaList,
+  IMangaUserList,
+  MangaListUserStatus
+} from '@/types/MangaList';
 
 export type SynchronizedAnimeList = Record<AnimeListUserStatus, IAnimeList[]>;
+export type SynchronizedMangaList = Record<MangaListUserStatus, IMangaList[]>;
 
-export interface AnimeListUpdateRequest extends Partial<IAnimeUserList> {
+interface BaseListUpdateRequest {
   providerId: Provider;
+  listType: 'anime' | 'manga';
   entryId?: number;
   mediaId?: number;
 }
+
+export interface AnimeListUpdateRequest
+  extends BaseListUpdateRequest, Partial<IAnimeUserList> {
+  listType: 'anime';
+}
+
+export interface MangaListUpdateRequest
+  extends BaseListUpdateRequest, Partial<IMangaUserList> {
+  listType: 'manga';
+}
+
+export type ListUpdateRequest = AnimeListUpdateRequest | MangaListUpdateRequest;
 
 export type SupportedPlayer = 'mpv' | 'mpc-hc' | 'mpc-be';
 
