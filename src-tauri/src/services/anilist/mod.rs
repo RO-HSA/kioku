@@ -616,3 +616,140 @@ impl UserStatusKey {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn anime_item(id: u64) -> AnimeListItem {
+        AnimeListItem {
+            id,
+            entry_id: id,
+            title: format!("Anime {id}"),
+            image_url: String::new(),
+            synopsis: String::new(),
+            alternative_titles: String::new(),
+            score: 0.0,
+            source: String::new(),
+            status: String::new(),
+            total_episodes: 0,
+            genres: String::new(),
+            start_season: String::new(),
+            start_date: String::new(),
+            broadcast: AnimeListBroadcast {
+                day_of_the_week: String::new(),
+                start_time: String::new(),
+                available_episodes: None,
+            },
+            studios: String::new(),
+            media_type: String::new(),
+            user_status: String::new(),
+            user_score: 0,
+            user_episodes_watched: 0,
+            is_rewatching: false,
+            user_comments: String::new(),
+            user_num_times_rewatched: 0,
+            user_start_date: None,
+            user_finish_date: None,
+            updated_at: None,
+        }
+    }
+
+    fn manga_item(id: u64) -> MangaListItem {
+        MangaListItem {
+            id,
+            entry_id: id,
+            title: format!("Manga {id}"),
+            image_url: String::new(),
+            synopsis: String::new(),
+            alternative_titles: String::new(),
+            score: 0.0,
+            status: String::new(),
+            total_volumes: 0,
+            total_chapters: 0,
+            genres: String::new(),
+            start_date: None,
+            end_date: None,
+            authors: String::new(),
+            serialization: String::new(),
+            media_type: String::new(),
+            user_status: String::new(),
+            user_score: 0,
+            user_volumes_read: 0,
+            user_chapters_read: 0,
+            is_rereading: false,
+            user_comments: String::new(),
+            user_num_times_reread: 0,
+            user_start_date: None,
+            user_finish_date: None,
+            updated_at: None,
+        }
+    }
+
+    #[test]
+    fn user_status_key_from_anilist_maps_statuses_per_list_type() {
+        assert!(matches!(
+            UserStatusKey::from_anilist(ListType::Anime, Some("CURRENT")),
+            UserStatusKey::Watching
+        ));
+        assert!(matches!(
+            UserStatusKey::from_anilist(ListType::Anime, Some("PAUSED")),
+            UserStatusKey::OnHold
+        ));
+        assert!(matches!(
+            UserStatusKey::from_anilist(ListType::Manga, Some("CURRENT")),
+            UserStatusKey::Reading
+        ));
+        assert!(matches!(
+            UserStatusKey::from_anilist(ListType::Manga, Some("unknown")),
+            UserStatusKey::PlanToRead
+        ));
+    }
+
+    #[test]
+    fn user_status_key_exposes_expected_status_strings() {
+        assert_eq!(UserStatusKey::Reading.as_user_status_str(), "reading");
+        assert_eq!(UserStatusKey::Watching.as_user_status_str(), "watching");
+        assert_eq!(
+            UserStatusKey::PlanToWatch.as_user_status_str(),
+            "planToWatch"
+        );
+        assert_eq!(UserStatusKey::PlanToRead.as_user_status_str(), "planToRead");
+    }
+
+    #[test]
+    fn user_status_key_pushes_items_into_expected_anime_buckets() {
+        let mut result = SynchronizedAnimeList::default();
+        UserStatusKey::Watching.push_anime(&mut result, anime_item(1));
+        UserStatusKey::Completed.push_anime(&mut result, anime_item(2));
+        UserStatusKey::OnHold.push_anime(&mut result, anime_item(3));
+        UserStatusKey::Dropped.push_anime(&mut result, anime_item(4));
+        UserStatusKey::PlanToWatch.push_anime(&mut result, anime_item(5));
+        UserStatusKey::Reading.push_anime(&mut result, anime_item(6));
+        UserStatusKey::PlanToRead.push_anime(&mut result, anime_item(7));
+
+        assert_eq!(result.watching.len(), 2);
+        assert_eq!(result.completed.len(), 1);
+        assert_eq!(result.on_hold.len(), 1);
+        assert_eq!(result.dropped.len(), 1);
+        assert_eq!(result.plan_to_watch.len(), 2);
+    }
+
+    #[test]
+    fn user_status_key_pushes_items_into_expected_manga_buckets() {
+        let mut result = SynchronizedMangaList::default();
+        UserStatusKey::Reading.push_manga(&mut result, manga_item(1));
+        UserStatusKey::Completed.push_manga(&mut result, manga_item(2));
+        UserStatusKey::OnHold.push_manga(&mut result, manga_item(3));
+        UserStatusKey::Dropped.push_manga(&mut result, manga_item(4));
+        UserStatusKey::PlanToRead.push_manga(&mut result, manga_item(5));
+        UserStatusKey::Watching.push_manga(&mut result, manga_item(6));
+        UserStatusKey::PlanToWatch.push_manga(&mut result, manga_item(7));
+
+        assert_eq!(result.reading.len(), 2);
+        assert_eq!(result.completed.len(), 1);
+        assert_eq!(result.on_hold.len(), 1);
+        assert_eq!(result.dropped.len(), 1);
+        assert_eq!(result.plan_to_read.len(), 2);
+    }
+}
