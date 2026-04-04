@@ -190,3 +190,70 @@ fn is_player_option(player: SupportedPlayer, value: &str) -> bool {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_selected_players_deduplicates_and_falls_back_when_empty() {
+        let selected = resolve_selected_players(Some(DetectPlayingAnimeRequest {
+            players: Some(vec![
+                SupportedPlayer::Mpv,
+                SupportedPlayer::Mpv,
+                SupportedPlayer::MpcBe,
+            ]),
+        }));
+        assert_eq!(selected, vec![SupportedPlayer::Mpv, SupportedPlayer::MpcBe]);
+
+        let fallback = resolve_selected_players(Some(DetectPlayingAnimeRequest {
+            players: Some(Vec::new()),
+        }));
+        assert_eq!(fallback, SupportedPlayer::all());
+    }
+
+    #[test]
+    fn match_process_to_player_uses_command_line_when_args_are_missing() {
+        let process = ProcessSnapshot {
+            pid: 42,
+            name: "unknown.exe".to_string(),
+            command_line:
+                "\"C:\\Program Files\\mpvnet\\mpvnet.exe\" \"C:\\Anime\\Frieren - 01.mkv\""
+                    .to_string(),
+            args: Vec::new(),
+        };
+
+        assert_eq!(
+            match_process_to_player(&process, &[SupportedPlayer::Mpv]),
+            Some(SupportedPlayer::Mpv)
+        );
+    }
+
+    #[test]
+    fn extract_media_source_skips_options_and_prefers_last_valid_candidate() {
+        let args = vec![
+            "mpv.exe".to_string(),
+            "--fullscreen".to_string(),
+            "C:\\Anime\\Frieren - 01.mkv".to_string(),
+            "https://cdn.example.com/Frieren%20-%2002.mp4".to_string(),
+        ];
+
+        assert_eq!(
+            extract_media_source(SupportedPlayer::Mpv, &args, ""),
+            Some("https://cdn.example.com/Frieren%20-%2002.mp4".to_string())
+        );
+    }
+
+    #[test]
+    fn mpc_switch_detection_does_not_confuse_paths_or_urls_with_options() {
+        assert!(is_player_option(SupportedPlayer::MpcHc, "/play"));
+        assert!(!is_player_option(
+            SupportedPlayer::MpcHc,
+            r"C:\Anime\Frieren - 01.mkv"
+        ));
+        assert!(!is_player_option(
+            SupportedPlayer::MpcHc,
+            "https://example.com/Frieren-01.mkv"
+        ));
+    }
+}
