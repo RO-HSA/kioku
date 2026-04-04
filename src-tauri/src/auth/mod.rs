@@ -1,6 +1,6 @@
 use rand::{distributions::Alphanumeric, Rng};
 use std::collections::HashMap;
-use tauri::{Emitter, Manager};
+use tauri::{Emitter, Manager, Runtime};
 use tauri_plugin_http::reqwest;
 use tauri_plugin_opener::OpenerExt;
 
@@ -20,14 +20,17 @@ pub use request::oauth_request;
 pub use secure_store::{init_stronghold_key, StrongholdKeyState};
 pub use token_manager::{ProviderConfig, TokenManagerState};
 
-fn emit_auth_failed(app: &tauri::AppHandle, provider_id: &str) {
+fn emit_auth_failed<R: Runtime>(app: &tauri::AppHandle<R>, provider_id: &str) {
     let failed_event_name = format!("{provider_id}-auth-failed");
     if let Err(err) = app.emit(failed_event_name.as_str(), ()) {
         eprintln!("Failed to emit {failed_event_name}: {err}");
     }
 }
 
-fn emit_auth_succeeded(app: &tauri::AppHandle, provider_id: &str) -> Result<(), String> {
+fn emit_auth_succeeded<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+    provider_id: &str,
+) -> Result<(), String> {
     let success_event_name = format!("{provider_id}-auth-callback");
     app.emit(success_event_name.as_str(), ())
         .map_err(|e| e.to_string())
@@ -149,7 +152,10 @@ pub async fn handle_myanimelist_callback(app: tauri::AppHandle, url: String) {
     }
 }
 
-async fn authorize_provider_impl(provider_id: &str, app: tauri::AppHandle) -> Result<(), String> {
+async fn authorize_provider_impl<R: Runtime>(
+    provider_id: &str,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     let provider = app.state::<TokenManagerState>().get_provider(provider_id)?;
     let state = provider.uses_state.then(|| {
         rand::thread_rng()
@@ -186,7 +192,7 @@ async fn authorize_provider_impl(provider_id: &str, app: tauri::AppHandle) -> Re
 }
 
 async fn handle_oauth_callback_impl(
-    app: &tauri::AppHandle,
+    app: &tauri::AppHandle<impl Runtime>,
     url: &str,
     provider_override: Option<&str>,
 ) -> Result<(), String> {

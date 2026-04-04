@@ -5,7 +5,7 @@ use base64::{engine::general_purpose, Engine as _};
 use rand::rngs::OsRng;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_stronghold::stronghold::Stronghold;
 
 const VAULT_FILE_NAME: &str = "stronghold.hold";
@@ -46,17 +46,17 @@ impl StrongholdKeyState {
     }
 }
 
-fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
+fn app_data_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     let dir = app.path().app_local_data_dir().map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
 }
 
-fn vault_path(app: &AppHandle) -> Result<PathBuf, String> {
+fn vault_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     Ok(app_data_dir(app)?.join(VAULT_FILE_NAME))
 }
 
-fn keyring_entry(app: &AppHandle) -> Result<keyring::Entry, String> {
+fn keyring_entry<R: Runtime>(app: &AppHandle<R>) -> Result<keyring::Entry, String> {
     let service = app.config().identifier.clone();
     keyring::Entry::new(&service, KEYRING_ENTRY).map_err(|e| e.to_string())
 }
@@ -67,7 +67,7 @@ fn generate_master_key() -> Vec<u8> {
     key.to_vec()
 }
 
-fn load_or_create_master_key(app: &AppHandle) -> Result<Vec<u8>, String> {
+fn load_or_create_master_key<R: Runtime>(app: &AppHandle<R>) -> Result<Vec<u8>, String> {
     let entry = keyring_entry(app)?;
     match entry.get_password() {
         Ok(encoded) => {
@@ -92,7 +92,7 @@ fn load_or_create_master_key(app: &AppHandle) -> Result<Vec<u8>, String> {
     }
 }
 
-fn open_stronghold(app: &AppHandle, key: &[u8]) -> Result<Stronghold, String> {
+fn open_stronghold<R: Runtime>(app: &AppHandle<R>, key: &[u8]) -> Result<Stronghold, String> {
     let path = vault_path(app)?;
     Stronghold::new(path, key.to_vec()).map_err(|e| e.to_string())
 }
@@ -122,13 +122,13 @@ fn decode_access_token_record(raw: &[u8]) -> Result<(String, u64), String> {
     Ok((record.token, record.expires_at_unix_secs))
 }
 
-pub fn init_stronghold_key(app: &AppHandle) -> Result<(), String> {
+pub fn init_stronghold_key<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     let key = load_or_create_master_key(app)?;
     app.state::<StrongholdKeyState>().set_key(key)
 }
 
-pub fn save_refresh_token(
-    app: &AppHandle,
+pub fn save_refresh_token<R: Runtime>(
+    app: &AppHandle<R>,
     provider_id: &str,
     refresh_token: &str,
 ) -> Result<(), String> {
@@ -153,7 +153,10 @@ pub fn save_refresh_token(
     Ok(())
 }
 
-pub fn read_refresh_token(app: &AppHandle, provider_id: &str) -> Result<Option<String>, String> {
+pub fn read_refresh_token<R: Runtime>(
+    app: &AppHandle<R>,
+    provider_id: &str,
+) -> Result<Option<String>, String> {
     let key = app.state::<StrongholdKeyState>().get_key()?;
     let stronghold = open_stronghold(app, &key)?;
     let client = stronghold
@@ -169,8 +172,8 @@ pub fn read_refresh_token(app: &AppHandle, provider_id: &str) -> Result<Option<S
     Ok(raw.and_then(|bytes| String::from_utf8(bytes).ok()))
 }
 
-pub fn save_access_token(
-    app: &AppHandle,
+pub fn save_access_token<R: Runtime>(
+    app: &AppHandle<R>,
     provider_id: &str,
     access_token: &str,
     expires_at_unix_secs: u64,
@@ -196,8 +199,8 @@ pub fn save_access_token(
     stronghold.save().map_err(|e| e.to_string())
 }
 
-pub fn read_access_token(
-    app: &AppHandle,
+pub fn read_access_token<R: Runtime>(
+    app: &AppHandle<R>,
     provider_id: &str,
 ) -> Result<Option<(String, u64)>, String> {
     let key = app.state::<StrongholdKeyState>().get_key()?;
