@@ -9,7 +9,7 @@ pub use api::{
     fetch_myanimelist_user_info, synchronize_myanimelist, update_myanimelist_list_entry,
 };
 
-const BASE_URL: &str = "https://api.myanimelist.net/v2/users/";
+const BASE_URL: &str = "https://api.myanimelist.net/v2/users";
 const ANIME_UPDATE_BASE_URL: &str = "https://api.myanimelist.net/v2/anime/";
 const MANGA_UPDATE_BASE_URL: &str = "https://api.myanimelist.net/v2/manga/";
 const USER_INFO_FIELDS: &str = "anime_statistics";
