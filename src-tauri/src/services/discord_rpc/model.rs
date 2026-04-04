@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::sanitize::normalize_optional_string;
+use super::sanitize::{normalize_optional_string, normalize_public_url};
 
 const MAX_DETAILS_LEN: usize = 128;
 const MAX_STATE_LEN: usize = 128;
@@ -45,7 +45,7 @@ impl DiscordPresenceRequest {
             status_display_type: sanitize_status_display_type(self.status_display_type),
             large_image: normalize_optional_string(self.large_image, MAX_DETAILS_LEN),
             large_text: normalize_optional_string(self.large_text, MAX_ASSET_TEXT_LEN),
-            large_url: normalize_optional_string(self.large_url, MAX_ASSET_URL_LEN),
+            large_url: normalize_public_url(self.large_url, MAX_ASSET_URL_LEN),
             small_image: normalize_optional_string(self.small_image, MAX_DETAILS_LEN),
             small_text: normalize_optional_string(self.small_text, MAX_ASSET_TEXT_LEN),
             start_timestamp: self.start_timestamp,
@@ -153,7 +153,7 @@ fn sanitize_buttons(
                 .into_iter()
                 .filter_map(|item| {
                     let label = normalize_optional_string(Some(item.label), MAX_BUTTON_LABEL_LEN)?;
-                    let url = normalize_optional_string(Some(item.url), MAX_BUTTON_URL_LEN)?;
+                    let url = normalize_public_url(Some(item.url), MAX_BUTTON_URL_LEN)?;
                     Some(DiscordPresenceButton { label, url })
                 })
                 .take(MAX_BUTTONS)
@@ -168,4 +168,72 @@ fn sanitize_activity_type(value: Option<u8>) -> Option<u8> {
 
 fn sanitize_status_display_type(value: Option<u8>) -> Option<u8> {
     value.filter(|item| *item <= MAX_STATUS_DISPLAY_TYPE)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sanitize_discards_invalid_values_and_limits_buttons() {
+        let sanitized = DiscordPresenceRequest {
+            details: Some("  Watching Frieren  ".to_string()),
+            state: Some("   ".to_string()),
+            r#type: Some(MAX_ACTIVITY_TYPE + 1),
+            status_display_type: Some(MAX_STATUS_DISPLAY_TYPE + 1),
+            large_url: Some("javascript:alert(1)".to_string()),
+            buttons: Some(vec![
+                DiscordPresenceButton {
+                    label: "   ".to_string(),
+                    url: "https://example.com/ignored".to_string(),
+                },
+                DiscordPresenceButton {
+                    label: "Unsafe".to_string(),
+                    url: "file:///etc/passwd".to_string(),
+                },
+                DiscordPresenceButton {
+                    label: "Open AniList".to_string(),
+                    url: "https://anilist.co/anime/1".to_string(),
+                },
+                DiscordPresenceButton {
+                    label: "Open MAL".to_string(),
+                    url: "https://myanimelist.net/anime/1".to_string(),
+                },
+                DiscordPresenceButton {
+                    label: "Overflow".to_string(),
+                    url: "https://example.com/overflow".to_string(),
+                },
+            ]),
+            ..Default::default()
+        }
+        .sanitize();
+
+        assert_eq!(sanitized.details.as_deref(), Some("Watching Frieren"));
+        assert_eq!(sanitized.state, None);
+        assert_eq!(sanitized.r#type, None);
+        assert_eq!(sanitized.status_display_type, None);
+        assert_eq!(sanitized.large_url, None);
+
+        let buttons = sanitized.buttons.expect("buttons should remain");
+        assert_eq!(buttons.len(), 2);
+        assert_eq!(buttons[0].label, "Open AniList");
+        assert_eq!(buttons[1].label, "Open MAL");
+    }
+
+    #[test]
+    fn into_activity_returns_none_when_every_field_is_removed() {
+        let activity = DiscordPresenceRequest {
+            details: Some("   ".to_string()),
+            large_url: Some("javascript:alert(1)".to_string()),
+            buttons: Some(vec![DiscordPresenceButton {
+                label: "Open".to_string(),
+                url: "file:///secret".to_string(),
+            }]),
+            ..Default::default()
+        }
+        .sanitize()
+        .into_activity();
+
+        assert!(activity.is_none());
+    }
 }
