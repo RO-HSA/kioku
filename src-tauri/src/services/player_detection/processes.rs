@@ -223,3 +223,50 @@ pub(crate) fn list_processes() -> Result<Vec<ProcessSnapshot>, String> {
 pub(crate) fn list_processes() -> Result<Vec<ProcessSnapshot>, String> {
     Ok(Vec::new())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(windows)]
+    #[test]
+    fn parse_windows_process_output_accepts_single_objects_and_arrays() {
+        let single = parse_windows_process_output(
+            r#"{"ProcessId":42,"Name":"mpv.exe","CommandLine":"mpv.exe C:\\Anime\\Frieren - 01.mkv"}"#,
+        )
+        .expect("single process payload should parse");
+        assert_eq!(single.len(), 1);
+        assert_eq!(single[0].process_id, 42);
+        assert_eq!(single[0].name, "mpv.exe");
+
+        let array = parse_windows_process_output(
+            r#"[{"ProcessId":1,"Name":"mpv.exe","CommandLine":null},{"ProcessId":2,"Name":"mpc-hc64.exe","CommandLine":"mpc-hc64.exe /play"}]"#,
+        )
+        .expect("array payload should parse");
+        assert_eq!(array.len(), 2);
+        assert!(array[0].command_line.is_none());
+        assert_eq!(array[1].process_id, 2);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn parse_windows_process_output_handles_null_and_rejects_invalid_shapes() {
+        assert!(parse_windows_process_output("null").unwrap().is_empty());
+        assert!(parse_windows_process_output("123").is_err());
+        assert!(parse_windows_process_output("{\"Name\":\"mpv.exe\"}").is_err());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn parse_linux_cmdline_splits_null_delimited_arguments() {
+        let args = parse_linux_cmdline(b"mpv\0--fs\0/tmp/Frieren - 01.mkv\0");
+        assert_eq!(
+            args,
+            vec![
+                "mpv".to_string(),
+                "--fs".to_string(),
+                "/tmp/Frieren - 01.mkv".to_string()
+            ]
+        );
+    }
+}
