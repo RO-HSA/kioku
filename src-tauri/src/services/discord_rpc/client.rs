@@ -50,6 +50,63 @@ struct DiscordRpcClient {
     connection: Option<DiscordIpcConnection>,
 }
 
+fn missing_client_id_error() -> String {
+    format!(
+        "Discord RPC client id is not configured. Set {}.",
+        DISCORD_CLIENT_ID_ENV
+    )
+}
+
+fn update_client_id_state<T>(
+    current_client_id: &mut Option<String>,
+    connection: &mut Option<T>,
+    client_id: Option<String>,
+) -> bool {
+    let normalized = normalize_client_id(client_id);
+    if *current_client_id != normalized {
+        *connection = None;
+        *current_client_id = normalized;
+    }
+
+    current_client_id.is_some()
+}
+
+fn send_activity_with_connection<T, Connect, Send>(
+    client_id: Option<&str>,
+    connection: &mut Option<T>,
+    activity: Option<DiscordActivity>,
+    mut connect: Connect,
+    mut send: Send,
+) -> Result<(), String>
+where
+    Connect: FnMut(&str) -> Result<T, String>,
+    Send: FnMut(&mut T, Option<DiscordActivity>) -> Result<(), String>,
+{
+    let Some(client_id) = client_id else {
+        return Err(missing_client_id_error());
+    };
+
+    if connection.is_none() {
+        *connection = Some(connect(client_id)?);
+    }
+
+    let retry_activity = activity.clone();
+    if let Some(active_connection) = connection.as_mut() {
+        if send(active_connection, activity).is_ok() {
+            return Ok(());
+        }
+    }
+
+    *connection = None;
+    *connection = Some(connect(client_id)?);
+
+    if let Some(active_connection) = connection.as_mut() {
+        return send(active_connection, retry_activity);
+    }
+
+    Err("Discord RPC connection is unavailable".to_string())
+}
+
 impl DiscordRpcClient {
     fn new(client_id: Option<String>) -> Self {
         Self {
@@ -59,13 +116,7 @@ impl DiscordRpcClient {
     }
 
     fn set_client_id(&mut self, client_id: Option<String>) -> bool {
-        let normalized = normalize_client_id(client_id);
-        if self.client_id != normalized {
-            self.connection = None;
-            self.client_id = normalized;
-        }
-
-        self.client_id.is_some()
+        update_client_id_state(&mut self.client_id, &mut self.connection, client_id)
     }
 
     fn set_presence(&mut self, request: DiscordPresenceRequest) -> Result<(), String> {
@@ -78,38 +129,130 @@ impl DiscordRpcClient {
     }
 
     fn send_activity(&mut self, activity: Option<DiscordActivity>) -> Result<(), String> {
-        let Some(client_id) = self.client_id.clone() else {
-            return Err(format!(
-                "Discord RPC client id is not configured. Set {}.",
-                DISCORD_CLIENT_ID_ENV
-            ));
-        };
+        send_activity_with_connection(
+            self.client_id.as_deref(),
+            &mut self.connection,
+            activity,
+            DiscordIpcConnection::connect,
+            |connection, payload| connection.send_activity(payload),
+        )
+    }
+}
 
-        self.ensure_connection(&client_id)?;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-        let retry_activity = activity.clone();
-        if let Some(connection) = self.connection.as_mut() {
-            if connection.send_activity(activity).is_ok() {
-                return Ok(());
-            }
-        }
+    #[test]
+    fn update_client_id_state_normalizes_values_and_clears_stale_connections() {
+        let mut client_id = Some("123".to_string());
+        let mut connection = Some(1_u8);
 
-        self.connection = None;
-        self.ensure_connection(&client_id)?;
+        assert!(update_client_id_state(
+            &mut client_id,
+            &mut connection,
+            Some("123".to_string())
+        ));
+        assert_eq!(client_id.as_deref(), Some("123"));
+        assert_eq!(connection, Some(1));
 
-        if let Some(connection) = self.connection.as_mut() {
-            return connection.send_activity(retry_activity);
-        }
-
-        Err("Discord RPC connection is unavailable".to_string())
+        assert!(!update_client_id_state(
+            &mut client_id,
+            &mut connection,
+            Some("invalid".to_string())
+        ));
+        assert_eq!(client_id, None);
+        assert_eq!(connection, None);
     }
 
-    fn ensure_connection(&mut self, client_id: &str) -> Result<(), String> {
-        if self.connection.is_some() {
-            return Ok(());
-        }
+    #[test]
+    fn send_activity_with_connection_requires_a_client_id() {
+        let mut connection: Option<u8> = None;
+        let error =
+            send_activity_with_connection(None, &mut connection, None, |_| Ok(1), |_, _| Ok(()))
+                .unwrap_err();
 
-        self.connection = Some(DiscordIpcConnection::connect(client_id)?);
-        Ok(())
+        assert_eq!(error, missing_client_id_error());
+    }
+
+    #[test]
+    fn send_activity_with_connection_uses_existing_connection_when_send_succeeds() {
+        let mut connection = Some(7_u8);
+        let mut connect_calls = 0;
+        let mut send_calls = 0;
+
+        let result = send_activity_with_connection(
+            Some("123"),
+            &mut connection,
+            None,
+            |_| {
+                connect_calls += 1;
+                Ok(9_u8)
+            },
+            |active_connection, _| {
+                send_calls += 1;
+                assert_eq!(*active_connection, 7);
+                Ok(())
+            },
+        );
+
+        assert!(result.is_ok());
+        assert_eq!(connect_calls, 0);
+        assert_eq!(send_calls, 1);
+        assert_eq!(connection, Some(7));
+    }
+
+    #[test]
+    fn send_activity_with_connection_retries_after_send_failure() {
+        let mut connection = Some(1_u8);
+        let mut connect_calls = 0;
+        let mut send_attempts = 0;
+
+        let result = send_activity_with_connection(
+            Some("123"),
+            &mut connection,
+            None,
+            |_| {
+                connect_calls += 1;
+                Ok(2_u8)
+            },
+            |active_connection, _| {
+                send_attempts += 1;
+                if send_attempts == 1 {
+                    assert_eq!(*active_connection, 1);
+                    Err("first send failed".to_string())
+                } else {
+                    assert_eq!(*active_connection, 2);
+                    Ok(())
+                }
+            },
+        );
+
+        assert!(result.is_ok());
+        assert_eq!(connect_calls, 1);
+        assert_eq!(send_attempts, 2);
+        assert_eq!(connection, Some(2));
+    }
+
+    #[test]
+    fn send_activity_with_connection_returns_second_connection_error() {
+        let mut connection = Some(1_u8);
+        let mut connect_calls = 0;
+
+        let error = send_activity_with_connection(
+            Some("123"),
+            &mut connection,
+            None,
+            |_| {
+                connect_calls += 1;
+                Err("reconnect failed".to_string())
+            },
+            |_, _| Err("send failed".to_string()),
+        )
+        .unwrap_err();
+
+        assert_eq!(error, "reconnect failed");
+        assert_eq!(connect_calls, 1);
+        assert_eq!(connection, None);
     }
 }

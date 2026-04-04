@@ -29,6 +29,19 @@ pub(crate) struct DiscordIpcConnection {
     stream: DiscordIpcStream,
 }
 
+fn encode_packet_bytes<T: Serialize>(opcode: i32, payload: &T) -> Result<Vec<u8>, String> {
+    let body = serde_json::to_vec(payload)
+        .map_err(|error| format!("Failed to encode Discord IPC payload: {error}"))?;
+    let payload_len =
+        i32::try_from(body.len()).map_err(|_| "Discord IPC payload is too large".to_string())?;
+
+    let mut packet = Vec::with_capacity(8 + body.len());
+    packet.extend_from_slice(&opcode.to_le_bytes());
+    packet.extend_from_slice(&payload_len.to_le_bytes());
+    packet.extend_from_slice(&body);
+    Ok(packet)
+}
+
 impl DiscordIpcConnection {
     pub(crate) fn connect(client_id: &str) -> Result<Self, String> {
         let endpoints = discord_ipc_endpoints();
@@ -85,21 +98,11 @@ impl DiscordIpcConnection {
     }
 
     fn send_packet<T: Serialize>(&mut self, opcode: i32, payload: &T) -> Result<(), String> {
-        let body = serde_json::to_vec(payload)
-            .map_err(|error| format!("Failed to encode Discord IPC payload: {error}"))?;
-        let payload_len = i32::try_from(body.len())
-            .map_err(|_| "Discord IPC payload is too large".to_string())?;
-
-        let mut header = [0_u8; 8];
-        header[..4].copy_from_slice(&opcode.to_le_bytes());
-        header[4..].copy_from_slice(&payload_len.to_le_bytes());
+        let packet = encode_packet_bytes(opcode, payload)?;
 
         self.stream
-            .write_all(&header)
-            .map_err(|error| format!("Failed to write Discord IPC header: {error}"))?;
-        self.stream
-            .write_all(&body)
-            .map_err(|error| format!("Failed to write Discord IPC body: {error}"))?;
+            .write_all(&packet)
+            .map_err(|error| format!("Failed to write Discord IPC payload: {error}"))?;
         self.stream
             .flush()
             .map_err(|error| format!("Failed to flush Discord IPC stream: {error}"))?;
@@ -187,4 +190,72 @@ fn discord_ipc_endpoints() -> Vec<String> {
 
     #[allow(unreachable_code)]
     Vec::new()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::model::DiscordPresenceRequest;
+    use super::*;
+
+    #[test]
+    fn encode_packet_bytes_writes_opcode_length_and_json_body() {
+        let packet = encode_packet_bytes(
+            DISCORD_IPC_OPCODE_FRAME,
+            &serde_json::json!({
+                "cmd": "SET_ACTIVITY"
+            }),
+        )
+        .expect("packet should encode");
+
+        let opcode = i32::from_le_bytes(packet[0..4].try_into().expect("opcode bytes"));
+        let length = i32::from_le_bytes(packet[4..8].try_into().expect("length bytes"));
+        let body = std::str::from_utf8(&packet[8..]).expect("body should be utf-8");
+
+        assert_eq!(opcode, DISCORD_IPC_OPCODE_FRAME);
+        assert_eq!(length as usize, packet.len() - 8);
+        assert!(body.contains("\"SET_ACTIVITY\""));
+    }
+
+    #[test]
+    fn discord_ipc_endpoints_returns_expected_windows_pipe_names() {
+        let endpoints = discord_ipc_endpoints();
+
+        #[cfg(windows)]
+        {
+            assert_eq!(endpoints.len(), 10);
+            assert_eq!(
+                endpoints.first().map(String::as_str),
+                Some(r"\\?\pipe\discord-ipc-0")
+            );
+            assert_eq!(
+                endpoints.last().map(String::as_str),
+                Some(r"\\?\pipe\discord-ipc-9")
+            );
+        }
+    }
+
+    #[test]
+    fn send_activity_packet_contains_command_and_activity_payload() {
+        let activity = DiscordPresenceRequest {
+            details: Some("Watching Frieren".to_string()),
+            ..Default::default()
+        }
+        .sanitize()
+        .into_activity();
+
+        let packet = encode_packet_bytes(
+            DISCORD_IPC_OPCODE_FRAME,
+            &DiscordIpcCommand {
+                cmd: DISCORD_COMMAND_SET_ACTIVITY,
+                args: DiscordIpcCommandArgs { pid: 123, activity },
+                nonce: "kioku-test".to_string(),
+            },
+        )
+        .expect("packet should encode");
+        let body = std::str::from_utf8(&packet[8..]).expect("body should be utf-8");
+
+        assert!(body.contains("\"cmd\":\"SET_ACTIVITY\""));
+        assert!(body.contains("\"details\":\"Watching Frieren\""));
+        assert!(body.contains("\"nonce\":\"kioku-test\""));
+    }
 }

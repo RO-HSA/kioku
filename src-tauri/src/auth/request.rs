@@ -7,6 +7,34 @@ use tauri_plugin_http::reqwest;
 
 use crate::auth::token_manager::get_access_token;
 
+#[derive(Debug, PartialEq)]
+enum OAuthRequestBody {
+    Json(serde_json::Value),
+    Text(String),
+    Empty,
+}
+
+fn parse_http_method(method: &str) -> Result<reqwest::Method, String> {
+    reqwest::Method::from_bytes(method.to_uppercase().as_bytes()).map_err(|e| e.to_string())
+}
+
+fn request_timeout(timeout_ms: Option<u64>) -> Option<Duration> {
+    timeout_ms.map(Duration::from_millis)
+}
+
+fn select_request_body(
+    json_body: Option<serde_json::Value>,
+    body: Option<String>,
+) -> OAuthRequestBody {
+    if let Some(json_body) = json_body {
+        OAuthRequestBody::Json(json_body)
+    } else if let Some(body) = body {
+        OAuthRequestBody::Text(body)
+    } else {
+        OAuthRequestBody::Empty
+    }
+}
+
 #[derive(Deserialize)]
 pub struct OAuthRequest {
     pub provider_id: String,
@@ -27,15 +55,14 @@ pub struct OAuthResponse {
 #[tauri::command]
 pub async fn oauth_request(app: AppHandle, request: OAuthRequest) -> Result<OAuthResponse, String> {
     let token = get_access_token(&app, &request.provider_id).await?;
-    let method = reqwest::Method::from_bytes(request.method.to_uppercase().as_bytes())
-        .map_err(|e| e.to_string())?;
+    let method = parse_http_method(&request.method)?;
 
     let mut builder = reqwest::Client::new()
         .request(method, &request.url)
         .bearer_auth(token);
 
-    if let Some(timeout_ms) = request.timeout_ms {
-        builder = builder.timeout(Duration::from_millis(timeout_ms));
+    if let Some(timeout) = request_timeout(request.timeout_ms) {
+        builder = builder.timeout(timeout);
     }
 
     if let Some(headers) = request.headers {
@@ -44,10 +71,14 @@ pub async fn oauth_request(app: AppHandle, request: OAuthRequest) -> Result<OAut
         }
     }
 
-    if let Some(json_body) = request.json_body {
-        builder = builder.json(&json_body);
-    } else if let Some(body) = request.body {
-        builder = builder.body(body);
+    match select_request_body(request.json_body, request.body) {
+        OAuthRequestBody::Json(json_body) => {
+            builder = builder.json(&json_body);
+        }
+        OAuthRequestBody::Text(body) => {
+            builder = builder.body(body);
+        }
+        OAuthRequestBody::Empty => {}
     }
 
     let response = builder.send().await.map_err(|e| e.to_string())?;
@@ -55,4 +86,39 @@ pub async fn oauth_request(app: AppHandle, request: OAuthRequest) -> Result<OAut
     let body = response.text().await.map_err(|e| e.to_string())?;
 
     Ok(OAuthResponse { status, body })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn parse_http_method_accepts_common_methods_case_insensitively() {
+        assert_eq!(parse_http_method("get").unwrap(), reqwest::Method::GET);
+        assert_eq!(parse_http_method("PoSt").unwrap(), reqwest::Method::POST);
+        assert!(parse_http_method("not a method").is_err());
+    }
+
+    #[test]
+    fn request_timeout_maps_milliseconds_to_duration() {
+        assert_eq!(request_timeout(None), None);
+        assert_eq!(
+            request_timeout(Some(1500)),
+            Some(Duration::from_millis(1500))
+        );
+    }
+
+    #[test]
+    fn select_request_body_prefers_json_and_falls_back_to_text() {
+        assert_eq!(
+            select_request_body(Some(json!({"ok": true})), Some("ignored".to_string())),
+            OAuthRequestBody::Json(json!({"ok": true}))
+        );
+        assert_eq!(
+            select_request_body(None, Some("body".to_string())),
+            OAuthRequestBody::Text("body".to_string())
+        );
+        assert_eq!(select_request_body(None, None), OAuthRequestBody::Empty);
+    }
 }

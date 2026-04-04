@@ -33,12 +33,7 @@ fn emit_auth_succeeded(app: &tauri::AppHandle, provider_id: &str) -> Result<(), 
         .map_err(|e| e.to_string())
 }
 
-fn resolve_provider_from_callback_hint(
-    app: &tauri::AppHandle,
-    parsed: &reqwest::Url,
-) -> Result<Option<String>, String> {
-    let token_manager = app.state::<TokenManagerState>();
-
+fn callback_hint_candidates(parsed: &reqwest::Url) -> Vec<String> {
     let mut hints = Vec::new();
     if let Some(host) = parsed.host_str().filter(|h| !h.is_empty()) {
         hints.push(host.to_string());
@@ -52,13 +47,79 @@ fn resolve_provider_from_callback_hint(
         hints.push(segment.to_string());
     }
 
-    for hint in hints {
-        if let Some(provider_id) = token_manager.get_provider_from_callback_hint(&hint)? {
-            return Ok(Some(provider_id));
+    hints
+}
+
+fn collect_callback_params(parsed: &reqwest::Url) -> Result<HashMap<String, String>, String> {
+    let mut params: HashMap<String, String> = parsed
+        .query_pairs()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+
+    if let Some(fragment) = parsed.fragment() {
+        let fragment_url = reqwest::Url::parse(&format!("kioku://callback/?{fragment}"))
+            .map_err(|e| e.to_string())?;
+        params.extend(
+            fragment_url
+                .query_pairs()
+                .map(|(k, v)| (k.to_string(), v.to_string())),
+        );
+    }
+
+    Ok(params)
+}
+
+fn resolve_provider_id_from_callback(
+    token_manager: &TokenManagerState,
+    parsed: &reqwest::Url,
+    params: &HashMap<String, String>,
+    provider_override: Option<&str>,
+) -> Result<String, String> {
+    if let Some(provider) = provider_override {
+        return Ok(provider.to_string());
+    }
+
+    if let Some(state) = params.get("state") {
+        if let Some(provider_id) = token_manager.get_oauth_state_provider(state)? {
+            return Ok(provider_id);
         }
     }
 
-    Ok(None)
+    for hint in callback_hint_candidates(parsed) {
+        if let Some(provider_id) = token_manager.get_provider_from_callback_hint(&hint)? {
+            return Ok(provider_id);
+        }
+    }
+
+    if let Some(provider_id) = token_manager.infer_provider_from_callback_params(params)? {
+        return Ok(provider_id);
+    }
+
+    Err("Unable to determine provider from callback URL".to_string())
+}
+
+fn missing_callback_payload_error(
+    provider_id: &str,
+    provider: &ProviderConfig,
+) -> Result<(), String> {
+    let mut expected = Vec::new();
+    if let Some(access_param) = provider.callback_access_token_param.as_ref() {
+        expected.push(access_param.as_str());
+    }
+    if let Some(code_param) = provider.callback_code_param.as_ref() {
+        expected.push(code_param.as_str());
+    }
+
+    if expected.is_empty() {
+        return Err(format!(
+            "Provider {provider_id} has no callback payload fields configured"
+        ));
+    }
+
+    Err(format!(
+        "Missing callback payload for provider {provider_id}; expected one of: {}",
+        expected.join(", ")
+    ))
 }
 
 #[tauri::command]
@@ -130,44 +191,13 @@ async fn handle_oauth_callback_impl(
     provider_override: Option<&str>,
 ) -> Result<(), String> {
     let parsed = reqwest::Url::parse(url).map_err(|e| e.to_string())?;
-
-    let mut params: HashMap<String, String> = parsed
-        .query_pairs()
-        .map(|(k, v)| (k.to_string(), v.to_string()))
-        .collect();
-
-    if let Some(fragment) = parsed.fragment() {
-        let fragment_url = reqwest::Url::parse(&format!("kioku://callback/?{fragment}"))
-            .map_err(|e| e.to_string())?;
-        params.extend(
-            fragment_url
-                .query_pairs()
-                .map(|(k, v)| (k.to_string(), v.to_string())),
-        );
-    }
-
-    let fallback_state = params.get("state").cloned();
-    let provider_from_state = if let Some(state) = fallback_state.as_ref() {
-        app.state::<TokenManagerState>()
-            .get_oauth_state_provider(state)?
-    } else {
-        None
-    };
-
-    let provider_id = if let Some(provider) = provider_override {
-        provider.to_string()
-    } else if let Some(provider_id) = provider_from_state {
-        provider_id
-    } else if let Some(provider_id) = resolve_provider_from_callback_hint(app, &parsed)? {
-        provider_id
-    } else if let Some(provider_id) = app
-        .state::<TokenManagerState>()
-        .infer_provider_from_callback_params(&params)?
-    {
-        provider_id
-    } else {
-        return Err("Unable to determine provider from callback URL".to_string());
-    };
+    let params = collect_callback_params(&parsed)?;
+    let provider_id = resolve_provider_id_from_callback(
+        &app.state::<TokenManagerState>(),
+        &parsed,
+        &params,
+        provider_override,
+    )?;
 
     let provider = app
         .state::<TokenManagerState>()
@@ -236,24 +266,7 @@ async fn handle_oauth_callback_impl(
             }
         }
 
-        let mut expected = Vec::new();
-        if let Some(access_param) = provider.callback_access_token_param.as_ref() {
-            expected.push(access_param.as_str());
-        }
-        if let Some(code_param) = provider.callback_code_param.as_ref() {
-            expected.push(code_param.as_str());
-        }
-
-        if expected.is_empty() {
-            return Err(format!(
-                "Provider {provider_id} has no callback payload fields configured"
-            ));
-        }
-
-        Err(format!(
-            "Missing callback payload for provider {provider_id}; expected one of: {}",
-            expected.join(", ")
-        ))
+        missing_callback_payload_error(&provider_id, &provider)
     }
     .await;
 
@@ -278,4 +291,130 @@ async fn handle_oauth_callback_impl(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn register_provider(state: &TokenManagerState, provider_id: &str, config: ProviderConfig) {
+        state
+            .register_provider(provider_id, config)
+            .expect("provider should register");
+    }
+
+    #[test]
+    fn callback_hint_candidates_collect_host_and_first_path_segment() {
+        let url =
+            reqwest::Url::parse("kioku://myanimelist/callback?code=1").expect("url should parse");
+        assert_eq!(
+            callback_hint_candidates(&url),
+            vec!["myanimelist".to_string(), "callback".to_string()]
+        );
+
+        let url = reqwest::Url::parse("kioku://callback").expect("url should parse");
+        assert_eq!(callback_hint_candidates(&url), vec!["callback".to_string()]);
+    }
+
+    #[test]
+    fn collect_callback_params_merges_query_and_fragment_pairs() {
+        let url = reqwest::Url::parse(
+            "kioku://callback?code=query-code&state=query-state#access_token=fragment-token&state=fragment-state",
+        )
+        .expect("url should parse");
+
+        let params = collect_callback_params(&url).expect("params should collect");
+
+        assert_eq!(params.get("code").map(String::as_str), Some("query-code"));
+        assert_eq!(
+            params.get("access_token").map(String::as_str),
+            Some("fragment-token")
+        );
+        assert_eq!(
+            params.get("state").map(String::as_str),
+            Some("fragment-state")
+        );
+    }
+
+    #[test]
+    fn resolve_provider_id_from_callback_obeys_override_state_hint_and_payload_inference() {
+        let state = TokenManagerState::default();
+        register_provider(
+            &state,
+            "myanimelist",
+            ProviderConfig::new("id", "https://auth", "https://token")
+                .with_callback_provider_hint("mal")
+                .with_callback_code_param("code"),
+        );
+        register_provider(
+            &state,
+            "anilist",
+            ProviderConfig::new("id", "https://auth", "https://token")
+                .with_state(false)
+                .without_callback_code()
+                .with_callback_access_token_param("access_token")
+                .with_callback_provider_hint("anilist"),
+        );
+        state
+            .set_oauth_state("known-state".to_string(), "myanimelist", None)
+            .expect("oauth state should store");
+
+        let override_url = reqwest::Url::parse("kioku://callback").expect("url should parse");
+        let empty = HashMap::new();
+        assert_eq!(
+            resolve_provider_id_from_callback(&state, &override_url, &empty, Some("forced"))
+                .unwrap(),
+            "forced"
+        );
+
+        let state_url =
+            reqwest::Url::parse("kioku://callback?state=known-state").expect("url should parse");
+        let state_params = collect_callback_params(&state_url).expect("params should collect");
+        assert_eq!(
+            resolve_provider_id_from_callback(&state, &state_url, &state_params, None).unwrap(),
+            "myanimelist"
+        );
+
+        let hint_url = reqwest::Url::parse("kioku://mal/callback").expect("url should parse");
+        assert_eq!(
+            resolve_provider_id_from_callback(&state, &hint_url, &HashMap::new(), None).unwrap(),
+            "myanimelist"
+        );
+
+        let payload_url =
+            reqwest::Url::parse("kioku://callback#access_token=token").expect("url should parse");
+        let payload_params = collect_callback_params(&payload_url).expect("params should collect");
+        assert_eq!(
+            resolve_provider_id_from_callback(&state, &payload_url, &payload_params, None).unwrap(),
+            "anilist"
+        );
+    }
+
+    #[test]
+    fn resolve_provider_id_from_callback_errors_when_unresolvable() {
+        let state = TokenManagerState::default();
+        let url = reqwest::Url::parse("kioku://callback").expect("url should parse");
+        let error =
+            resolve_provider_id_from_callback(&state, &url, &HashMap::new(), None).unwrap_err();
+        assert_eq!(error, "Unable to determine provider from callback URL");
+    }
+
+    #[test]
+    fn missing_callback_payload_error_reports_expected_params() {
+        let provider = ProviderConfig::new("id", "https://auth", "https://token")
+            .with_callback_access_token_param("access_token")
+            .with_callback_code_param("code");
+        assert_eq!(
+            missing_callback_payload_error("provider", &provider).unwrap_err(),
+            "Missing callback payload for provider provider; expected one of: access_token, code"
+        );
+
+        let provider = ProviderConfig::new("id", "https://auth", "https://token")
+            .without_callback_code()
+            .without_callback_access_token();
+        assert_eq!(
+            missing_callback_payload_error("provider", &provider).unwrap_err(),
+            "Provider provider has no callback payload fields configured"
+        );
+    }
 }

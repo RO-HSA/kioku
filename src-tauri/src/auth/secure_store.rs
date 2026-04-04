@@ -109,6 +109,19 @@ fn access_record_key(provider_id: &str) -> String {
     token_record_key(provider_id, ACCESS_TOKEN_KEY)
 }
 
+fn encode_access_token_record(token: &str, expires_at_unix_secs: u64) -> Result<Vec<u8>, String> {
+    serde_json::to_vec(&AccessTokenRecord {
+        token: token.to_string(),
+        expires_at_unix_secs,
+    })
+    .map_err(|e| e.to_string())
+}
+
+fn decode_access_token_record(raw: &[u8]) -> Result<(String, u64), String> {
+    let record = serde_json::from_slice::<AccessTokenRecord>(raw).map_err(|e| e.to_string())?;
+    Ok((record.token, record.expires_at_unix_secs))
+}
+
 pub fn init_stronghold_key(app: &AppHandle) -> Result<(), String> {
     let key = load_or_create_master_key(app)?;
     app.state::<StrongholdKeyState>().set_key(key)
@@ -169,11 +182,7 @@ pub fn save_access_token(
         .or_else(|_| stronghold.create_client(CLIENT_ID))
         .map_err(|e| e.to_string())?;
 
-    let record = AccessTokenRecord {
-        token: access_token.to_string(),
-        expires_at_unix_secs,
-    };
-    let encoded = serde_json::to_vec(&record).map_err(|e| e.to_string())?;
+    let encoded = encode_access_token_record(access_token, expires_at_unix_secs)?;
 
     client
         .store()
@@ -207,6 +216,52 @@ pub fn read_access_token(
         return Ok(None);
     };
 
-    let record = serde_json::from_slice::<AccessTokenRecord>(&raw).map_err(|e| e.to_string())?;
-    Ok(Some((record.token, record.expires_at_unix_secs)))
+    decode_access_token_record(&raw).map(Some)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stronghold_key_state_roundtrips_and_errors_before_initialization() {
+        let state = StrongholdKeyState::default();
+        assert_eq!(
+            state.get_key().unwrap_err(),
+            "Stronghold key not initialized"
+        );
+
+        state.set_key(vec![1, 2, 3]).expect("key should store");
+        assert_eq!(state.get_key().unwrap(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn generate_master_key_has_expected_length_and_nonconstant_output() {
+        let first = generate_master_key();
+        let second = generate_master_key();
+
+        assert_eq!(first.len(), KEY_LENGTH);
+        assert_eq!(second.len(), KEY_LENGTH);
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn token_record_keys_are_namespaced_per_provider_and_kind() {
+        assert_eq!(
+            token_record_key("mal", "refresh_token"),
+            "mal:refresh_token"
+        );
+        assert_eq!(refresh_record_key("mal"), "mal:refresh_token");
+        assert_eq!(access_record_key("anilist"), "anilist:access_token");
+    }
+
+    #[test]
+    fn access_token_record_encoding_roundtrips_and_rejects_invalid_json() {
+        let encoded = encode_access_token_record("token", 123).expect("record should encode");
+        assert_eq!(
+            decode_access_token_record(&encoded).unwrap(),
+            ("token".to_string(), 123)
+        );
+        assert!(decode_access_token_record(br#"{"token":1}"#).is_err());
+    }
 }
