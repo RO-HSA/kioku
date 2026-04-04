@@ -9,8 +9,8 @@ use crate::auth::token_manager::get_access_token;
 use crate::services::anime_list_updates::{AnimeListUpdateRequest, ListType};
 
 use super::mapping::{
-    map_anilist_statistics, map_anime_to_domain, map_manga_to_domain,
-    map_user_status_to_anilist, parse_fuzzy_date_input,
+    map_anilist_statistics, map_anime_to_domain, map_manga_to_domain, map_user_status_to_anilist,
+    parse_fuzzy_date_input,
 };
 use super::{
     AniListCollection, AniListUserInfo, GraphQlError, GraphQlRequest, GraphQlResponse,
