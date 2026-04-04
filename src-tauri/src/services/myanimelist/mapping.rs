@@ -316,3 +316,274 @@ pub(super) fn map_mal_statistics(statistics: super::MalAnimeStatistics) -> UserS
         mean_score: statistics.mean_score,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::super::MalAuthor;
+    use super::*;
+
+    fn sample_anime_entry() -> MalListEntry {
+        serde_json::from_value(json!({
+            "node": {
+                "id": 1,
+                "title": "Frieren",
+                "main_picture": {
+                    "medium": "https://img.example/medium.jpg",
+                    "large": "https://img.example/large.jpg"
+                },
+                "synopsis": "A journey.",
+                "alternative_titles": {
+                    "synonyms": [" Beyond Journey's End ", " "],
+                    "en": " Frieren: Beyond Journey's End ",
+                    "ja": " 葬送のフリーレン "
+                },
+                "mean": 9.1,
+                "source": "light_novel",
+                "num_episodes": 28,
+                "status": "currently_airing",
+                "genres": [{"name": "Adventure"}, {"name": "Fantasy"}],
+                "start_season": {"season": "Fall", "year": 2023},
+                "broadcast": {"day_of_the_week": "friday", "start_time": "23:00"},
+                "start_date": "2023-09-29",
+                "media_type": "tv",
+                "studios": [{"name": "Madhouse"}],
+                "authors": [],
+                "serialization": null
+            },
+            "list_status": {
+                "status": "watching",
+                "score": 8,
+                "num_episodes_watched": 12,
+                "is_rewatching": true,
+                "comments": "great",
+                "num_times_rewatched": 1,
+                "updated_at": "2024-01-01T00:00:00+00:00",
+                "start_date": "2023-10-01",
+                "finish_date": null
+            }
+        }))
+        .expect("sample anime entry should deserialize")
+    }
+
+    fn sample_manga_entry() -> MalListEntry {
+        serde_json::from_value(json!({
+            "node": {
+                "id": 2,
+                "title": "Vagabond",
+                "main_picture": {
+                    "medium": "https://img.example/vagabond-medium.jpg"
+                },
+                "synopsis": null,
+                "alternative_titles": {
+                    "synonyms": [" Takehiko Inoue "],
+                    "en": "",
+                    "ja": " バガボンド "
+                },
+                "mean": 8.7,
+                "num_volumes": 37,
+                "num_chapters": 327,
+                "status": "on_hiatus",
+                "genres": [{"name": "Action"}, {"name": ""}],
+                "start_date": "1998-09-03",
+                "end_date": null,
+                "media_type": "manhwa",
+                "authors": [
+                    {"node": {"first_name": "Takehiko", "last_name": "Inoue"}},
+                    {"node": {"first_name": "", "last_name": "Yoshikawa"}}
+                ],
+                "serialization": {"name": " Morning "}
+            },
+            "list_status": {
+                "status": "reading",
+                "score": 10,
+                "num_volumes_read": 20,
+                "num_chapters_read": 200,
+                "is_rereading": false,
+                "comments": null,
+                "num_times_reread": 4,
+                "updated_at": null,
+                "start_date": "2020-01-01",
+                "finish_date": null
+            }
+        }))
+        .expect("sample manga entry should deserialize")
+    }
+
+    #[test]
+    fn basic_mapping_helpers_convert_known_values_and_preserve_unknowns() {
+        assert_eq!(map_source(Some("light_novel".to_string())), "Light Novel");
+        assert_eq!(map_source(Some("webtoon".to_string())), "webtoon");
+        assert_eq!(map_source(None), "Unknown");
+
+        assert_eq!(
+            map_status(Some("finished_airing".to_string())),
+            "Finished Airing"
+        );
+        assert_eq!(map_status(Some("custom".to_string())), "custom");
+        assert_eq!(map_status(None), "Unknown");
+
+        assert_eq!(map_media_type(Some("one_shot".to_string())), "One-shot");
+        assert_eq!(map_media_type(Some("custom".to_string())), "custom");
+        assert_eq!(map_media_type(None), "Unknown");
+    }
+
+    #[test]
+    fn user_status_mapping_handles_aliases_and_invalid_values() {
+        assert_eq!(
+            map_user_status_to_mal(MyAnimeListListType::Anime, "planToWatch"),
+            Some("plan_to_watch")
+        );
+        assert_eq!(
+            map_user_status_to_mal(MyAnimeListListType::Manga, "on_hold"),
+            Some("on_hold")
+        );
+        assert_eq!(
+            map_user_status_to_mal(MyAnimeListListType::Manga, "watching"),
+            None
+        );
+    }
+
+    #[test]
+    fn title_author_and_season_helpers_trim_and_default_correctly() {
+        assert_eq!(
+            build_alternative_titles(Some(MalAlternativeTitles {
+                synonyms: Some(vec![" Alias ".to_string(), "".to_string()]),
+                en: Some(" English ".to_string()),
+                ja: Some(" ".to_string()),
+            })),
+            "English, Alias"
+        );
+        assert_eq!(build_alternative_titles(None), "Unknown");
+
+        assert_eq!(
+            format_start_season(Some(MalStartSeason {
+                season: Some("Fall".to_string()),
+                year: Some(2023),
+            })),
+            "Fall 2023"
+        );
+        assert_eq!(
+            format_start_season(Some(MalStartSeason {
+                season: None,
+                year: Some(2023),
+            })),
+            "Unknown 2023"
+        );
+        assert_eq!(
+            format_start_season(Some(MalStartSeason {
+                season: Some("".to_string()),
+                year: None,
+            })),
+            "Unknown"
+        );
+
+        assert_eq!(
+            build_author_names(vec![
+                MalAuthorRole {
+                    node: Some(MalAuthor {
+                        first_name: Some("Hiromu".to_string()),
+                        last_name: Some("Arakawa".to_string()),
+                    }),
+                },
+                MalAuthorRole {
+                    node: Some(MalAuthor {
+                        first_name: None,
+                        last_name: Some("Yoshikawa".to_string()),
+                    }),
+                },
+            ]),
+            "Hiromu Arakawa, Yoshikawa"
+        );
+        assert_eq!(build_author_names(Vec::new()), "Unknown");
+        assert_eq!(
+            build_serialization_label(Some(MalSerialization {
+                name: Some(" Weekly Shonen Jump ".to_string()),
+            })),
+            "Weekly Shonen Jump"
+        );
+        assert_eq!(build_serialization_label(None), "Unknown");
+    }
+
+    #[test]
+    fn map_anime_entry_to_domain_applies_defaults_and_field_mappings() {
+        let mapped = map_anime_entry_to_domain(sample_anime_entry(), UserStatusKey::Watching);
+
+        assert_eq!(mapped.id, 1);
+        assert_eq!(mapped.title, "Frieren");
+        assert_eq!(mapped.image_url, "https://img.example/large.jpg");
+        assert_eq!(
+            mapped.alternative_titles,
+            "Frieren: Beyond Journey's End, 葬送のフリーレン, Beyond Journey's End"
+        );
+        assert_eq!(mapped.source, "Light Novel");
+        assert_eq!(mapped.status, "Currently Airing");
+        assert_eq!(mapped.total_episodes, 28);
+        assert_eq!(mapped.genres, "Adventure, Fantasy");
+        assert_eq!(mapped.start_season, "Fall 2023");
+        assert_eq!(mapped.broadcast.day_of_the_week, "friday");
+        assert_eq!(mapped.broadcast.start_time, "23:00");
+        assert_eq!(mapped.media_type, "TV");
+        assert_eq!(mapped.user_status, "watching");
+        assert_eq!(mapped.user_score, 8);
+        assert_eq!(mapped.user_episodes_watched, 12);
+        assert!(mapped.is_rewatching);
+        assert_eq!(mapped.user_num_times_rewatched, 1);
+    }
+
+    #[test]
+    fn map_manga_entry_to_domain_uses_fallbacks_when_values_are_missing() {
+        let mapped = map_manga_entry_to_domain(sample_manga_entry(), UserStatusKey::Reading);
+
+        assert_eq!(mapped.id, 2);
+        assert_eq!(mapped.image_url, "https://img.example/vagabond-medium.jpg");
+        assert_eq!(mapped.synopsis, "No synopsis available.");
+        assert_eq!(mapped.alternative_titles, "バガボンド, Takehiko Inoue");
+        assert_eq!(mapped.status, "On Hiatus");
+        assert_eq!(mapped.total_volumes, 37);
+        assert_eq!(mapped.total_chapters, 327);
+        assert_eq!(mapped.genres, "Action");
+        assert_eq!(mapped.authors, "Takehiko Inoue, Yoshikawa");
+        assert_eq!(mapped.serialization, "Morning");
+        assert_eq!(mapped.media_type, "Manhwa");
+        assert_eq!(mapped.user_status, "reading");
+        assert_eq!(mapped.user_volumes_read, 20);
+        assert_eq!(mapped.user_chapters_read, 200);
+        assert!(!mapped.is_rereading);
+        assert_eq!(mapped.user_num_times_reread, 4);
+    }
+
+    #[test]
+    fn map_mal_statistics_is_a_direct_projection() {
+        let statistics = super::super::MalAnimeStatistics {
+            num_items_watching: 1,
+            num_items_completed: 2,
+            num_items_on_hold: 3,
+            num_items_dropped: 4,
+            num_items_plan_to_watch: 5,
+            num_items: 15,
+            num_days_watched: 10.5,
+            num_days_watching: 1.5,
+            num_days_completed: 2.5,
+            num_days_on_hold: 3.5,
+            num_days_dropped: 4.5,
+            num_days: 10.5,
+            num_episodes: 99,
+            num_times_rewatched: 7,
+            mean_score: 8.9,
+        };
+
+        let mapped = map_mal_statistics(statistics);
+
+        assert_eq!(mapped.num_items_watching, 1);
+        assert_eq!(mapped.num_items_completed, 2);
+        assert_eq!(mapped.num_items_on_hold, 3);
+        assert_eq!(mapped.num_items_dropped, 4);
+        assert_eq!(mapped.num_items_plan_to_watch, 5);
+        assert_eq!(mapped.num_items, 15);
+        assert_eq!(mapped.num_episodes, 99);
+        assert_eq!(mapped.num_times_rewatched, 7);
+        assert_eq!(mapped.mean_score, 8.9);
+    }
+}

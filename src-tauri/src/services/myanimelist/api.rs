@@ -47,6 +47,98 @@ fn parse_next_offset(next_url: &str) -> Option<u32> {
         .and_then(|(_, value)| value.parse::<u32>().ok())
 }
 
+struct MalUpdatePayload {
+    list_type: MyAnimeListListType,
+    entry_id: u64,
+    params: Vec<(String, String)>,
+}
+
+fn build_mal_update_payload(update: &AnimeListUpdateRequest) -> Result<MalUpdatePayload, String> {
+    let list_type = MyAnimeListListType::from(update.list_type.unwrap_or_default());
+    let entry_id = update
+        .entry_id
+        .ok_or_else(|| "Missing entryId for MyAnimeList update".to_string())?;
+
+    let mut params: Vec<(String, String)> = Vec::new();
+
+    if let Some(status) = update.user_status.as_deref() {
+        let mapped = map_user_status_to_mal(list_type, status)
+            .ok_or_else(|| format!("Invalid MyAnimeList status: {status}"))?;
+        params.push(("status".to_string(), mapped.to_string()));
+    }
+
+    if let Some(score) = update.user_score {
+        params.push(("score".to_string(), score.to_string()));
+    }
+
+    match list_type {
+        MyAnimeListListType::Anime => {
+            if let Some(episodes) = update.user_episodes_watched {
+                params.push(("num_watched_episodes".to_string(), episodes.to_string()));
+            }
+
+            if let Some(is_rewatching) = update.is_rewatching {
+                params.push(("is_rewatching".to_string(), is_rewatching.to_string()));
+            }
+
+            if let Some(num_times_rewatched) = update.user_num_times_rewatched {
+                params.push((
+                    "num_times_rewatched".to_string(),
+                    num_times_rewatched.min(5).to_string(),
+                ));
+            }
+        }
+        MyAnimeListListType::Manga => {
+            if let Some(volumes) = update.user_volumes_read {
+                params.push(("num_volumes_read".to_string(), volumes.to_string()));
+            }
+
+            if let Some(chapters) = update.user_chapters_read {
+                params.push(("num_chapters_read".to_string(), chapters.to_string()));
+            }
+
+            if let Some(is_rereading) = update.is_rereading {
+                params.push(("is_rereading".to_string(), is_rereading.to_string()));
+            }
+
+            if let Some(num_times_reread) = update.user_num_times_reread {
+                params.push((
+                    "num_times_reread".to_string(),
+                    num_times_reread.min(5).to_string(),
+                ));
+            }
+        }
+    }
+
+    if let Some(comments) = update.user_comments.as_ref() {
+        params.push(("comments".to_string(), comments.to_string()));
+    }
+
+    if let Some(start_date) = update.user_start_date.as_ref() {
+        let trimmed = start_date.trim();
+        if !trimmed.is_empty() {
+            params.push(("start_date".to_string(), trimmed.to_string()));
+        }
+    }
+
+    if let Some(finish_date) = update.user_finish_date.as_ref() {
+        let trimmed = finish_date.trim();
+        if !trimmed.is_empty() {
+            params.push(("finish_date".to_string(), trimmed.to_string()));
+        }
+    }
+
+    if params.is_empty() {
+        return Err("No update fields provided".to_string());
+    }
+
+    Ok(MalUpdatePayload {
+        list_type,
+        entry_id,
+        params,
+    })
+}
+
 async fn fetch_all_entries(
     client: &reqwest::Client,
     token: &str,
@@ -93,90 +185,18 @@ pub async fn update_myanimelist_list_entry(
     update: &AnimeListUpdateRequest,
 ) -> Result<(), String> {
     let token = get_access_token(app, MAL_PROVIDER_ID).await?;
-    let list_type = MyAnimeListListType::from(update.list_type.unwrap_or_default());
-    let entry_id = update
-        .entry_id
-        .ok_or_else(|| "Missing entryId for MyAnimeList update".to_string())?;
+    let payload = build_mal_update_payload(update)?;
 
-    let mut params: Vec<(String, String)> = Vec::new();
-
-    if let Some(status) = update.user_status.as_deref() {
-        let mapped = map_user_status_to_mal(list_type, status)
-            .ok_or_else(|| format!("Invalid MyAnimeList status: {status}"))?;
-        params.push(("status".to_string(), mapped.to_string()));
-    }
-
-    if let Some(score) = update.user_score {
-        params.push(("score".to_string(), score.to_string()));
-    }
-
-    match list_type {
-        MyAnimeListListType::Anime => {
-            if let Some(episodes) = update.user_episodes_watched {
-                params.push(("num_watched_episodes".to_string(), episodes.to_string()));
-            }
-
-            if let Some(is_rewatching) = update.is_rewatching {
-                params.push(("is_rewatching".to_string(), is_rewatching.to_string()));
-            }
-
-            if let Some(num_times_rewatched) = update.user_num_times_rewatched {
-                let clamped = num_times_rewatched.min(5);
-                params.push(("num_times_rewatched".to_string(), clamped.to_string()));
-            }
-        }
-        MyAnimeListListType::Manga => {
-            if let Some(volumes) = update.user_volumes_read {
-                params.push(("num_volumes_read".to_string(), volumes.to_string()));
-            }
-
-            if let Some(chapters) = update.user_chapters_read {
-                params.push(("num_chapters_read".to_string(), chapters.to_string()));
-            }
-
-            if let Some(is_rereading) = update.is_rereading {
-                params.push(("is_rereading".to_string(), is_rereading.to_string()));
-            }
-
-            if let Some(num_times_reread) = update.user_num_times_reread {
-                let clamped = num_times_reread.min(5);
-                params.push(("num_times_reread".to_string(), clamped.to_string()));
-            }
-        }
-    }
-
-    if let Some(comments) = update.user_comments.as_ref() {
-        params.push(("comments".to_string(), comments.to_string()));
-    }
-
-    if let Some(start_date) = update.user_start_date.as_ref() {
-        let trimmed = start_date.trim();
-        if !trimmed.is_empty() {
-            params.push(("start_date".to_string(), trimmed.to_string()));
-        }
-    }
-
-    if let Some(finish_date) = update.user_finish_date.as_ref() {
-        let trimmed = finish_date.trim();
-        if !trimmed.is_empty() {
-            params.push(("finish_date".to_string(), trimmed.to_string()));
-        }
-    }
-
-    if params.is_empty() {
-        return Err("No update fields provided".to_string());
-    }
-
-    let update_base_url = match list_type {
+    let update_base_url = match payload.list_type {
         MyAnimeListListType::Anime => ANIME_UPDATE_BASE_URL,
         MyAnimeListListType::Manga => MANGA_UPDATE_BASE_URL,
     };
 
-    let url = format!("{}{}/my_list_status", update_base_url, entry_id);
+    let url = format!("{}{}/my_list_status", update_base_url, payload.entry_id);
     let response = client
         .put(url)
         .bearer_auth(token)
-        .form(&params)
+        .form(&payload.params)
         .send()
         .await
         .map_err(|e| e.to_string())?;
@@ -354,6 +374,110 @@ mod tests {
         assert_eq!(
             parse_next_offset("https://api.myanimelist.net/v2/users/@me/animelist"),
             None
+        );
+    }
+
+    fn base_update() -> AnimeListUpdateRequest {
+        AnimeListUpdateRequest {
+            provider_id: MAL_PROVIDER_ID.to_string(),
+            list_type: Some(crate::services::anime_list_updates::ListType::Anime),
+            entry_id: Some(10),
+            media_id: None,
+            user_status: None,
+            user_score: None,
+            user_episodes_watched: None,
+            user_volumes_read: None,
+            user_chapters_read: None,
+            is_rewatching: None,
+            is_rereading: None,
+            user_comments: None,
+            user_num_times_rewatched: None,
+            user_num_times_reread: None,
+            user_start_date: None,
+            user_finish_date: None,
+        }
+    }
+
+    #[test]
+    fn build_mal_update_payload_for_anime_maps_and_clamps_fields() {
+        let mut update = base_update();
+        update.user_status = Some("planToWatch".to_string());
+        update.user_score = Some(9);
+        update.user_episodes_watched = Some(12);
+        update.is_rewatching = Some(true);
+        update.user_num_times_rewatched = Some(9);
+        update.user_comments = Some(" note ".to_string());
+        update.user_start_date = Some(" 2024-01-01 ".to_string());
+        update.user_finish_date = Some("   ".to_string());
+
+        let payload = build_mal_update_payload(&update).expect("payload should build");
+
+        assert!(matches!(payload.list_type, MyAnimeListListType::Anime));
+        assert_eq!(payload.entry_id, 10);
+        assert_eq!(
+            payload.params,
+            vec![
+                ("status".to_string(), "plan_to_watch".to_string()),
+                ("score".to_string(), "9".to_string()),
+                ("num_watched_episodes".to_string(), "12".to_string()),
+                ("is_rewatching".to_string(), "true".to_string()),
+                ("num_times_rewatched".to_string(), "5".to_string()),
+                ("comments".to_string(), " note ".to_string()),
+                ("start_date".to_string(), "2024-01-01".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn build_mal_update_payload_for_manga_uses_reading_fields() {
+        let mut update = base_update();
+        update.list_type = Some(crate::services::anime_list_updates::ListType::Manga);
+        update.user_status = Some("plan_to_read".to_string());
+        update.user_volumes_read = Some(7);
+        update.user_chapters_read = Some(42);
+        update.is_rereading = Some(false);
+        update.user_num_times_reread = Some(2);
+
+        let payload = build_mal_update_payload(&update).expect("payload should build");
+
+        assert!(matches!(payload.list_type, MyAnimeListListType::Manga));
+        assert_eq!(
+            payload.params,
+            vec![
+                ("status".to_string(), "plan_to_read".to_string()),
+                ("num_volumes_read".to_string(), "7".to_string()),
+                ("num_chapters_read".to_string(), "42".to_string()),
+                ("is_rereading".to_string(), "false".to_string()),
+                ("num_times_reread".to_string(), "2".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn build_mal_update_payload_rejects_missing_entry_id_no_fields_and_invalid_status() {
+        let missing_entry = AnimeListUpdateRequest {
+            entry_id: None,
+            user_score: Some(8),
+            ..base_update()
+        };
+        assert_eq!(
+            build_mal_update_payload(&missing_entry).err().as_deref(),
+            Some("Missing entryId for MyAnimeList update")
+        );
+
+        let no_fields = base_update();
+        assert_eq!(
+            build_mal_update_payload(&no_fields).err().as_deref(),
+            Some("No update fields provided")
+        );
+
+        let invalid_status = AnimeListUpdateRequest {
+            user_status: Some("reading".to_string()),
+            ..base_update()
+        };
+        assert_eq!(
+            build_mal_update_payload(&invalid_status).err().as_deref(),
+            Some("Invalid MyAnimeList status: reading")
         );
     }
 }

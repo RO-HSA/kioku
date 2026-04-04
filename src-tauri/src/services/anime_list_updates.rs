@@ -93,14 +93,58 @@ fn spawn_update_worker(
     });
 }
 
+fn validate_supported_provider(provider_id: &str) -> Result<(), String> {
+    match provider_id {
+        ANILIST_PROVIDER_ID | MAL_PROVIDER_ID => Ok(()),
+        _ => Err(format!("Provider not supported: {provider_id}")),
+    }
+}
+
 async fn handle_update(
     app: &tauri::AppHandle,
     client: &reqwest::Client,
     update: &AnimeListUpdateRequest,
 ) -> Result<(), String> {
+    validate_supported_provider(&update.provider_id)?;
+
     match update.provider_id.as_str() {
         ANILIST_PROVIDER_ID => update_anilist_list_entry(app, client, update).await,
         MAL_PROVIDER_ID => update_myanimelist_list_entry(app, client, update).await,
-        _ => Err(format!("Provider not supported: {}", update.provider_id)),
+        _ => unreachable!("provider should have been validated"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn list_type_defaults_to_anime_and_request_aliases_deserialize() {
+        let request: AnimeListUpdateRequest = serde_json::from_value(serde_json::json!({
+            "providerId": "myanimelist",
+            "id": 42,
+            "mediaId": 7,
+            "userStatus": "completed"
+        }))
+        .expect("request should deserialize");
+
+        assert_eq!(request.provider_id, "myanimelist");
+        assert!(matches!(
+            request.list_type.unwrap_or_default(),
+            ListType::Anime
+        ));
+        assert_eq!(request.entry_id, Some(42));
+        assert_eq!(request.media_id, Some(7));
+        assert_eq!(request.user_status.as_deref(), Some("completed"));
+    }
+
+    #[test]
+    fn validate_supported_provider_accepts_known_ids_and_rejects_others() {
+        assert!(validate_supported_provider(ANILIST_PROVIDER_ID).is_ok());
+        assert!(validate_supported_provider(MAL_PROVIDER_ID).is_ok());
+        assert_eq!(
+            validate_supported_provider("unknown").unwrap_err(),
+            "Provider not supported: unknown"
+        );
     }
 }
