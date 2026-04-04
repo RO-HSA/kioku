@@ -13,8 +13,8 @@ use super::mapping::{
 };
 use super::{
     MalListEntry, MalListResponse, MyAnimeListListType, MyAnimeListUserInfo, SynchronizedAnimeList,
-    SynchronizedListResult, SynchronizedMangaList, UserStatusKey, ANIME_UPDATE_BASE_URL,
-    BASE_URL, LIMIT, MANGA_UPDATE_BASE_URL, USER_INFO_FIELDS,
+    SynchronizedListResult, SynchronizedMangaList, UserStatusKey, ANIME_UPDATE_BASE_URL, BASE_URL,
+    LIMIT, MANGA_UPDATE_BASE_URL, USER_INFO_FIELDS,
 };
 
 fn build_user_list_url(
@@ -203,7 +203,8 @@ pub async fn fetch_myanimelist_user_info(
         segments.push("@me");
     }
 
-    url.query_pairs_mut().append_pair("fields", USER_INFO_FIELDS);
+    url.query_pairs_mut()
+        .append_pair("fields", USER_INFO_FIELDS);
 
     let client = reqwest::Client::new();
     let response = client
@@ -263,8 +264,10 @@ pub async fn synchronize_myanimelist(
             let mut result = SynchronizedAnimeList::default();
 
             for entry in entries {
-                let status_key =
-                    UserStatusKey::from_mal(MyAnimeListListType::Anime, entry.list_status.status.as_deref());
+                let status_key = UserStatusKey::from_mal(
+                    MyAnimeListListType::Anime,
+                    entry.list_status.status.as_deref(),
+                );
                 let item = map_anime_entry_to_domain(entry, status_key);
                 status_key.push_anime(&mut result, item);
             }
@@ -275,13 +278,82 @@ pub async fn synchronize_myanimelist(
             let mut result = SynchronizedMangaList::default();
 
             for entry in entries {
-                let status_key =
-                    UserStatusKey::from_mal(MyAnimeListListType::Manga, entry.list_status.status.as_deref());
+                let status_key = UserStatusKey::from_mal(
+                    MyAnimeListListType::Manga,
+                    entry.list_status.status.as_deref(),
+                );
                 let item = map_manga_entry_to_domain(entry, status_key);
                 status_key.push_manga(&mut result, item);
             }
 
             Ok(SynchronizedListResult::Manga(result))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+
+    #[test]
+    fn build_user_list_url_uses_expected_path_and_query_values() {
+        let url = build_user_list_url("robert", MyAnimeListListType::Anime, 300)
+            .expect("url should build");
+        let parsed = reqwest::Url::parse(&url).expect("built url should parse");
+        let segments = parsed
+            .path_segments()
+            .expect("path segments should exist")
+            .collect::<Vec<_>>();
+        let query = parsed
+            .query_pairs()
+            .map(|(key, value)| (key.to_string(), value.to_string()))
+            .collect::<HashMap<_, _>>();
+
+        assert_eq!(parsed.domain(), Some("api.myanimelist.net"));
+        assert_eq!(segments, vec!["v2", "users", "robert", "animelist"]);
+        assert_eq!(
+            query.get("fields"),
+            Some(&MyAnimeListListType::Anime.fields().to_string())
+        );
+        assert_eq!(query.get("nsfw"), Some(&"true".to_string()));
+        assert_eq!(query.get("limit"), Some(&LIMIT.to_string()));
+        assert_eq!(query.get("offset"), Some(&"300".to_string()));
+    }
+
+    #[test]
+    fn build_user_list_url_keeps_username_in_a_single_encoded_path_segment() {
+        let username = "../evil?admin=true";
+        let url =
+            build_user_list_url(username, MyAnimeListListType::Manga, 0).expect("url should build");
+        let parsed = reqwest::Url::parse(&url).expect("built url should parse");
+        let segments = parsed
+            .path_segments()
+            .expect("path segments should exist")
+            .collect::<Vec<_>>();
+
+        assert_eq!(parsed.domain(), Some("api.myanimelist.net"));
+        assert_eq!(
+            segments,
+            vec!["v2", "users", "..%2Fevil%3Fadmin=true", "mangalist"]
+        );
+    }
+
+    #[test]
+    fn parse_next_offset_extracts_numeric_offsets_only() {
+        assert_eq!(
+            parse_next_offset("https://api.myanimelist.net/v2/users/@me/animelist?offset=2000"),
+            Some(2000)
+        );
+        assert_eq!(
+            parse_next_offset("https://api.myanimelist.net/v2/users/@me/animelist?offset=abc"),
+            None
+        );
+        assert_eq!(parse_next_offset("javascript:alert(1)"), None);
+        assert_eq!(
+            parse_next_offset("https://api.myanimelist.net/v2/users/@me/animelist"),
+            None
+        );
     }
 }
