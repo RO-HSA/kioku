@@ -2,8 +2,8 @@ use crate::services::anime_list_updates::ListType;
 
 use super::{
     AniListAnimeStatistics, AniListFuzzyDate, AniListMedia, AniListMediaListEntry, AniListStaff,
-    AniListStudios, AniListTitle, AnimeListBroadcast, AnimeListItem, FuzzyDateInput,
-    MangaListItem, UserStatistics, UserStatusKey,
+    AniListStudios, AniListTitle, AnimeListBroadcast, AnimeListItem, FuzzyDateInput, MangaListItem,
+    UserStatistics, UserStatusKey,
 };
 
 fn normalize_text(value: Option<&str>) -> Option<String> {
@@ -479,5 +479,106 @@ pub(super) fn map_manga_to_domain(
         user_start_date: format_fuzzy_date(media_list_entry.started_at),
         user_finish_date: format_fuzzy_date(media_list_entry.completed_at),
         updated_at: None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::services::anilist::AniListAnimeStatisticsStatus;
+
+    use super::*;
+
+    #[test]
+    fn parse_fuzzy_date_input_accepts_trimmed_dates_and_rejects_invalid_shapes() {
+        assert!(parse_fuzzy_date_input(None, "userStartDate")
+            .expect("missing date should be accepted")
+            .is_none());
+        assert!(parse_fuzzy_date_input(Some("   "), "userStartDate")
+            .expect("blank date should be accepted")
+            .is_none());
+
+        let parsed = parse_fuzzy_date_input(Some(" 2024-02-29 "), "userStartDate")
+            .expect("valid date should parse")
+            .expect("date should be present");
+        assert_eq!(parsed.year, 2024);
+        assert_eq!(parsed.month, 2);
+        assert_eq!(parsed.day, 29);
+
+        assert_eq!(
+            parse_fuzzy_date_input(Some("2024-13-01"), "userStartDate")
+                .err()
+                .as_deref(),
+            Some("Invalid userStartDate: expected YYYY-MM-DD")
+        );
+        assert_eq!(
+            parse_fuzzy_date_input(Some("2024-01"), "userStartDate")
+                .err()
+                .as_deref(),
+            Some("Invalid userStartDate: expected YYYY-MM-DD")
+        );
+        assert_eq!(
+            parse_fuzzy_date_input(Some("2024-01-01-extra"), "userStartDate")
+                .err()
+                .as_deref(),
+            Some("Invalid userStartDate: expected YYYY-MM-DD")
+        );
+    }
+
+    #[test]
+    fn map_user_status_to_anilist_accepts_known_aliases_and_rejects_invalid_values() {
+        assert_eq!(
+            map_user_status_to_anilist(ListType::Anime, "planToWatch").unwrap(),
+            "PLANNING"
+        );
+        assert_eq!(
+            map_user_status_to_anilist(ListType::Anime, "on_hold").unwrap(),
+            "PAUSED"
+        );
+        assert_eq!(
+            map_user_status_to_anilist(ListType::Manga, "plan_to_read").unwrap(),
+            "PLANNING"
+        );
+        assert!(map_user_status_to_anilist(ListType::Manga, "watching").is_err());
+    }
+
+    #[test]
+    fn normalize_score_handles_invalid_and_extreme_values() {
+        assert_eq!(normalize_score(None), 0);
+        assert_eq!(normalize_score(Some(f64::NAN)), 0);
+        assert_eq!(normalize_score(Some(f64::INFINITY)), 0);
+        assert_eq!(normalize_score(Some(-1.0)), 0);
+        assert_eq!(normalize_score(Some(8.6)), 9);
+        assert_eq!(normalize_score(Some(u32::MAX as f64 + 10.0)), u32::MAX);
+    }
+
+    #[test]
+    fn map_anilist_statistics_falls_back_to_status_totals_and_saturates_counts() {
+        let statistics = AniListAnimeStatistics {
+            count: None,
+            episodes_watched: Some(12),
+            mean_score: Some(81.5),
+            minutes_watched: None,
+            statuses: vec![
+                AniListAnimeStatisticsStatus {
+                    count: Some(u32::MAX),
+                    minutes_watched: Some(120),
+                    status: Some("CURRENT".to_string()),
+                },
+                AniListAnimeStatisticsStatus {
+                    count: Some(10),
+                    minutes_watched: Some(60),
+                    status: Some("COMPLETED".to_string()),
+                },
+            ],
+        };
+
+        let mapped = map_anilist_statistics(statistics);
+
+        assert_eq!(mapped.num_items_watching, u32::MAX);
+        assert_eq!(mapped.num_items_completed, 10);
+        assert_eq!(mapped.num_items, u32::MAX);
+        assert_eq!(mapped.num_episodes, 12);
+        assert!((mapped.num_days - (180.0 / 1440.0)).abs() < f64::EPSILON);
+        assert_eq!(mapped.mean_score, 81.5);
     }
 }
