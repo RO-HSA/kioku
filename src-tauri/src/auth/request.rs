@@ -42,9 +42,7 @@ fn allowed_oauth_request_hosts(provider_id: &str) -> Option<&'static [&'static s
     }
 }
 
-fn parse_oauth_request_url(provider_id: &str, url: &str) -> Result<reqwest::Url, String> {
-    let parsed = reqwest::Url::parse(url).map_err(|e| e.to_string())?;
-
+fn ensure_oauth_request_url(provider_id: &str, parsed: &reqwest::Url) -> Result<(), String> {
     if parsed.scheme() != "https" {
         return Err("OAuth requests require an HTTPS URL".to_string());
     }
@@ -64,7 +62,21 @@ fn parse_oauth_request_url(provider_id: &str, url: &str) -> Result<reqwest::Url,
         ));
     }
 
+    Ok(())
+}
+
+fn parse_oauth_request_url(provider_id: &str, url: &str) -> Result<reqwest::Url, String> {
+    let parsed = reqwest::Url::parse(url).map_err(|e| e.to_string())?;
+    ensure_oauth_request_url(provider_id, &parsed)?;
     Ok(parsed)
+}
+
+fn build_oauth_http_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .https_only(true)
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|e| e.to_string())
 }
 
 fn select_request_body(
@@ -111,11 +123,11 @@ pub struct OAuthResponse {
 #[tauri::command]
 pub async fn oauth_request(app: AppHandle, request: OAuthRequest) -> Result<OAuthResponse, String> {
     let request = prepare_oauth_request(request)?;
+    ensure_oauth_request_url(&request.provider_id, &request.url)?;
     let token = get_access_token(&app, &request.provider_id).await?;
+    let client = build_oauth_http_client()?;
 
-    let mut builder = reqwest::Client::new()
-        .request(request.method, request.url)
-        .bearer_auth(token);
+    let mut builder = client.request(request.method, request.url).bearer_auth(token);
 
     if let Some(timeout) = request.timeout {
         builder = builder.timeout(timeout);
@@ -194,6 +206,22 @@ mod tests {
                 .err()
                 .as_deref(),
             Some("OAuth requests are not allowed for provider unknown")
+        );
+    }
+
+    #[test]
+    fn ensure_oauth_request_url_revalidates_prepared_urls() {
+        let secure = reqwest::Url::parse("https://api.myanimelist.net/v2/anime")
+            .expect("url should parse");
+        ensure_oauth_request_url(MAL_PROVIDER_ID, &secure).expect("known https host should pass");
+
+        let insecure =
+            reqwest::Url::parse("http://api.myanimelist.net/v2/anime").expect("url should parse");
+        assert_eq!(
+            ensure_oauth_request_url(MAL_PROVIDER_ID, &insecure)
+                .err()
+                .as_deref(),
+            Some("OAuth requests require an HTTPS URL")
         );
     }
 
