@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 use tauri_plugin_http::reqwest;
 
+use crate::auth::anilist::PROVIDER_ID as ANILIST_PROVIDER_ID;
+use crate::auth::mal::PROVIDER_ID as MAL_PROVIDER_ID;
 use crate::auth::token_manager::get_access_token;
 
 #[derive(Debug, PartialEq)]
@@ -32,15 +34,34 @@ fn request_timeout(timeout_ms: Option<u64>) -> Option<Duration> {
     timeout_ms.map(Duration::from_millis)
 }
 
-fn parse_oauth_request_url(url: &str) -> Result<reqwest::Url, String> {
+fn allowed_oauth_request_hosts(provider_id: &str) -> Option<&'static [&'static str]> {
+    match provider_id {
+        ANILIST_PROVIDER_ID => Some(&["graphql.anilist.co"]),
+        MAL_PROVIDER_ID => Some(&["api.myanimelist.net"]),
+        _ => None,
+    }
+}
+
+fn parse_oauth_request_url(provider_id: &str, url: &str) -> Result<reqwest::Url, String> {
     let parsed = reqwest::Url::parse(url).map_err(|e| e.to_string())?;
 
     if parsed.scheme() != "https" {
         return Err("OAuth requests require an HTTPS URL".to_string());
     }
 
-    if parsed.host_str().is_none() {
-        return Err("OAuth request URL must include a host".to_string());
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| "OAuth request URL must include a host".to_string())?;
+    let allowed_hosts = allowed_oauth_request_hosts(provider_id)
+        .ok_or_else(|| format!("OAuth requests are not allowed for provider {provider_id}"))?;
+
+    if !allowed_hosts
+        .iter()
+        .any(|allowed_host| host == *allowed_host)
+    {
+        return Err(format!(
+            "OAuth request host is not allowed for provider {provider_id}"
+        ));
     }
 
     Ok(parsed)
@@ -61,9 +82,9 @@ fn select_request_body(
 
 fn prepare_oauth_request(request: OAuthRequest) -> Result<PreparedOAuthRequest, String> {
     Ok(PreparedOAuthRequest {
-        provider_id: request.provider_id,
+        provider_id: request.provider_id.clone(),
         method: parse_http_method(&request.method)?,
-        url: parse_oauth_request_url(&request.url)?,
+        url: parse_oauth_request_url(&request.provider_id, &request.url)?,
         headers: request.headers.unwrap_or_default().into_iter().collect(),
         body: select_request_body(request.json_body, request.body),
         timeout: request_timeout(request.timeout_ms),
@@ -143,19 +164,37 @@ mod tests {
     }
 
     #[test]
-    fn parse_oauth_request_url_allows_https_and_rejects_cleartext_or_invalid_urls() {
+    fn parse_oauth_request_url_allows_known_provider_hosts_and_rejects_others() {
         let parsed =
-            parse_oauth_request_url("https://example.com/graphql").expect("https url should work");
+            parse_oauth_request_url(ANILIST_PROVIDER_ID, "https://graphql.anilist.co/query")
+                .expect("anilist graphql url should work");
         assert_eq!(parsed.scheme(), "https");
-        assert_eq!(parsed.host_str(), Some("example.com"));
+        assert_eq!(parsed.host_str(), Some("graphql.anilist.co"));
+
+        let mal =
+            parse_oauth_request_url(MAL_PROVIDER_ID, "https://api.myanimelist.net/v2/users/@me")
+                .expect("mal api url should work");
+        assert_eq!(mal.host_str(), Some("api.myanimelist.net"));
 
         assert_eq!(
-            parse_oauth_request_url("http://example.com/graphql")
+            parse_oauth_request_url(ANILIST_PROVIDER_ID, "http://graphql.anilist.co/query")
                 .err()
                 .as_deref(),
             Some("OAuth requests require an HTTPS URL")
         );
-        assert!(parse_oauth_request_url("not a url").is_err());
+        assert!(parse_oauth_request_url(ANILIST_PROVIDER_ID, "not a url").is_err());
+        assert_eq!(
+            parse_oauth_request_url(ANILIST_PROVIDER_ID, "https://api.myanimelist.net/v2/users")
+                .err()
+                .as_deref(),
+            Some("OAuth request host is not allowed for provider anilist")
+        );
+        assert_eq!(
+            parse_oauth_request_url("unknown", "https://example.com")
+                .err()
+                .as_deref(),
+            Some("OAuth requests are not allowed for provider unknown")
+        );
     }
 
     #[test]
@@ -176,7 +215,7 @@ mod tests {
         let request = OAuthRequest {
             provider_id: "anilist".to_string(),
             method: "pAtCh".to_string(),
-            url: "https://example.com/graphql".to_string(),
+            url: "https://graphql.anilist.co/query".to_string(),
             headers: Some(HashMap::from([
                 ("X-Test".to_string(), "1".to_string()),
                 ("Content-Type".to_string(), "application/json".to_string()),
@@ -190,7 +229,7 @@ mod tests {
 
         assert_eq!(prepared.provider_id, "anilist");
         assert_eq!(prepared.method, reqwest::Method::PATCH);
-        assert_eq!(prepared.url.as_str(), "https://example.com/graphql");
+        assert_eq!(prepared.url.as_str(), "https://graphql.anilist.co/query");
         assert_eq!(prepared.timeout, Some(Duration::from_millis(2500)));
         assert_eq!(prepared.body, OAuthRequestBody::Json(json!({"ok": true})));
         assert_eq!(prepared.headers.len(), 2);
@@ -205,9 +244,9 @@ mod tests {
     #[test]
     fn prepare_oauth_request_rejects_invalid_methods_and_handles_missing_optionals() {
         let invalid = OAuthRequest {
-            provider_id: "mal".to_string(),
+            provider_id: MAL_PROVIDER_ID.to_string(),
             method: "not a method".to_string(),
-            url: "https://example.com".to_string(),
+            url: "https://api.myanimelist.net/v2/anime".to_string(),
             headers: None,
             body: None,
             json_body: None,
@@ -216,9 +255,9 @@ mod tests {
         assert!(prepare_oauth_request(invalid).is_err());
 
         let insecure_url = OAuthRequest {
-            provider_id: "mal".to_string(),
+            provider_id: MAL_PROVIDER_ID.to_string(),
             method: "get".to_string(),
-            url: "http://example.com".to_string(),
+            url: "http://api.myanimelist.net/v2/anime".to_string(),
             headers: None,
             body: None,
             json_body: None,
@@ -229,10 +268,24 @@ mod tests {
             Some("OAuth requests require an HTTPS URL")
         );
 
-        let request = OAuthRequest {
-            provider_id: "mal".to_string(),
+        let wrong_host = OAuthRequest {
+            provider_id: MAL_PROVIDER_ID.to_string(),
             method: "get".to_string(),
-            url: "https://example.com".to_string(),
+            url: "https://graphql.anilist.co/query".to_string(),
+            headers: None,
+            body: None,
+            json_body: None,
+            timeout_ms: None,
+        };
+        assert_eq!(
+            prepare_oauth_request(wrong_host).err().as_deref(),
+            Some("OAuth request host is not allowed for provider myanimelist")
+        );
+
+        let request = OAuthRequest {
+            provider_id: MAL_PROVIDER_ID.to_string(),
+            method: "get".to_string(),
+            url: "https://api.myanimelist.net/v2/anime".to_string(),
             headers: None,
             body: Some("body".to_string()),
             json_body: None,
@@ -240,7 +293,7 @@ mod tests {
         };
         let prepared = prepare_oauth_request(request).expect("request should prepare");
 
-        assert_eq!(prepared.provider_id, "mal");
+        assert_eq!(prepared.provider_id, MAL_PROVIDER_ID);
         assert_eq!(prepared.method, reqwest::Method::GET);
         assert!(prepared.headers.is_empty());
         assert_eq!(prepared.timeout, None);
