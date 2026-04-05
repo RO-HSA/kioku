@@ -12,9 +12,10 @@ use super::mapping::{
     map_user_status_to_mal,
 };
 use super::{
-    MalListEntry, MalListResponse, MyAnimeListListType, MyAnimeListUserInfo, SynchronizedAnimeList,
-    SynchronizedListResult, SynchronizedMangaList, UserStatusKey, ANIME_UPDATE_BASE_URL, BASE_URL,
-    LIMIT, MANGA_UPDATE_BASE_URL, USER_INFO_FIELDS,
+    MalListEntry, MalListResponse, MyAnimeListListType, MyAnimeListSearchResult,
+    MyAnimeListUserInfo, SynchronizedAnimeList, SynchronizedListResult, SynchronizedMangaList,
+    UserStatusKey, ANIME_UPDATE_BASE_URL, BASE_URL, LIMIT, MANGA_UPDATE_BASE_URL, SEARCH_LIMIT_MAX,
+    USER_INFO_FIELDS,
 };
 
 fn build_user_list_url(
@@ -51,6 +52,36 @@ fn build_user_info_url() -> Result<String, String> {
 
     url.query_pairs_mut()
         .append_pair("fields", USER_INFO_FIELDS);
+
+    Ok(url.to_string())
+}
+
+fn normalize_search_query(query: &str) -> Result<String, String> {
+    let trimmed = query.trim();
+    if trimmed.is_empty() {
+        return Err("Search query cannot be empty".to_string());
+    }
+
+    Ok(trimmed.to_string())
+}
+
+fn normalize_search_limit(limit: Option<u32>) -> u32 {
+    limit.unwrap_or(SEARCH_LIMIT_MAX).clamp(1, SEARCH_LIMIT_MAX)
+}
+
+fn build_search_url(
+    query: &str,
+    list_type: MyAnimeListListType,
+    limit: Option<u32>,
+) -> Result<String, String> {
+    let mut url = reqwest::Url::parse(list_type.search_endpoint()).map_err(|e| e.to_string())?;
+    let query = normalize_search_query(query)?;
+    let limit = normalize_search_limit(limit);
+
+    url.query_pairs_mut()
+        .append_pair("q", &query)
+        .append_pair("limit", &limit.to_string())
+        .append_pair("fields", list_type.search_fields());
 
     Ok(url.to_string())
 }
@@ -225,6 +256,28 @@ async fn fetch_all_entries(
     Ok(())
 }
 
+async fn fetch_search_entries(
+    client: &reqwest::Client,
+    token: &str,
+    query: &str,
+    list_type: MyAnimeListListType,
+    limit: Option<u32>,
+) -> Result<Vec<MalListEntry>, String> {
+    let url = build_search_url(query, list_type, limit)?;
+    let response = client
+        .get(url)
+        .bearer_auth(token)
+        .timeout(Duration::from_secs(15))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    let status_code = response.status();
+    let body = response.text().await.map_err(|e| e.to_string())?;
+    let parsed = parse_list_response(status_code, &body)?;
+
+    Ok(parsed.data)
+}
+
 pub async fn update_myanimelist_list_entry(
     app: &tauri::AppHandle,
     client: &reqwest::Client,
@@ -270,6 +323,35 @@ pub async fn fetch_myanimelist_user_info(
     let status = response.status();
     let body = response.text().await.map_err(|e| e.to_string())?;
     parse_user_info_response(status, &body)
+}
+
+#[tauri::command]
+pub async fn search_myanimelist_media(
+    app: tauri::AppHandle,
+    query: String,
+    list_type: Option<MyAnimeListListType>,
+    limit: Option<u32>,
+) -> Result<MyAnimeListSearchResult, String> {
+    let token = get_access_token(&app, MAL_PROVIDER_ID).await?;
+    let list_type = list_type.unwrap_or_default();
+    let client = reqwest::Client::new();
+    let status_key = list_type.default_search_status_key();
+    let entries = fetch_search_entries(&client, &token, &query, list_type, limit).await?;
+
+    match list_type {
+        MyAnimeListListType::Anime => Ok(MyAnimeListSearchResult::Anime(
+            entries
+                .into_iter()
+                .map(|entry| map_anime_entry_to_domain(entry, status_key))
+                .collect(),
+        )),
+        MyAnimeListListType::Manga => Ok(MyAnimeListSearchResult::Manga(
+            entries
+                .into_iter()
+                .map(|entry| map_manga_entry_to_domain(entry, status_key))
+                .collect(),
+        )),
+    }
 }
 
 #[tauri::command]
@@ -391,6 +473,42 @@ mod tests {
         assert_eq!(parsed.domain(), Some("api.myanimelist.net"));
         assert_eq!(segments, vec!["v2", "users", "@me"]);
         assert_eq!(query.get("fields"), Some(&USER_INFO_FIELDS.to_string()));
+    }
+
+    #[test]
+    fn build_search_url_uses_expected_endpoint_and_query_values() {
+        let url = build_search_url(" Kingdom ", MyAnimeListListType::Anime, Some(150))
+            .expect("url should build");
+        let parsed = reqwest::Url::parse(&url).expect("built url should parse");
+        let segments = parsed
+            .path_segments()
+            .expect("path segments should exist")
+            .collect::<Vec<_>>();
+        let query = parsed
+            .query_pairs()
+            .map(|(key, value)| (key.to_string(), value.to_string()))
+            .collect::<HashMap<_, _>>();
+
+        assert_eq!(parsed.domain(), Some("api.myanimelist.net"));
+        assert_eq!(segments, vec!["v2", "anime"]);
+        assert_eq!(query.get("q"), Some(&"Kingdom".to_string()));
+        assert_eq!(query.get("limit"), Some(&SEARCH_LIMIT_MAX.to_string()));
+        assert_eq!(
+            query.get("fields"),
+            Some(&MyAnimeListListType::Anime.search_fields().to_string())
+        );
+    }
+
+    #[test]
+    fn search_helpers_reject_blank_queries_and_clamp_limits() {
+        assert_eq!(
+            normalize_search_query("   ").err().as_deref(),
+            Some("Search query cannot be empty")
+        );
+        assert_eq!(normalize_search_limit(None), SEARCH_LIMIT_MAX);
+        assert_eq!(normalize_search_limit(Some(0)), 1);
+        assert_eq!(normalize_search_limit(Some(10)), 10);
+        assert_eq!(normalize_search_limit(Some(999)), SEARCH_LIMIT_MAX);
     }
 
     #[test]
@@ -544,6 +662,35 @@ mod tests {
             parsed.paging.and_then(|paging| paging.next),
             Some("https://api.myanimelist.net/v2/users/@me/animelist?offset=1000".to_string())
         );
+    }
+
+    #[test]
+    fn parse_list_response_accepts_search_payloads_without_list_status() {
+        let parsed = parse_list_response(
+            reqwest::StatusCode::OK,
+            r#"{
+                "data": [
+                    {
+                        "node": {
+                            "id": 17389,
+                            "title": "Kingdom 2nd Season",
+                            "mean": 8.29,
+                            "status": "finished_airing",
+                            "genres": [
+                                {"id": 1, "name": "Action"}
+                            ]
+                        }
+                    }
+                ]
+            }"#,
+        )
+        .expect("search response should parse");
+
+        assert_eq!(parsed.data.len(), 1);
+        assert_eq!(parsed.data[0].node.id, 17389);
+        assert_eq!(parsed.data[0].node.title, "Kingdom 2nd Season");
+        assert!(parsed.data[0].list_status.status.is_none());
+        assert!(parsed.paging.is_none());
     }
 
     #[test]
