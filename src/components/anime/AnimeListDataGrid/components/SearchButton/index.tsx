@@ -13,6 +13,7 @@ import { Provider } from '@/types/List';
 
 const SearchButton = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -35,9 +36,6 @@ const SearchButton = () => {
 
   const setAnimeSearchResults = useMyAnimeListStore(
     (state) => state.setAnimeSearchResults
-  );
-  const setMangaSearchResults = useMyAnimeListStore(
-    (state) => state.setMangaSearchResults
   );
 
   const open = Boolean(anchorEl);
@@ -76,8 +74,7 @@ const SearchButton = () => {
       activeProvider,
       navigate,
       setRemoteSearchValue,
-      setAnimeSearchResults,
-      setMangaSearchResults
+      setAnimeSearchResults
     ]
   );
 
