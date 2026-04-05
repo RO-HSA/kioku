@@ -18,7 +18,7 @@ enum OAuthRequestBody {
 struct PreparedOAuthRequest {
     provider_id: String,
     method: reqwest::Method,
-    url: String,
+    url: reqwest::Url,
     headers: Vec<(String, String)>,
     body: OAuthRequestBody,
     timeout: Option<Duration>,
@@ -30,6 +30,20 @@ fn parse_http_method(method: &str) -> Result<reqwest::Method, String> {
 
 fn request_timeout(timeout_ms: Option<u64>) -> Option<Duration> {
     timeout_ms.map(Duration::from_millis)
+}
+
+fn parse_oauth_request_url(url: &str) -> Result<reqwest::Url, String> {
+    let parsed = reqwest::Url::parse(url).map_err(|e| e.to_string())?;
+
+    if parsed.scheme() != "https" {
+        return Err("OAuth requests require an HTTPS URL".to_string());
+    }
+
+    if parsed.host_str().is_none() {
+        return Err("OAuth request URL must include a host".to_string());
+    }
+
+    Ok(parsed)
 }
 
 fn select_request_body(
@@ -49,7 +63,7 @@ fn prepare_oauth_request(request: OAuthRequest) -> Result<PreparedOAuthRequest, 
     Ok(PreparedOAuthRequest {
         provider_id: request.provider_id,
         method: parse_http_method(&request.method)?,
-        url: request.url,
+        url: parse_oauth_request_url(&request.url)?,
         headers: request.headers.unwrap_or_default().into_iter().collect(),
         body: select_request_body(request.json_body, request.body),
         timeout: request_timeout(request.timeout_ms),
@@ -79,7 +93,7 @@ pub async fn oauth_request(app: AppHandle, request: OAuthRequest) -> Result<OAut
     let token = get_access_token(&app, &request.provider_id).await?;
 
     let mut builder = reqwest::Client::new()
-        .request(request.method, &request.url)
+        .request(request.method, request.url)
         .bearer_auth(token);
 
     if let Some(timeout) = request.timeout {
@@ -129,6 +143,22 @@ mod tests {
     }
 
     #[test]
+    fn parse_oauth_request_url_allows_https_and_rejects_cleartext_or_invalid_urls() {
+        let parsed =
+            parse_oauth_request_url("https://example.com/graphql").expect("https url should work");
+        assert_eq!(parsed.scheme(), "https");
+        assert_eq!(parsed.host_str(), Some("example.com"));
+
+        assert_eq!(
+            parse_oauth_request_url("http://example.com/graphql")
+                .err()
+                .as_deref(),
+            Some("OAuth requests require an HTTPS URL")
+        );
+        assert!(parse_oauth_request_url("not a url").is_err());
+    }
+
+    #[test]
     fn select_request_body_prefers_json_and_falls_back_to_text() {
         assert_eq!(
             select_request_body(Some(json!({"ok": true})), Some("ignored".to_string())),
@@ -160,7 +190,7 @@ mod tests {
 
         assert_eq!(prepared.provider_id, "anilist");
         assert_eq!(prepared.method, reqwest::Method::PATCH);
-        assert_eq!(prepared.url, "https://example.com/graphql");
+        assert_eq!(prepared.url.as_str(), "https://example.com/graphql");
         assert_eq!(prepared.timeout, Some(Duration::from_millis(2500)));
         assert_eq!(prepared.body, OAuthRequestBody::Json(json!({"ok": true})));
         assert_eq!(prepared.headers.len(), 2);
@@ -184,6 +214,20 @@ mod tests {
             timeout_ms: None,
         };
         assert!(prepare_oauth_request(invalid).is_err());
+
+        let insecure_url = OAuthRequest {
+            provider_id: "mal".to_string(),
+            method: "get".to_string(),
+            url: "http://example.com".to_string(),
+            headers: None,
+            body: None,
+            json_body: None,
+            timeout_ms: None,
+        };
+        assert_eq!(
+            prepare_oauth_request(insecure_url).err().as_deref(),
+            Some("OAuth requests require an HTTPS URL")
+        );
 
         let request = OAuthRequest {
             provider_id: "mal".to_string(),
