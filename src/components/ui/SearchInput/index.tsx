@@ -35,7 +35,7 @@ const SearchInput: FC<SearchInputProps> = ({ value, onChange, onEnterKey }) => {
       fullWidth
       size="small"
       sx={{
-        '& .MuiInputAdornment-root': {
+        '& .MuiInputAdornment-positionEnd': {
           visibility: value.length > 0 ? 'visible' : 'hidden'
         }
       }}

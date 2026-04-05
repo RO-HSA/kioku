@@ -1,10 +1,13 @@
+import { PathName } from '@/routes';
 import { Box } from '@mui/material';
 import {
   MRT_ShowHideColumnsButton,
   MRT_TableInstance
 } from 'material-react-table';
 import { FC } from 'react';
+import { useLocation } from 'react-router';
 
+import { cn } from '@/lib/utils';
 import { SynchronizedAnimeList } from '@/services/backend/types';
 import { IAnimeList } from '@/types/AnimeList';
 import RefreshListButton from '../RefreshListButton';
@@ -17,17 +20,30 @@ interface CustomTopToolbarProps {
 }
 
 const CustomTopToolbar: FC<CustomTopToolbarProps> = ({ listData, table }) => {
+  const location = useLocation();
+
+  const isSearchPage = location.pathname === PathName.SEARCH;
+
   return (
-    <Box className="flex justify-between px-3 w-full items-center overflow-hidden">
-      <StatusTabs
-        watchingCount={listData?.watching.length || 0}
-        completedCount={listData?.completed.length || 0}
-        onHoldCount={listData?.onHold.length || 0}
-        droppedCount={listData?.dropped.length || 0}
-        planToWatchCount={listData?.planToWatch.length || 0}
-      />
+    <Box
+      className={cn(
+        'flex px-3 w-full items-center overflow-hidden',
+        isSearchPage ? 'justify-end' : 'justify-between'
+      )}>
+      {!isSearchPage && (
+        <StatusTabs
+          watchingCount={listData?.watching.length || 0}
+          completedCount={listData?.completed.length || 0}
+          onHoldCount={listData?.onHold.length || 0}
+          droppedCount={listData?.dropped.length || 0}
+          planToWatchCount={listData?.planToWatch.length || 0}
+        />
+      )}
+
       <SearchButton />
-      <RefreshListButton />
+
+      {!isSearchPage && <RefreshListButton />}
+
       <MRT_ShowHideColumnsButton table={table} />
     </Box>
   );
