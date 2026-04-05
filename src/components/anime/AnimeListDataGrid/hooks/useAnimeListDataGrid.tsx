@@ -271,10 +271,31 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
         }
       },
       {
+        accessorKey: 'score',
+        header: 'Score',
+        size: 85,
+        enableGlobalFilter: false,
+        visibleInShowHideMenu: isSearchPage,
+        Cell: ({ cell }) => {
+          const score = cell.getValue<number>();
+
+          return (
+            <Box display="flex" justifyContent="center" width="100%">
+              {score === 0 ? (
+                <span className="text-gray-500">{'N/A'}</span>
+              ) : (
+                score
+              )}
+            </Box>
+          );
+        }
+      },
+      {
         accessorKey: 'userScore',
         header: 'Score',
         size: 85,
         enableGlobalFilter: false,
+        visibleInShowHideMenu: !isSearchPage,
         Cell: ({ cell, row }) => {
           const score = cell.getValue<number>();
 
@@ -454,7 +475,9 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
       sorting,
       columnVisibility: {
         ...columnVisibility,
-        ...(isSearchPage && { userEpisodesWatched: false })
+        ...(isSearchPage
+          ? { userEpisodesWatched: false, userScore: false }
+          : { score: false })
       },
       columnSizing
     },
