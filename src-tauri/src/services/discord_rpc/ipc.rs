@@ -421,8 +421,9 @@ mod tests {
         }
         .sanitize()
         .into_activity();
+        let nonce = build_nonce();
 
-        let command = build_activity_command(123, activity, "kioku-test".to_string());
+        let command = build_activity_command(123, activity, nonce.clone());
         let command_json = serde_json::to_value(&command).expect("command should serialize");
         let handshake_json = build_handshake_payload("456");
 
@@ -432,7 +433,7 @@ mod tests {
             command_json["args"]["activity"]["details"],
             "Watching Frieren"
         );
-        assert_eq!(command_json["nonce"], "kioku-test");
+        assert_eq!(command_json["nonce"], nonce);
         assert_eq!(handshake_json["v"], DISCORD_HANDSHAKE_VERSION);
         assert_eq!(handshake_json["client_id"], "456");
     }
@@ -445,13 +446,14 @@ mod tests {
         }
         .sanitize()
         .into_activity();
+        let nonce = build_nonce();
 
         let packet = encode_packet_bytes(
             DISCORD_IPC_OPCODE_FRAME,
             &DiscordIpcCommand {
                 cmd: DISCORD_COMMAND_SET_ACTIVITY,
                 args: DiscordIpcCommandArgs { pid: 123, activity },
-                nonce: "kioku-test".to_string(),
+                nonce: nonce.clone(),
             },
         )
         .expect("packet should encode");
@@ -459,6 +461,6 @@ mod tests {
 
         assert!(body.contains("\"cmd\":\"SET_ACTIVITY\""));
         assert!(body.contains("\"details\":\"Watching Frieren\""));
-        assert!(body.contains("\"nonce\":\"kioku-test\""));
+        assert!(body.contains(&format!("\"nonce\":\"{nonce}\"")));
     }
 }
