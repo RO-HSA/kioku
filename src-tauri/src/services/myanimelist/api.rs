@@ -40,6 +40,21 @@ fn build_user_list_url(
     Ok(url.to_string())
 }
 
+fn build_user_info_url() -> Result<String, String> {
+    let mut url = reqwest::Url::parse(BASE_URL).map_err(|e| e.to_string())?;
+    {
+        let mut segments = url
+            .path_segments_mut()
+            .map_err(|_| "Invalid MyAnimeList base URL".to_string())?;
+        segments.push("@me");
+    }
+
+    url.query_pairs_mut()
+        .append_pair("fields", USER_INFO_FIELDS);
+
+    Ok(url.to_string())
+}
+
 fn parse_next_offset(next_url: &str) -> Option<u32> {
     let url = reqwest::Url::parse(next_url).ok()?;
     url.query_pairs()
@@ -139,6 +154,45 @@ fn build_mal_update_payload(update: &AnimeListUpdateRequest) -> Result<MalUpdate
     })
 }
 
+fn parse_list_response(status: reqwest::StatusCode, body: &str) -> Result<MalListResponse, String> {
+    if !status.is_success() {
+        return Err(format!("MyAnimeList request failed: {} - {}", status, body));
+    }
+
+    serde_json::from_str(body)
+        .map_err(|e| format!("Failed to parse MyAnimeList list response: {e}"))
+}
+
+fn parse_user_info_response(
+    status: reqwest::StatusCode,
+    body: &str,
+) -> Result<MyAnimeListUserInfo, String> {
+    if !status.is_success() {
+        return Err(format!(
+            "MyAnimeList user info request failed: {} - {}",
+            status, body
+        ));
+    }
+
+    let raw: super::MalUserInfoResponse = serde_json::from_str(body)
+        .map_err(|e| format!("Failed to parse MyAnimeList user info response: {e}"))?;
+
+    Ok(MyAnimeListUserInfo {
+        id: raw.id,
+        name: raw.name,
+        picture: raw.picture,
+        statistics: raw.anime_statistics.map(map_mal_statistics),
+    })
+}
+
+fn validate_update_response(status: reqwest::StatusCode, body: &str) -> Result<(), String> {
+    if !status.is_success() {
+        return Err(format!("MyAnimeList update failed: {} - {}", status, body));
+    }
+
+    Ok(())
+}
+
 async fn fetch_all_entries(
     client: &reqwest::Client,
     token: &str,
@@ -158,16 +212,8 @@ async fn fetch_all_entries(
             .await
             .map_err(|e| e.to_string())?;
         let status_code = response.status();
-
-        if !status_code.is_success() {
-            let body = response.text().await.map_err(|e| e.to_string())?;
-            return Err(format!(
-                "MyAnimeList request failed: {} - {}",
-                status_code, body
-            ));
-        }
-
-        let parsed: MalListResponse = response.json().await.map_err(|e| e.to_string())?;
+        let body = response.text().await.map_err(|e| e.to_string())?;
+        let parsed = parse_list_response(status_code, &body)?;
 
         result.extend(parsed.data);
 
@@ -202,12 +248,8 @@ pub async fn update_myanimelist_list_entry(
         .map_err(|e| e.to_string())?;
 
     let status = response.status();
-    if !status.is_success() {
-        let body = response.text().await.map_err(|e| e.to_string())?;
-        return Err(format!("MyAnimeList update failed: {} - {}", status, body));
-    }
-
-    Ok(())
+    let body = response.text().await.map_err(|e| e.to_string())?;
+    validate_update_response(status, &body)
 }
 
 #[tauri::command]
@@ -215,17 +257,7 @@ pub async fn fetch_myanimelist_user_info(
     app: tauri::AppHandle,
 ) -> Result<MyAnimeListUserInfo, String> {
     let token = get_access_token(&app, MAL_PROVIDER_ID).await?;
-    let mut url = reqwest::Url::parse(BASE_URL).map_err(|e| e.to_string())?;
-    {
-        let mut segments = url
-            .path_segments_mut()
-            .map_err(|_| "Invalid MyAnimeList base URL".to_string())?;
-        segments.push("@me");
-    }
-
-    url.query_pairs_mut()
-        .append_pair("fields", USER_INFO_FIELDS);
-
+    let url = build_user_info_url()?;
     let client = reqwest::Client::new();
     let response = client
         .get(url)
@@ -236,25 +268,8 @@ pub async fn fetch_myanimelist_user_info(
         .map_err(|e| e.to_string())?;
 
     let status = response.status();
-    if !status.is_success() {
-        let body = response.text().await.map_err(|e| e.to_string())?;
-        return Err(format!(
-            "MyAnimeList user info request failed: {} - {}",
-            status, body
-        ));
-    }
-
-    let raw = response
-        .json::<super::MalUserInfoResponse>()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    Ok(MyAnimeListUserInfo {
-        id: raw.id,
-        name: raw.name,
-        picture: raw.picture,
-        statistics: raw.anime_statistics.map(map_mal_statistics),
-    })
+    let body = response.text().await.map_err(|e| e.to_string())?;
+    parse_user_info_response(status, &body)
 }
 
 #[tauri::command]
@@ -358,6 +373,24 @@ mod tests {
             segments,
             vec!["v2", "users", "..%2Fevil%3Fadmin=true", "mangalist"]
         );
+    }
+
+    #[test]
+    fn build_user_info_url_uses_expected_path_and_query_values() {
+        let url = build_user_info_url().expect("url should build");
+        let parsed = reqwest::Url::parse(&url).expect("built url should parse");
+        let segments = parsed
+            .path_segments()
+            .expect("path segments should exist")
+            .collect::<Vec<_>>();
+        let query = parsed
+            .query_pairs()
+            .map(|(key, value)| (key.to_string(), value.to_string()))
+            .collect::<HashMap<_, _>>();
+
+        assert_eq!(parsed.domain(), Some("api.myanimelist.net"));
+        assert_eq!(segments, vec!["v2", "users", "@me"]);
+        assert_eq!(query.get("fields"), Some(&USER_INFO_FIELDS.to_string()));
     }
 
     #[test]
@@ -478,6 +511,131 @@ mod tests {
         assert_eq!(
             build_mal_update_payload(&invalid_status).err().as_deref(),
             Some("Invalid MyAnimeList status: reading")
+        );
+    }
+
+    #[test]
+    fn parse_list_response_accepts_valid_payloads_and_preserves_paging() {
+        let parsed = parse_list_response(
+            reqwest::StatusCode::OK,
+            r#"{
+                "data": [
+                    {
+                        "node": {
+                            "id": 1,
+                            "title": "Frieren"
+                        },
+                        "list_status": {
+                            "status": "watching"
+                        }
+                    }
+                ],
+                "paging": {
+                    "next": "https://api.myanimelist.net/v2/users/@me/animelist?offset=1000"
+                }
+            }"#,
+        )
+        .expect("list response should parse");
+
+        assert_eq!(parsed.data.len(), 1);
+        assert_eq!(parsed.data[0].node.id, 1);
+        assert_eq!(parsed.data[0].node.title, "Frieren");
+        assert_eq!(
+            parsed.paging.and_then(|paging| paging.next),
+            Some("https://api.myanimelist.net/v2/users/@me/animelist?offset=1000".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_list_response_rejects_http_errors_and_invalid_payloads() {
+        assert_eq!(
+            parse_list_response(reqwest::StatusCode::TOO_MANY_REQUESTS, "slow down")
+                .err()
+                .as_deref(),
+            Some("MyAnimeList request failed: 429 Too Many Requests - slow down")
+        );
+
+        assert!(parse_list_response(reqwest::StatusCode::OK, "{")
+            .err()
+            .expect("invalid json should fail")
+            .starts_with("Failed to parse MyAnimeList list response:"));
+
+        assert!(
+            parse_list_response(reqwest::StatusCode::OK, r#"{"data":[{}]}"#)
+                .err()
+                .expect("missing node should fail")
+                .starts_with("Failed to parse MyAnimeList list response:")
+        );
+    }
+
+    #[test]
+    fn parse_user_info_response_maps_statistics() {
+        let parsed = parse_user_info_response(
+            reqwest::StatusCode::OK,
+            r#"{
+                "id": 99,
+                "name": "robert",
+                "picture": "https://img.example/avatar.png",
+                "anime_statistics": {
+                    "num_items_watching": 1,
+                    "num_items_completed": 2,
+                    "num_items_on_hold": 3,
+                    "num_items_dropped": 4,
+                    "num_items_plan_to_watch": 5,
+                    "num_items": 15,
+                    "num_days_watched": 10.5,
+                    "num_days_watching": 1.5,
+                    "num_days_completed": 2.5,
+                    "num_days_on_hold": 3.5,
+                    "num_days_dropped": 4.5,
+                    "num_days": 10.5,
+                    "num_episodes": 24,
+                    "num_times_rewatched": 7,
+                    "mean_score": 8.9
+                }
+            }"#,
+        )
+        .expect("user info should parse");
+
+        let statistics = parsed.statistics.expect("statistics should be present");
+
+        assert_eq!(parsed.id, 99);
+        assert_eq!(parsed.name, "robert");
+        assert_eq!(
+            parsed.picture.as_deref(),
+            Some("https://img.example/avatar.png")
+        );
+        assert_eq!(statistics.num_items, 15);
+        assert_eq!(statistics.num_items_watching, 1);
+        assert_eq!(statistics.num_times_rewatched, 7);
+        assert_eq!(statistics.mean_score, 8.9);
+    }
+
+    #[test]
+    fn parse_user_info_response_rejects_http_errors_and_invalid_json() {
+        assert_eq!(
+            parse_user_info_response(reqwest::StatusCode::UNAUTHORIZED, "expired")
+                .err()
+                .as_deref(),
+            Some("MyAnimeList user info request failed: 401 Unauthorized - expired")
+        );
+
+        assert!(parse_user_info_response(reqwest::StatusCode::OK, "{")
+            .err()
+            .expect("invalid json should fail")
+            .starts_with("Failed to parse MyAnimeList user info response:"));
+    }
+
+    #[test]
+    fn validate_update_response_accepts_success_and_rejects_failures() {
+        validate_update_response(reqwest::StatusCode::NO_CONTENT, "")
+            .expect("successful update should be accepted");
+
+        assert_eq!(
+            validate_update_response(reqwest::StatusCode::BAD_REQUEST, "invalid")
+                .err()
+                .as_deref(),
+            Some("MyAnimeList update failed: 400 Bad Request - invalid")
         );
     }
 }

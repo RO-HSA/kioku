@@ -119,6 +119,82 @@ fn build_save_media_list_entry_variables(
     })
 }
 
+fn parse_collection_response(
+    status: reqwest::StatusCode,
+    body: &str,
+) -> Result<AniListCollection, String> {
+    if !status.is_success() {
+        return Err(format!("AniList request failed: {} - {}", status, body));
+    }
+
+    let parsed: GraphQlResponse =
+        serde_json::from_str(body).map_err(|e| format!("Failed to parse AniList response: {e}"))?;
+
+    map_graphql_errors(parsed.errors)?;
+
+    parsed
+        .data
+        .and_then(|data| data.media_list_collection)
+        .ok_or_else(|| "AniList response missing MediaListCollection".to_string())
+}
+
+fn parse_viewer_response(
+    status: reqwest::StatusCode,
+    body: &str,
+) -> Result<AniListUserInfo, String> {
+    if !status.is_success() {
+        return Err(format!("AniList request failed: {} - {}", status, body));
+    }
+
+    let parsed: ViewerResponse =
+        serde_json::from_str(body).map_err(|e| format!("Failed to parse AniList response: {e}"))?;
+
+    map_graphql_errors(parsed.errors)?;
+
+    let viewer = parsed
+        .data
+        .and_then(|data| data.viewer)
+        .ok_or_else(|| "AniList response missing Viewer".to_string())?;
+
+    Ok(AniListUserInfo {
+        id: viewer.id,
+        name: viewer.name,
+        picture: viewer.avatar.and_then(|avatar| avatar.large),
+        statistics: viewer
+            .statistics
+            .and_then(|statistics| statistics.anime)
+            .map(map_anilist_statistics),
+    })
+}
+
+fn parse_save_media_list_entry_response(
+    status: reqwest::StatusCode,
+    body: &str,
+) -> Result<(), String> {
+    if !status.is_success() {
+        return Err(format!("AniList update failed: {} - {}", status, body));
+    }
+
+    let parsed: SaveMediaListEntryMutationResponse = serde_json::from_str(body)
+        .map_err(|e| format!("Failed to parse AniList update response: {e}"))?;
+
+    map_graphql_errors(parsed.errors)?;
+
+    let Some(data) = parsed.data else {
+        return Err("AniList update response missing data".to_string());
+    };
+
+    let Some(saved_entry) = data.save_media_list_entry else {
+        return Err("AniList update response missing SaveMediaListEntry".to_string());
+    };
+
+    if saved_entry.id == 0 {
+        return Err("AniList update returned an invalid entry id".to_string());
+    }
+
+    Ok(())
+}
+
 async fn fetch_collection(
     client: &reqwest::Client,
     token: &str,
@@ -147,19 +223,7 @@ async fn fetch_collection(
     let status = response.status();
 
     let body = response.text().await.map_err(|e| e.to_string())?;
-    if !status.is_success() {
-        return Err(format!("AniList request failed: {} - {}", status, body));
-    }
-
-    let parsed: GraphQlResponse = serde_json::from_str(&body)
-        .map_err(|e| format!("Failed to parse AniList response: {e}"))?;
-
-    map_graphql_errors(parsed.errors)?;
-
-    parsed
-        .data
-        .and_then(|data| data.media_list_collection)
-        .ok_or_else(|| "AniList response missing MediaListCollection".to_string())
+    parse_collection_response(status, &body)
 }
 
 async fn fetch_viewer(client: &reqwest::Client, token: &str) -> Result<AniListUserInfo, String> {
@@ -178,29 +242,7 @@ async fn fetch_viewer(client: &reqwest::Client, token: &str) -> Result<AniListUs
     let status = response.status();
 
     let body = response.text().await.map_err(|e| e.to_string())?;
-    if !status.is_success() {
-        return Err(format!("AniList request failed: {} - {}", status, body));
-    }
-
-    let parsed: ViewerResponse = serde_json::from_str(&body)
-        .map_err(|e| format!("Failed to parse AniList response: {e}"))?;
-
-    map_graphql_errors(parsed.errors)?;
-
-    let viewer = parsed
-        .data
-        .and_then(|data| data.viewer)
-        .ok_or_else(|| "AniList response missing Viewer".to_string())?;
-
-    Ok(AniListUserInfo {
-        id: viewer.id,
-        name: viewer.name,
-        picture: viewer.avatar.and_then(|avatar| avatar.large),
-        statistics: viewer
-            .statistics
-            .and_then(|statistics| statistics.anime)
-            .map(map_anilist_statistics),
-    })
+    parse_viewer_response(status, &body)
 }
 
 #[tauri::command]
@@ -305,29 +347,7 @@ pub async fn update_anilist_list_entry(
         .map_err(|e| e.to_string())?;
     let status_code = response.status();
     let body = response.text().await.map_err(|e| e.to_string())?;
-
-    if !status_code.is_success() {
-        return Err(format!("AniList update failed: {} - {}", status_code, body));
-    }
-
-    let parsed: SaveMediaListEntryMutationResponse = serde_json::from_str(&body)
-        .map_err(|e| format!("Failed to parse AniList update response: {e}"))?;
-
-    map_graphql_errors(parsed.errors)?;
-
-    let Some(data) = parsed.data else {
-        return Err("AniList update response missing data".to_string());
-    };
-
-    let Some(saved_entry) = data.save_media_list_entry else {
-        return Err("AniList update response missing SaveMediaListEntry".to_string());
-    };
-
-    if saved_entry.id == 0 {
-        return Err("AniList update returned an invalid entry id".to_string());
-    }
-
-    Ok(())
+    parse_save_media_list_entry_response(status_code, &body)
 }
 
 #[cfg(test)]
@@ -471,6 +491,200 @@ mod tests {
                 .err()
                 .as_deref(),
             Some("Invalid userStartDate: expected YYYY-MM-DD")
+        );
+    }
+
+    #[test]
+    fn parse_collection_response_accepts_successful_payloads() {
+        let collection = parse_collection_response(
+            reqwest::StatusCode::OK,
+            r#"{
+                "data": {
+                    "MediaListCollection": {
+                        "lists": [],
+                        "hasNextChunk": true
+                    }
+                }
+            }"#,
+        )
+        .expect("collection should parse");
+
+        assert!(collection.lists.is_empty());
+        assert!(collection.has_next_chunk);
+    }
+
+    #[test]
+    fn parse_collection_response_rejects_http_errors_invalid_json_and_missing_data() {
+        assert_eq!(
+            parse_collection_response(reqwest::StatusCode::UNAUTHORIZED, "denied")
+                .err()
+                .as_deref(),
+            Some("AniList request failed: 401 Unauthorized - denied")
+        );
+
+        assert!(parse_collection_response(reqwest::StatusCode::OK, "{")
+            .err()
+            .expect("invalid json should fail")
+            .starts_with("Failed to parse AniList response:"));
+
+        assert_eq!(
+            parse_collection_response(reqwest::StatusCode::OK, r#"{"data":{}}"#)
+                .err()
+                .as_deref(),
+            Some("AniList response missing MediaListCollection")
+        );
+    }
+
+    #[test]
+    fn parse_collection_response_surfaces_graphql_errors() {
+        assert_eq!(
+            parse_collection_response(
+                reqwest::StatusCode::OK,
+                r#"{"errors":[{"message":"forbidden"},{"message":"rate limited"}]}"#,
+            )
+            .err()
+            .as_deref(),
+            Some("AniList GraphQL error: forbidden; rate limited")
+        );
+    }
+
+    #[test]
+    fn parse_viewer_response_maps_user_info_and_statistics() {
+        let user = parse_viewer_response(
+            reqwest::StatusCode::OK,
+            r#"{
+                "data": {
+                    "Viewer": {
+                        "id": 7,
+                        "name": "robert",
+                        "avatar": {
+                            "large": "https://img.example/avatar.png"
+                        },
+                        "statistics": {
+                            "anime": {
+                                "count": 15,
+                                "episodesWatched": 24,
+                                "meanScore": 81.5,
+                                "minutesWatched": 1440,
+                                "statuses": [
+                                    {"count": 1, "minutesWatched": 120, "status": "CURRENT"},
+                                    {"count": 2, "minutesWatched": 240, "status": "COMPLETED"},
+                                    {"count": 3, "minutesWatched": 360, "status": "PAUSED"},
+                                    {"count": 4, "minutesWatched": 480, "status": "DROPPED"},
+                                    {"count": 5, "minutesWatched": 0, "status": "PLANNING"}
+                                ]
+                            }
+                        }
+                    }
+                }
+            }"#,
+        )
+        .expect("viewer should parse");
+
+        let statistics = user.statistics.expect("statistics should be present");
+
+        assert_eq!(user.id, 7);
+        assert_eq!(user.name, "robert");
+        assert_eq!(
+            user.picture.as_deref(),
+            Some("https://img.example/avatar.png")
+        );
+        assert_eq!(statistics.num_items, 15);
+        assert_eq!(statistics.num_items_watching, 1);
+        assert_eq!(statistics.num_items_completed, 2);
+        assert_eq!(statistics.num_items_on_hold, 3);
+        assert_eq!(statistics.num_items_dropped, 4);
+        assert_eq!(statistics.num_items_plan_to_watch, 5);
+        assert_eq!(statistics.num_episodes, 24);
+        assert!((statistics.num_days_watched - 1.0).abs() < f64::EPSILON);
+        assert_eq!(statistics.mean_score, 81.5);
+    }
+
+    #[test]
+    fn parse_viewer_response_rejects_http_errors_invalid_json_missing_viewer_and_graphql_errors() {
+        assert_eq!(
+            parse_viewer_response(reqwest::StatusCode::FORBIDDEN, "blocked")
+                .err()
+                .as_deref(),
+            Some("AniList request failed: 403 Forbidden - blocked")
+        );
+
+        assert!(parse_viewer_response(reqwest::StatusCode::OK, "{")
+            .err()
+            .expect("invalid json should fail")
+            .starts_with("Failed to parse AniList response:"));
+
+        assert_eq!(
+            parse_viewer_response(reqwest::StatusCode::OK, r#"{"data":{}}"#)
+                .err()
+                .as_deref(),
+            Some("AniList response missing Viewer")
+        );
+
+        assert_eq!(
+            parse_viewer_response(
+                reqwest::StatusCode::OK,
+                r#"{"errors":[{"message":"session expired"}]}"#,
+            )
+            .err()
+            .as_deref(),
+            Some("AniList GraphQL error: session expired")
+        );
+    }
+
+    #[test]
+    fn parse_save_media_list_entry_response_validates_success_and_error_paths() {
+        parse_save_media_list_entry_response(
+            reqwest::StatusCode::OK,
+            r#"{"data":{"SaveMediaListEntry":{"id":123}}}"#,
+        )
+        .expect("successful mutation should be accepted");
+
+        assert_eq!(
+            parse_save_media_list_entry_response(reqwest::StatusCode::BAD_REQUEST, "invalid")
+                .err()
+                .as_deref(),
+            Some("AniList update failed: 400 Bad Request - invalid")
+        );
+
+        assert!(
+            parse_save_media_list_entry_response(reqwest::StatusCode::OK, "{")
+                .unwrap_err()
+                .starts_with("Failed to parse AniList update response:")
+        );
+
+        assert_eq!(
+            parse_save_media_list_entry_response(
+                reqwest::StatusCode::OK,
+                r#"{"errors":[{"message":"mutation denied"}]}"#,
+            )
+            .err()
+            .as_deref(),
+            Some("AniList GraphQL error: mutation denied")
+        );
+
+        assert_eq!(
+            parse_save_media_list_entry_response(reqwest::StatusCode::OK, r#"{"data":null}"#)
+                .err()
+                .as_deref(),
+            Some("AniList update response missing data")
+        );
+
+        assert_eq!(
+            parse_save_media_list_entry_response(reqwest::StatusCode::OK, r#"{"data":{}}"#)
+                .err()
+                .as_deref(),
+            Some("AniList update response missing SaveMediaListEntry")
+        );
+
+        assert_eq!(
+            parse_save_media_list_entry_response(
+                reqwest::StatusCode::OK,
+                r#"{"data":{"SaveMediaListEntry":{"id":0}}}"#,
+            )
+            .err()
+            .as_deref(),
+            Some("AniList update returned an invalid entry id")
         );
     }
 }
