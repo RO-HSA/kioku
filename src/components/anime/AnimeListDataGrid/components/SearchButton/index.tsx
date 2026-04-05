@@ -27,6 +27,9 @@ const SearchButton = () => {
   const remoteSearchValue = useAnimeListDataGridStore(
     (state) => state.remoteSearchValue
   );
+  const setIsLoadingGrid = useAnimeListDataGridStore(
+    (state) => state.setIsLoading
+  );
   const setLocalSearchValue = useAnimeListDataGridStore(
     (state) => state.setLocalSearchValue
   );
@@ -64,22 +67,27 @@ const SearchButton = () => {
 
       switch (activeProvider) {
         case Provider.MY_ANIME_LIST: {
+          setIsLoadingGrid(true);
           const results = await MyAnimeListService.searchMedia(
             searchValue,
             'anime'
           );
           setAnimeSearchResults(results);
+          setIsLoadingGrid(false);
           break;
         }
         case Provider.ANILIST: {
+          setIsLoadingGrid(true);
           const results = await AniListService.searchMedia(
             searchValue,
             'anime'
           );
           setAniListAnimeSearchResults(results);
+          setIsLoadingGrid(false);
           break;
         }
         default:
+          setIsLoadingGrid(false);
           break;
       }
     },

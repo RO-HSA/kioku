@@ -33,6 +33,9 @@ const SearchButton = () => {
   const setRemoteSearchValue = useMangaListDataGridStore(
     (state) => state.setRemoteSearchValue
   );
+  const setIsLoadingGrid = useMangaListDataGridStore(
+    (state) => state.setIsloading
+  );
 
   const activeProvider = useProviderStore((state) => state.activeProvider);
 
@@ -64,22 +67,27 @@ const SearchButton = () => {
 
       switch (activeProvider) {
         case Provider.MY_ANIME_LIST: {
+          setIsLoadingGrid(true);
           const results = await MyAnimeListService.searchMedia(
             searchValue,
             'manga'
           );
           setMangaSearchResults(results);
+          setIsLoadingGrid(false);
           break;
         }
         case Provider.ANILIST: {
+          setIsLoadingGrid(true);
           const results = await AniListService.searchMedia(
             searchValue,
             'manga'
           );
           setAniListMangaSearchResults(results);
+          setIsLoadingGrid(false);
           break;
         }
         default:
+          setIsLoadingGrid(false);
           break;
       }
     },

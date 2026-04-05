@@ -1,7 +1,7 @@
 import { Box, SelectChangeEvent, Tooltip } from '@mui/material';
 import { SquareCheck, SquarePlay, SquareStop } from 'lucide-react';
 import { MRT_ColumnDef, useMaterialReactTable } from 'material-react-table';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router';
 
 import ProgressStatus from '@/components/anime/AnimeListDataGrid/components/ProgressStatus';
@@ -30,8 +30,6 @@ interface UseAnimeListDataGridProps {
 }
 
 const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
-  const [isLoading, setIsLoading] = useState(true);
-
   const location = useLocation();
 
   const isSearchPage = location.pathname === PathName.SEARCH;
@@ -47,6 +45,8 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     (state) => state.columnVisibility
   );
   const columnSizing = useAnimeListDataGridStore((state) => state.columnSizing);
+  const isLoading = useAnimeListDataGridStore((state) => state.isLoading);
+  const setIsLoading = useAnimeListDataGridStore((state) => state.setIsLoading);
   const onSortingChange = useAnimeListDataGridStore(
     (state) => state.onSortingChange
   );

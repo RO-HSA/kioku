@@ -12,6 +12,7 @@ import {
 type MangaListDataGridStore = {
   localSearchValue: string;
   remoteSearchValue: string;
+  isLoading: boolean;
   selectedStatus: MangaListUserStatus;
   sorting: MRT_SortingState;
   columnVisibility: MRT_VisibilityState;
@@ -19,6 +20,7 @@ type MangaListDataGridStore = {
   setSelectedStatus: (selectedStatus: MangaListUserStatus) => void;
   setLocalSearchValue: (searchValue: string) => void;
   setRemoteSearchValue: (searchValue: string) => void;
+  setIsloading: (isLoading: boolean) => void;
   onSortingChange: OnChangeFn<MRT_SortingState>;
   onColumnVisibilityChange: OnChangeFn<MRT_VisibilityState>;
   onColumnSizingChange: OnChangeFn<MRT_ColumnSizingState>;
@@ -28,6 +30,7 @@ export const useMangaListDataGridStore = create<MangaListDataGridStore>(
   (set) => ({
     localSearchValue: '',
     remoteSearchValue: '',
+    isLoading: true,
     selectedStatus: 'reading',
     sorting: [],
     columnVisibility: { userStatus: false, genres: false },
@@ -37,6 +40,7 @@ export const useMangaListDataGridStore = create<MangaListDataGridStore>(
     setRemoteSearchValue: (searchValue) =>
       set(() => ({ remoteSearchValue: searchValue })),
     setSelectedStatus: (selectedStatus) => set(() => ({ selectedStatus })),
+    setIsloading: (isLoading) => set(() => ({ isLoading })),
     onSortingChange: (updaterOrValue) =>
       set((state) => {
         const sorting =
@@ -73,7 +77,7 @@ export const tauriHandler = createTauriStore(
   {
     autoStart: true,
     saveOnChange: true,
-    filterKeys: ['localSearchValue', 'remoteSearchValue'],
+    filterKeys: ['localSearchValue', 'remoteSearchValue', 'isLoading'],
     filterKeysStrategy: 'omit'
   }
 );
