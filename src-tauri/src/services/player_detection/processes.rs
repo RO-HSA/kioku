@@ -65,26 +65,7 @@ pub(crate) fn list_processes() -> Result<Vec<ProcessSnapshot>, String> {
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    if stdout.trim().is_empty() {
-        return Ok(Vec::new());
-    }
-
-    let parsed = parse_windows_process_output(stdout.trim())?;
-
-    Ok(parsed
-        .into_iter()
-        .map(|process| {
-            let command_line = process.command_line.unwrap_or_default();
-            let args = split_command_line(&command_line);
-
-            ProcessSnapshot {
-                pid: process.process_id,
-                name: process.name,
-                command_line,
-                args,
-            }
-        })
-        .collect())
+    parse_windows_process_snapshots(&stdout)
 }
 
 #[cfg(windows)]
@@ -105,6 +86,35 @@ fn parse_windows_process_output(payload: &str) -> Result<Vec<WindowsProcess>, St
         }
         _ => Err("Unexpected process output format".to_string()),
     }
+}
+
+#[cfg(windows)]
+fn windows_processes_to_snapshots(processes: Vec<WindowsProcess>) -> Vec<ProcessSnapshot> {
+    processes
+        .into_iter()
+        .map(|process| {
+            let command_line = process.command_line.unwrap_or_default();
+            let args = split_command_line(&command_line);
+
+            ProcessSnapshot {
+                pid: process.process_id,
+                name: process.name,
+                command_line,
+                args,
+            }
+        })
+        .collect()
+}
+
+#[cfg(windows)]
+fn parse_windows_process_snapshots(stdout: &str) -> Result<Vec<ProcessSnapshot>, String> {
+    let trimmed = stdout.trim();
+    if trimmed.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let parsed = parse_windows_process_output(trimmed)?;
+    Ok(windows_processes_to_snapshots(parsed))
 }
 
 #[cfg(target_os = "linux")]
@@ -252,8 +262,55 @@ mod tests {
     #[test]
     fn parse_windows_process_output_handles_null_and_rejects_invalid_shapes() {
         assert!(parse_windows_process_output("null").unwrap().is_empty());
+        assert!(parse_windows_process_output("{").is_err());
         assert!(parse_windows_process_output("123").is_err());
         assert!(parse_windows_process_output("{\"Name\":\"mpv.exe\"}").is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn parse_windows_process_snapshots_handles_empty_output_and_maps_command_lines() {
+        assert!(parse_windows_process_snapshots("   ")
+            .expect("empty output should be accepted")
+            .is_empty());
+
+        let snapshots = parse_windows_process_snapshots(
+            r#"
+            [
+                {
+                    "ProcessId": 42,
+                    "Name": "mpv.exe",
+                    "CommandLine": "\"C:\\Program Files\\mpv\\mpv.exe\" --fs \"C:\\Anime\\Frieren - 01.mkv\""
+                },
+                {
+                    "ProcessId": 77,
+                    "Name": "mpc-hc64.exe",
+                    "CommandLine": null
+                }
+            ]
+            "#,
+        )
+        .expect("snapshot payload should parse");
+
+        assert_eq!(snapshots.len(), 2);
+        assert_eq!(snapshots[0].pid, 42);
+        assert_eq!(snapshots[0].name, "mpv.exe");
+        assert_eq!(
+            snapshots[0].command_line,
+            "\"C:\\Program Files\\mpv\\mpv.exe\" --fs \"C:\\Anime\\Frieren - 01.mkv\""
+        );
+        assert_eq!(
+            snapshots[0].args,
+            vec![
+                "C:\\Program Files\\mpv\\mpv.exe".to_string(),
+                "--fs".to_string(),
+                "C:\\Anime\\Frieren - 01.mkv".to_string()
+            ]
+        );
+        assert_eq!(snapshots[1].pid, 77);
+        assert_eq!(snapshots[1].name, "mpc-hc64.exe");
+        assert!(snapshots[1].command_line.is_empty());
+        assert!(snapshots[1].args.is_empty());
     }
 
     #[cfg(target_os = "linux")]

@@ -20,6 +20,17 @@ pub use request::oauth_request;
 pub use secure_store::{init_stronghold_key, StrongholdKeyState};
 pub use token_manager::{ProviderConfig, TokenManagerState};
 
+#[derive(Debug, PartialEq, Eq)]
+enum CallbackPayload {
+    AccessToken {
+        access_token: String,
+        expires_in: u64,
+    },
+    AuthorizationCode {
+        code: String,
+    },
+}
+
 fn emit_auth_failed<R: Runtime>(app: &tauri::AppHandle<R>, provider_id: &str) {
     let failed_event_name = format!("{provider_id}-auth-failed");
     if let Err(err) = app.emit(failed_event_name.as_str(), ()) {
@@ -101,10 +112,7 @@ fn resolve_provider_id_from_callback(
     Err("Unable to determine provider from callback URL".to_string())
 }
 
-fn missing_callback_payload_error(
-    provider_id: &str,
-    provider: &ProviderConfig,
-) -> Result<(), String> {
+fn missing_callback_payload_error(provider_id: &str, provider: &ProviderConfig) -> String {
     let mut expected = Vec::new();
     if let Some(access_param) = provider.callback_access_token_param.as_ref() {
         expected.push(access_param.as_str());
@@ -114,15 +122,90 @@ fn missing_callback_payload_error(
     }
 
     if expected.is_empty() {
-        return Err(format!(
-            "Provider {provider_id} has no callback payload fields configured"
-        ));
+        return format!("Provider {provider_id} has no callback payload fields configured");
     }
 
-    Err(format!(
+    format!(
         "Missing callback payload for provider {provider_id}; expected one of: {}",
         expected.join(", ")
-    ))
+    )
+}
+
+fn validate_callback_state(
+    token_manager: &TokenManagerState,
+    provider_id: &str,
+    provider: &ProviderConfig,
+    callback_state: Option<&str>,
+) -> Result<Option<(String, Option<String>)>, String> {
+    if !provider.uses_state {
+        return Ok(None);
+    }
+
+    let state = callback_state.ok_or_else(|| "Missing OAuth state in callback".to_string())?;
+    let state_entry = token_manager
+        .take_oauth_state(state)?
+        .ok_or_else(|| "Unknown or expired OAuth state".to_string())?;
+
+    if state_entry.0 != provider_id {
+        return Err("OAuth state/provider mismatch".to_string());
+    }
+
+    Ok(Some(state_entry))
+}
+
+fn extract_callback_payload(
+    provider_id: &str,
+    provider: &ProviderConfig,
+    params: &HashMap<String, String>,
+) -> Result<CallbackPayload, String> {
+    if let Some(error) = params.get("error") {
+        return Err(format!("Error during authorization: {error}"));
+    }
+
+    if let Some(access_token_param) = provider.callback_access_token_param.as_ref() {
+        if let Some(access_token) = params.get(access_token_param) {
+            let expires_in = provider
+                .resolve_callback_expires_in(params)
+                .ok_or_else(|| {
+                    "Missing access token expiration in callback and no default configured"
+                        .to_string()
+                })?;
+
+            return Ok(CallbackPayload::AccessToken {
+                access_token: access_token.clone(),
+                expires_in,
+            });
+        }
+    }
+
+    if let Some(code_param) = provider.callback_code_param.as_ref() {
+        if let Some(code) = params.get(code_param) {
+            return Ok(CallbackPayload::AuthorizationCode { code: code.clone() });
+        }
+    }
+
+    Err(missing_callback_payload_error(provider_id, provider))
+}
+
+fn resolve_pkce_verifier(
+    token_manager: &TokenManagerState,
+    provider_id: &str,
+    provider: &ProviderConfig,
+    state_entry: Option<&(String, Option<String>)>,
+) -> Result<Option<String>, String> {
+    if !provider.use_pkce {
+        return Ok(None);
+    }
+
+    if provider.uses_state {
+        let (_, verifier) =
+            state_entry.ok_or_else(|| "Missing OAuth state for PKCE validation".to_string())?;
+        return Ok(Some(verifier.clone().ok_or_else(|| {
+            "Missing PKCE verifier associated with OAuth state".to_string()
+        })?));
+    }
+
+    token_manager.take_pkce_verifier(provider_id)
 }
 
 #[tauri::command]
@@ -211,68 +294,35 @@ async fn handle_oauth_callback_impl(
     let callback_state = params.get(&provider.callback_state_param).cloned();
 
     let callback_result: Result<(), String> = async {
-        if let Some(error) = params.get("error") {
-            return Err(format!("Error during authorization: {error}"));
-        }
+        let token_manager = app.state::<TokenManagerState>();
+        let state_entry = validate_callback_state(
+            &token_manager,
+            &provider_id,
+            &provider,
+            callback_state.as_deref(),
+        )?;
 
-        let state = callback_state.clone();
-
-        let state_entry = if provider.uses_state {
-            let state = state
-                .as_ref()
-                .ok_or_else(|| "Missing OAuth state in callback".to_string())?;
-            let state_entry = app
-                .state::<TokenManagerState>()
-                .take_oauth_state(state)?
-                .ok_or_else(|| "Unknown or expired OAuth state".to_string())?;
-            if state_entry.0 != provider_id {
-                return Err("OAuth state/provider mismatch".to_string());
-            }
-            Some(state_entry)
-        } else {
-            None
-        };
-
-        if let Some(access_token_param) = provider.callback_access_token_param.as_ref() {
-            if let Some(access_token) = params.get(access_token_param) {
-                let expires_in =
-                    provider
-                        .resolve_callback_expires_in(&params)
-                        .ok_or_else(|| {
-                            "Missing access token expiration in callback and no default configured"
-                                .to_string()
-                        })?;
-                store_access_token(app, &provider_id, access_token, expires_in)?;
+        match extract_callback_payload(&provider_id, &provider, &params)? {
+            CallbackPayload::AccessToken {
+                access_token,
+                expires_in,
+            } => {
+                store_access_token(app, &provider_id, &access_token, expires_in)?;
                 emit_auth_succeeded(app, &provider_id)?;
-                return Ok(());
+                Ok(())
             }
-        }
-
-        if let Some(code_param) = provider.callback_code_param.as_ref() {
-            if let Some(code) = params.get(code_param) {
-                let code_verifier = if provider.use_pkce {
-                    if provider.uses_state {
-                        let (_, verifier) = state_entry
-                            .as_ref()
-                            .ok_or_else(|| "Missing OAuth state for PKCE validation".to_string())?;
-                        Some(verifier.clone().ok_or_else(|| {
-                            "Missing PKCE verifier associated with OAuth state".to_string()
-                        })?)
-                    } else {
-                        app.state::<TokenManagerState>()
-                            .take_pkce_verifier(&provider_id)?
-                    }
-                } else {
-                    None
-                };
-
-                exchange_authorization_code(app, &provider_id, code, code_verifier).await?;
+            CallbackPayload::AuthorizationCode { code } => {
+                let code_verifier = resolve_pkce_verifier(
+                    &token_manager,
+                    &provider_id,
+                    &provider,
+                    state_entry.as_ref(),
+                )?;
+                exchange_authorization_code(app, &provider_id, &code, code_verifier).await?;
                 emit_auth_succeeded(app, &provider_id)?;
-                return Ok(());
+                Ok(())
             }
         }
-
-        missing_callback_payload_error(&provider_id, &provider)
     }
     .await;
 
@@ -302,6 +352,10 @@ async fn handle_oauth_callback_impl(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_provider() -> ProviderConfig {
+        ProviderConfig::new("id", "https://auth", "https://token")
+    }
 
     fn register_provider(state: &TokenManagerState, provider_id: &str, config: ProviderConfig) {
         state
@@ -407,20 +461,228 @@ mod tests {
 
     #[test]
     fn missing_callback_payload_error_reports_expected_params() {
-        let provider = ProviderConfig::new("id", "https://auth", "https://token")
+        let provider = test_provider()
             .with_callback_access_token_param("access_token")
             .with_callback_code_param("code");
         assert_eq!(
-            missing_callback_payload_error("provider", &provider).unwrap_err(),
+            missing_callback_payload_error("provider", &provider),
             "Missing callback payload for provider provider; expected one of: access_token, code"
         );
 
-        let provider = ProviderConfig::new("id", "https://auth", "https://token")
+        let provider = test_provider()
             .without_callback_code()
             .without_callback_access_token();
         assert_eq!(
-            missing_callback_payload_error("provider", &provider).unwrap_err(),
+            missing_callback_payload_error("provider", &provider),
             "Provider provider has no callback payload fields configured"
+        );
+    }
+
+    #[test]
+    fn validate_callback_state_handles_disabled_missing_unknown_mismatched_and_valid_states() {
+        let state = TokenManagerState::default();
+        let provider = test_provider();
+
+        assert_eq!(
+            validate_callback_state(&state, "provider", &provider, None)
+                .err()
+                .as_deref(),
+            Some("Missing OAuth state in callback")
+        );
+        assert_eq!(
+            validate_callback_state(&state, "provider", &provider, Some("missing"))
+                .err()
+                .as_deref(),
+            Some("Unknown or expired OAuth state")
+        );
+
+        state
+            .set_oauth_state("wrong".to_string(), "other-provider", None)
+            .expect("state should store");
+        assert_eq!(
+            validate_callback_state(&state, "provider", &provider, Some("wrong"))
+                .err()
+                .as_deref(),
+            Some("OAuth state/provider mismatch")
+        );
+
+        state
+            .set_oauth_state(
+                "known".to_string(),
+                "provider",
+                Some("verifier".to_string()),
+            )
+            .expect("state should store");
+        assert_eq!(
+            validate_callback_state(&state, "provider", &provider, Some("known")).unwrap(),
+            Some(("provider".to_string(), Some("verifier".to_string())))
+        );
+        assert_eq!(state.take_oauth_state("known").unwrap(), None);
+
+        assert_eq!(
+            validate_callback_state(&state, "provider", &test_provider().with_state(false), None,)
+                .unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn extract_callback_payload_handles_errors_tokens_codes_and_missing_expiration() {
+        let implicit_provider = test_provider()
+            .without_callback_code()
+            .with_callback_access_token_param("access_token");
+        let default_ttl_provider = implicit_provider
+            .clone()
+            .with_default_access_token_ttl_secs(3600);
+        let code_provider = test_provider()
+            .without_callback_access_token()
+            .with_callback_code_param("authorization_code");
+
+        assert_eq!(
+            extract_callback_payload(
+                "provider",
+                &implicit_provider,
+                &HashMap::from([("error".to_string(), "access_denied".to_string())]),
+            )
+            .err()
+            .as_deref(),
+            Some("Error during authorization: access_denied")
+        );
+
+        assert_eq!(
+            extract_callback_payload(
+                "provider",
+                &implicit_provider,
+                &HashMap::from([
+                    ("access_token".to_string(), "token".to_string()),
+                    ("expires_in".to_string(), "120".to_string()),
+                ]),
+            )
+            .unwrap(),
+            CallbackPayload::AccessToken {
+                access_token: "token".to_string(),
+                expires_in: 120,
+            }
+        );
+
+        assert_eq!(
+            extract_callback_payload(
+                "provider",
+                &default_ttl_provider,
+                &HashMap::from([("access_token".to_string(), "token".to_string())]),
+            )
+            .unwrap(),
+            CallbackPayload::AccessToken {
+                access_token: "token".to_string(),
+                expires_in: 3600,
+            }
+        );
+
+        assert_eq!(
+            extract_callback_payload(
+                "provider",
+                &implicit_provider,
+                &HashMap::from([("access_token".to_string(), "token".to_string())]),
+            )
+            .err()
+            .as_deref(),
+            Some("Missing access token expiration in callback and no default configured")
+        );
+
+        assert_eq!(
+            extract_callback_payload(
+                "provider",
+                &code_provider,
+                &HashMap::from([("authorization_code".to_string(), "auth-code".to_string())]),
+            )
+            .unwrap(),
+            CallbackPayload::AuthorizationCode {
+                code: "auth-code".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn extract_callback_payload_prefers_access_tokens_and_reports_missing_payload() {
+        let hybrid_provider = test_provider()
+            .with_callback_access_token_param("access_token")
+            .with_callback_code_param("code")
+            .with_default_access_token_ttl_secs(90);
+
+        assert_eq!(
+            extract_callback_payload(
+                "provider",
+                &hybrid_provider,
+                &HashMap::from([
+                    ("access_token".to_string(), "token".to_string()),
+                    ("code".to_string(), "auth-code".to_string()),
+                ]),
+            )
+            .unwrap(),
+            CallbackPayload::AccessToken {
+                access_token: "token".to_string(),
+                expires_in: 90,
+            }
+        );
+
+        assert_eq!(
+            extract_callback_payload("provider", &hybrid_provider, &HashMap::new())
+                .err()
+                .as_deref(),
+            Some("Missing callback payload for provider provider; expected one of: access_token, code")
+        );
+    }
+
+    #[test]
+    fn resolve_pkce_verifier_handles_disabled_state_bound_and_standalone_flows() {
+        let state = TokenManagerState::default();
+
+        assert_eq!(
+            resolve_pkce_verifier(&state, "provider", &test_provider().with_pkce(false), None,)
+                .unwrap(),
+            None
+        );
+
+        let stateful_provider = test_provider();
+        assert_eq!(
+            resolve_pkce_verifier(&state, "provider", &stateful_provider, None)
+                .err()
+                .as_deref(),
+            Some("Missing OAuth state for PKCE validation")
+        );
+        assert_eq!(
+            resolve_pkce_verifier(
+                &state,
+                "provider",
+                &stateful_provider,
+                Some(&("provider".to_string(), None)),
+            )
+            .err()
+            .as_deref(),
+            Some("Missing PKCE verifier associated with OAuth state")
+        );
+        assert_eq!(
+            resolve_pkce_verifier(
+                &state,
+                "provider",
+                &stateful_provider,
+                Some(&("provider".to_string(), Some("state-verifier".to_string()))),
+            )
+            .unwrap(),
+            Some("state-verifier".to_string())
+        );
+
+        let stateless_provider = test_provider().with_state(false);
+        state
+            .set_pkce_verifier("provider", "standalone-verifier".to_string())
+            .expect("pkce verifier should store");
+        assert_eq!(
+            resolve_pkce_verifier(&state, "provider", &stateless_provider, None).unwrap(),
+            Some("standalone-verifier".to_string())
+        );
+        assert_eq!(
+            resolve_pkce_verifier(&state, "provider", &stateless_provider, None).unwrap(),
+            None
         );
     }
 }
