@@ -4,7 +4,7 @@ use std::time::{Duration, SystemTime};
 
 use serde::Deserialize;
 use serde_json;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_http::reqwest;
 
 use crate::auth::secure_store::{
@@ -384,8 +384,8 @@ impl TokenManagerState {
     }
 }
 
-pub fn store_tokens(
-    app: &AppHandle,
+pub fn store_tokens<R: Runtime>(
+    app: &AppHandle<R>,
     provider_id: &str,
     response: &TokenResponse,
 ) -> Result<(), String> {
@@ -403,8 +403,8 @@ pub fn store_tokens(
     Ok(())
 }
 
-pub fn store_access_token(
-    app: &AppHandle,
+pub fn store_access_token<R: Runtime>(
+    app: &AppHandle<R>,
     provider_id: &str,
     access_token: &str,
     expires_in: u64,
@@ -423,7 +423,10 @@ pub fn store_access_token(
     )
 }
 
-pub async fn get_access_token(app: &AppHandle, provider_id: &str) -> Result<String, String> {
+pub async fn get_access_token<R: Runtime>(
+    app: &AppHandle<R>,
+    provider_id: &str,
+) -> Result<String, String> {
     if let Some(token) = app
         .state::<TokenManagerState>()
         .get_valid_access_token(provider_id)?
@@ -446,8 +449,8 @@ pub async fn get_access_token(app: &AppHandle, provider_id: &str) -> Result<Stri
     refresh_access_token(app, provider_id).await
 }
 
-pub fn build_authorize_url(
-    app: &AppHandle,
+pub fn build_authorize_url<R: Runtime>(
+    app: &AppHandle<R>,
     provider_id: &str,
     code_challenge: Option<&str>,
     state: Option<&str>,
@@ -490,8 +493,8 @@ pub fn build_authorize_url(
         .map(|url| url.to_string())
 }
 
-pub async fn exchange_authorization_code(
-    app: &AppHandle,
+pub async fn exchange_authorization_code<R: Runtime>(
+    app: &AppHandle<R>,
     provider_id: &str,
     code: &str,
     code_verifier: Option<String>,
@@ -549,7 +552,10 @@ pub async fn exchange_authorization_code(
     Ok(token_response)
 }
 
-async fn refresh_access_token(app: &AppHandle, provider_id: &str) -> Result<String, String> {
+async fn refresh_access_token<R: Runtime>(
+    app: &AppHandle<R>,
+    provider_id: &str,
+) -> Result<String, String> {
     let refresh_token = read_refresh_token(app, provider_id)?
         .ok_or_else(|| "No refresh token stored".to_string())?;
 
@@ -611,8 +617,8 @@ fn compute_expires_at_unix_secs(expires_in: u64) -> Result<u64, String> {
         .map(|value| value.as_secs())
 }
 
-fn restore_access_token_from_store(
-    app: &AppHandle,
+fn restore_access_token_from_store<R: Runtime>(
+    app: &AppHandle<R>,
     provider_id: &str,
 ) -> Result<Option<String>, String> {
     let Some((token, expires_at_unix_secs)) = read_access_token(app, provider_id)? else {
@@ -647,4 +653,215 @@ fn restore_access_token_from_store(
     )?;
 
     Ok(Some(token))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn test_provider() -> ProviderConfig {
+        ProviderConfig::new(
+            "client-id",
+            "https://example.com/authorize",
+            "https://example.com/token",
+        )
+    }
+
+    #[test]
+    fn resolve_callback_expires_in_prefers_callback_value_and_falls_back_to_default() {
+        let provider = test_provider().with_default_access_token_ttl_secs(3600);
+        let params = HashMap::from([("expires_in".to_string(), "120".to_string())]);
+        let invalid = HashMap::from([("expires_in".to_string(), "invalid".to_string())]);
+
+        assert_eq!(provider.resolve_callback_expires_in(&params), Some(120));
+        assert_eq!(provider.resolve_callback_expires_in(&invalid), Some(3600));
+        assert_eq!(
+            provider.resolve_callback_expires_in(&HashMap::new()),
+            Some(3600)
+        );
+    }
+
+    #[test]
+    fn callback_hint_lookup_matches_provider_ids_and_custom_hints_case_insensitively() {
+        let state = TokenManagerState::default();
+        state
+            .register_provider(
+                "myanimelist",
+                test_provider().with_callback_provider_hint("mal"),
+            )
+            .expect("provider should register");
+
+        assert_eq!(
+            state
+                .get_provider_from_callback_hint("myanimelist")
+                .unwrap(),
+            Some("myanimelist".to_string())
+        );
+        assert_eq!(
+            state.get_provider_from_callback_hint("MAL").unwrap(),
+            Some("myanimelist".to_string())
+        );
+        assert_eq!(
+            state.get_provider_from_callback_hint("anilist").unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn callback_param_inference_only_returns_unambiguous_matches() {
+        let state = TokenManagerState::default();
+        state
+            .register_provider(
+                "implicit",
+                test_provider()
+                    .without_callback_code()
+                    .with_callback_access_token_param("access_token"),
+            )
+            .expect("implicit provider should register");
+        state
+            .register_provider(
+                "code",
+                test_provider()
+                    .without_callback_access_token()
+                    .with_callback_code_param("authorization_code"),
+            )
+            .expect("code provider should register");
+
+        let implicit_params = HashMap::from([("access_token".to_string(), "token".to_string())]);
+        let code_params =
+            HashMap::from([("authorization_code".to_string(), "auth-code".to_string())]);
+
+        assert_eq!(
+            state
+                .infer_provider_from_callback_params(&implicit_params)
+                .unwrap(),
+            Some("implicit".to_string())
+        );
+        assert_eq!(
+            state
+                .infer_provider_from_callback_params(&code_params)
+                .unwrap(),
+            Some("code".to_string())
+        );
+
+        state
+            .register_provider(
+                "implicit-2",
+                test_provider()
+                    .without_callback_code()
+                    .with_callback_access_token_param("access_token"),
+            )
+            .expect("second implicit provider should register");
+
+        assert_eq!(
+            state
+                .infer_provider_from_callback_params(&implicit_params)
+                .unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn access_tokens_respect_refresh_buffer_and_expiration_overflow_is_rejected() {
+        let state = TokenManagerState::default();
+        state
+            .set_access_token("provider", "token".to_string(), REFRESH_EARLY_SECS + 5)
+            .expect("token should be stored");
+        assert_eq!(
+            state.get_valid_access_token("provider").unwrap(),
+            Some("token".to_string())
+        );
+
+        state
+            .set_access_token("provider", "token".to_string(), REFRESH_EARLY_SECS)
+            .expect("token should be replaced");
+        assert_eq!(state.get_valid_access_token("provider").unwrap(), None);
+
+        assert!(compute_expires_at_unix_secs(u64::MAX).is_err());
+    }
+
+    #[test]
+    fn oauth_state_and_pkce_verifiers_are_one_time_use() {
+        let state = TokenManagerState::default();
+        state
+            .set_oauth_state(
+                "oauth-state".to_string(),
+                "provider",
+                Some("pkce-verifier".to_string()),
+            )
+            .expect("oauth state should store");
+        state
+            .set_pkce_verifier("provider", "standalone-verifier".to_string())
+            .expect("pkce verifier should store");
+
+        assert_eq!(
+            state.get_oauth_state_provider("oauth-state").unwrap(),
+            Some("provider".to_string())
+        );
+        assert_eq!(
+            state.take_oauth_state("oauth-state").unwrap(),
+            Some(("provider".to_string(), Some("pkce-verifier".to_string())))
+        );
+        assert_eq!(state.take_oauth_state("oauth-state").unwrap(), None);
+
+        assert_eq!(
+            state.take_pkce_verifier("provider").unwrap(),
+            Some("standalone-verifier".to_string())
+        );
+        assert_eq!(state.take_pkce_verifier("provider").unwrap(), None);
+    }
+
+    #[test]
+    fn provider_config_builders_override_defaults_and_match_callback_payloads() {
+        let provider = test_provider()
+            .with_pkce(false)
+            .with_authorize_response_type("")
+            .with_state(false)
+            .with_callback_state_param("state_param")
+            .with_callback_code_param("authorization_code")
+            .with_callback_access_token_param("token")
+            .with_callback_expires_in_param("ttl")
+            .with_default_access_token_ttl_secs(90)
+            .with_refresh_token(false)
+            .with_callback_provider_hint("alias")
+            .with_authorize_param("scope", "read write")
+            .with_token_param("audience", "desktop")
+            .with_refresh_param("resource", "anime");
+
+        let token_params = HashMap::from([("token".to_string(), "value".to_string())]);
+        let code_params = HashMap::from([("authorization_code".to_string(), "value".to_string())]);
+
+        assert!(!provider.use_pkce);
+        assert_eq!(provider.authorize_response_type, "");
+        assert!(!provider.uses_state);
+        assert_eq!(provider.callback_state_param, "state_param");
+        assert_eq!(
+            provider.callback_code_param.as_deref(),
+            Some("authorization_code")
+        );
+        assert_eq!(
+            provider.callback_access_token_param.as_deref(),
+            Some("token")
+        );
+        assert_eq!(provider.callback_expires_in_param.as_deref(), Some("ttl"));
+        assert_eq!(provider.default_access_token_ttl_secs, Some(90));
+        assert!(!provider.supports_refresh_token);
+        assert_eq!(provider.callback_provider_hint.as_deref(), Some("alias"));
+        assert_eq!(
+            provider.authorize_extra_params,
+            vec![("scope".to_string(), "read write".to_string())]
+        );
+        assert_eq!(
+            provider.token_extra_params,
+            vec![("audience".to_string(), "desktop".to_string())]
+        );
+        assert_eq!(
+            provider.refresh_extra_params,
+            vec![("resource".to_string(), "anime".to_string())]
+        );
+        assert!(provider.matches_callback_payload(&token_params));
+        assert!(provider.matches_callback_payload(&code_params));
+        assert!(!provider.matches_callback_payload(&HashMap::new()));
+    }
 }

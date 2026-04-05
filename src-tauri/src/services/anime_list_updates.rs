@@ -62,6 +62,11 @@ impl AnimeListUpdateQueue {
             .await
             .map_err(|_| "Update queue is unavailable".to_string())
     }
+
+    #[cfg(test)]
+    fn from_sender(sender: mpsc::Sender<AnimeListUpdateRequest>) -> Self {
+        Self { sender }
+    }
 }
 
 #[tauri::command]
@@ -93,14 +98,109 @@ fn spawn_update_worker(
     });
 }
 
+fn validate_supported_provider(provider_id: &str) -> Result<(), String> {
+    match provider_id {
+        ANILIST_PROVIDER_ID | MAL_PROVIDER_ID => Ok(()),
+        _ => Err(format!("Provider not supported: {provider_id}")),
+    }
+}
+
 async fn handle_update(
     app: &tauri::AppHandle,
     client: &reqwest::Client,
     update: &AnimeListUpdateRequest,
 ) -> Result<(), String> {
+    validate_supported_provider(&update.provider_id)?;
+
     match update.provider_id.as_str() {
         ANILIST_PROVIDER_ID => update_anilist_list_entry(app, client, update).await,
         MAL_PROVIDER_ID => update_myanimelist_list_entry(app, client, update).await,
-        _ => Err(format!("Provider not supported: {}", update.provider_id)),
+        _ => unreachable!("provider should have been validated"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_update() -> AnimeListUpdateRequest {
+        AnimeListUpdateRequest {
+            provider_id: MAL_PROVIDER_ID.to_string(),
+            list_type: Some(ListType::Anime),
+            entry_id: Some(1),
+            media_id: None,
+            user_status: Some("completed".to_string()),
+            user_score: None,
+            user_episodes_watched: None,
+            user_volumes_read: None,
+            user_chapters_read: None,
+            is_rewatching: None,
+            is_rereading: None,
+            user_comments: None,
+            user_num_times_rewatched: None,
+            user_num_times_reread: None,
+            user_start_date: None,
+            user_finish_date: None,
+        }
+    }
+
+    #[test]
+    fn list_type_defaults_to_anime_and_request_aliases_deserialize() {
+        let request: AnimeListUpdateRequest = serde_json::from_value(serde_json::json!({
+            "providerId": "myanimelist",
+            "id": 42,
+            "mediaId": 7,
+            "userStatus": "completed"
+        }))
+        .expect("request should deserialize");
+
+        assert_eq!(request.provider_id, "myanimelist");
+        assert!(matches!(
+            request.list_type.unwrap_or_default(),
+            ListType::Anime
+        ));
+        assert_eq!(request.entry_id, Some(42));
+        assert_eq!(request.media_id, Some(7));
+        assert_eq!(request.user_status.as_deref(), Some("completed"));
+    }
+
+    #[test]
+    fn validate_supported_provider_accepts_known_ids_and_rejects_others() {
+        assert!(validate_supported_provider(ANILIST_PROVIDER_ID).is_ok());
+        assert!(validate_supported_provider(MAL_PROVIDER_ID).is_ok());
+        assert_eq!(
+            validate_supported_provider("unknown").unwrap_err(),
+            "Provider not supported: unknown"
+        );
+    }
+
+    #[test]
+    fn enqueue_returns_error_when_receiver_is_gone() {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime should build");
+        let (sender, receiver) = mpsc::channel(1);
+        drop(receiver);
+        let queue = AnimeListUpdateQueue::from_sender(sender);
+
+        let error = runtime.block_on(async { queue.enqueue(sample_update()).await });
+
+        assert_eq!(error.unwrap_err(), "Update queue is unavailable");
+    }
+
+    #[test]
+    fn enqueue_succeeds_when_receiver_exists() {
+        let runtime = tokio::runtime::Runtime::new().expect("runtime should build");
+        let (sender, mut receiver) = mpsc::channel(1);
+        let queue = AnimeListUpdateQueue::from_sender(sender);
+        let update = sample_update();
+
+        runtime
+            .block_on(async { queue.enqueue(update.clone()).await })
+            .expect("enqueue should succeed");
+        let received = runtime
+            .block_on(async { receiver.recv().await })
+            .expect("receiver should get update");
+
+        assert_eq!(received.provider_id, update.provider_id);
+        assert_eq!(received.entry_id, update.entry_id);
     }
 }

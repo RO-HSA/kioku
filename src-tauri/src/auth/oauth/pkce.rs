@@ -17,3 +17,20 @@ pub fn generate_pkce() -> PkcePair {
         code_challenge: code_verifier,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generate_pkce_returns_plain_alphanumeric_pair_for_mal() {
+        let pair = generate_pkce();
+
+        assert_eq!(pair.code_verifier.len(), 64);
+        assert_eq!(pair.code_challenge, pair.code_verifier);
+        assert!(pair
+            .code_verifier
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric()));
+    }
+}

@@ -13,8 +13,8 @@ use super::mapping::{
 };
 use super::{
     MalListEntry, MalListResponse, MyAnimeListListType, MyAnimeListUserInfo, SynchronizedAnimeList,
-    SynchronizedListResult, SynchronizedMangaList, UserStatusKey, ANIME_UPDATE_BASE_URL,
-    BASE_URL, LIMIT, MANGA_UPDATE_BASE_URL, USER_INFO_FIELDS,
+    SynchronizedListResult, SynchronizedMangaList, UserStatusKey, ANIME_UPDATE_BASE_URL, BASE_URL,
+    LIMIT, MANGA_UPDATE_BASE_URL, USER_INFO_FIELDS,
 };
 
 fn build_user_list_url(
@@ -40,6 +40,21 @@ fn build_user_list_url(
     Ok(url.to_string())
 }
 
+fn build_user_info_url() -> Result<String, String> {
+    let mut url = reqwest::Url::parse(BASE_URL).map_err(|e| e.to_string())?;
+    {
+        let mut segments = url
+            .path_segments_mut()
+            .map_err(|_| "Invalid MyAnimeList base URL".to_string())?;
+        segments.push("@me");
+    }
+
+    url.query_pairs_mut()
+        .append_pair("fields", USER_INFO_FIELDS);
+
+    Ok(url.to_string())
+}
+
 fn parse_next_offset(next_url: &str) -> Option<u32> {
     let url = reqwest::Url::parse(next_url).ok()?;
     url.query_pairs()
@@ -47,52 +62,13 @@ fn parse_next_offset(next_url: &str) -> Option<u32> {
         .and_then(|(_, value)| value.parse::<u32>().ok())
 }
 
-async fn fetch_all_entries(
-    client: &reqwest::Client,
-    token: &str,
-    username: &str,
+struct MalUpdatePayload {
     list_type: MyAnimeListListType,
-    result: &mut Vec<MalListEntry>,
-) -> Result<(), String> {
-    let mut offset: u32 = 0;
-
-    loop {
-        let url = build_user_list_url(username, list_type, offset)?;
-        let response = client
-            .get(url)
-            .bearer_auth(token)
-            .timeout(Duration::from_secs(15))
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        let status_code = response.status();
-
-        if !status_code.is_success() {
-            let body = response.text().await.map_err(|e| e.to_string())?;
-            return Err(format!(
-                "MyAnimeList request failed: {} - {}",
-                status_code, body
-            ));
-        }
-
-        let parsed: MalListResponse = response.json().await.map_err(|e| e.to_string())?;
-
-        result.extend(parsed.data);
-
-        let next = parsed.paging.and_then(|p| p.next);
-        let Some(next_url) = next else { break };
-        offset = parse_next_offset(&next_url).unwrap_or(offset + LIMIT);
-    }
-
-    Ok(())
+    entry_id: u64,
+    params: Vec<(String, String)>,
 }
 
-pub async fn update_myanimelist_list_entry(
-    app: &tauri::AppHandle,
-    client: &reqwest::Client,
-    update: &AnimeListUpdateRequest,
-) -> Result<(), String> {
-    let token = get_access_token(app, MAL_PROVIDER_ID).await?;
+fn build_mal_update_payload(update: &AnimeListUpdateRequest) -> Result<MalUpdatePayload, String> {
     let list_type = MyAnimeListListType::from(update.list_type.unwrap_or_default());
     let entry_id = update
         .entry_id
@@ -121,8 +97,10 @@ pub async fn update_myanimelist_list_entry(
             }
 
             if let Some(num_times_rewatched) = update.user_num_times_rewatched {
-                let clamped = num_times_rewatched.min(5);
-                params.push(("num_times_rewatched".to_string(), clamped.to_string()));
+                params.push((
+                    "num_times_rewatched".to_string(),
+                    num_times_rewatched.min(5).to_string(),
+                ));
             }
         }
         MyAnimeListListType::Manga => {
@@ -139,8 +117,10 @@ pub async fn update_myanimelist_list_entry(
             }
 
             if let Some(num_times_reread) = update.user_num_times_reread {
-                let clamped = num_times_reread.min(5);
-                params.push(("num_times_reread".to_string(), clamped.to_string()));
+                params.push((
+                    "num_times_reread".to_string(),
+                    num_times_reread.min(5).to_string(),
+                ));
             }
         }
     }
@@ -167,27 +147,109 @@ pub async fn update_myanimelist_list_entry(
         return Err("No update fields provided".to_string());
     }
 
-    let update_base_url = match list_type {
+    Ok(MalUpdatePayload {
+        list_type,
+        entry_id,
+        params,
+    })
+}
+
+fn parse_list_response(status: reqwest::StatusCode, body: &str) -> Result<MalListResponse, String> {
+    if !status.is_success() {
+        return Err(format!("MyAnimeList request failed: {} - {}", status, body));
+    }
+
+    serde_json::from_str(body)
+        .map_err(|e| format!("Failed to parse MyAnimeList list response: {e}"))
+}
+
+fn parse_user_info_response(
+    status: reqwest::StatusCode,
+    body: &str,
+) -> Result<MyAnimeListUserInfo, String> {
+    if !status.is_success() {
+        return Err(format!(
+            "MyAnimeList user info request failed: {} - {}",
+            status, body
+        ));
+    }
+
+    let raw: super::MalUserInfoResponse = serde_json::from_str(body)
+        .map_err(|e| format!("Failed to parse MyAnimeList user info response: {e}"))?;
+
+    Ok(MyAnimeListUserInfo {
+        id: raw.id,
+        name: raw.name,
+        picture: raw.picture,
+        statistics: raw.anime_statistics.map(map_mal_statistics),
+    })
+}
+
+fn validate_update_response(status: reqwest::StatusCode, body: &str) -> Result<(), String> {
+    if !status.is_success() {
+        return Err(format!("MyAnimeList update failed: {} - {}", status, body));
+    }
+
+    Ok(())
+}
+
+async fn fetch_all_entries(
+    client: &reqwest::Client,
+    token: &str,
+    username: &str,
+    list_type: MyAnimeListListType,
+    result: &mut Vec<MalListEntry>,
+) -> Result<(), String> {
+    let mut offset: u32 = 0;
+
+    loop {
+        let url = build_user_list_url(username, list_type, offset)?;
+        let response = client
+            .get(url)
+            .bearer_auth(token)
+            .timeout(Duration::from_secs(15))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        let status_code = response.status();
+        let body = response.text().await.map_err(|e| e.to_string())?;
+        let parsed = parse_list_response(status_code, &body)?;
+
+        result.extend(parsed.data);
+
+        let next = parsed.paging.and_then(|p| p.next);
+        let Some(next_url) = next else { break };
+        offset = parse_next_offset(&next_url).unwrap_or(offset + LIMIT);
+    }
+
+    Ok(())
+}
+
+pub async fn update_myanimelist_list_entry(
+    app: &tauri::AppHandle,
+    client: &reqwest::Client,
+    update: &AnimeListUpdateRequest,
+) -> Result<(), String> {
+    let token = get_access_token(app, MAL_PROVIDER_ID).await?;
+    let payload = build_mal_update_payload(update)?;
+
+    let update_base_url = match payload.list_type {
         MyAnimeListListType::Anime => ANIME_UPDATE_BASE_URL,
         MyAnimeListListType::Manga => MANGA_UPDATE_BASE_URL,
     };
 
-    let url = format!("{}{}/my_list_status", update_base_url, entry_id);
+    let url = format!("{}{}/my_list_status", update_base_url, payload.entry_id);
     let response = client
         .put(url)
         .bearer_auth(token)
-        .form(&params)
+        .form(&payload.params)
         .send()
         .await
         .map_err(|e| e.to_string())?;
 
     let status = response.status();
-    if !status.is_success() {
-        let body = response.text().await.map_err(|e| e.to_string())?;
-        return Err(format!("MyAnimeList update failed: {} - {}", status, body));
-    }
-
-    Ok(())
+    let body = response.text().await.map_err(|e| e.to_string())?;
+    validate_update_response(status, &body)
 }
 
 #[tauri::command]
@@ -195,16 +257,7 @@ pub async fn fetch_myanimelist_user_info(
     app: tauri::AppHandle,
 ) -> Result<MyAnimeListUserInfo, String> {
     let token = get_access_token(&app, MAL_PROVIDER_ID).await?;
-    let mut url = reqwest::Url::parse(BASE_URL).map_err(|e| e.to_string())?;
-    {
-        let mut segments = url
-            .path_segments_mut()
-            .map_err(|_| "Invalid MyAnimeList base URL".to_string())?;
-        segments.push("@me");
-    }
-
-    url.query_pairs_mut().append_pair("fields", USER_INFO_FIELDS);
-
+    let url = build_user_info_url()?;
     let client = reqwest::Client::new();
     let response = client
         .get(url)
@@ -215,25 +268,8 @@ pub async fn fetch_myanimelist_user_info(
         .map_err(|e| e.to_string())?;
 
     let status = response.status();
-    if !status.is_success() {
-        let body = response.text().await.map_err(|e| e.to_string())?;
-        return Err(format!(
-            "MyAnimeList user info request failed: {} - {}",
-            status, body
-        ));
-    }
-
-    let raw = response
-        .json::<super::MalUserInfoResponse>()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    Ok(MyAnimeListUserInfo {
-        id: raw.id,
-        name: raw.name,
-        picture: raw.picture,
-        statistics: raw.anime_statistics.map(map_mal_statistics),
-    })
+    let body = response.text().await.map_err(|e| e.to_string())?;
+    parse_user_info_response(status, &body)
 }
 
 #[tauri::command]
@@ -263,8 +299,10 @@ pub async fn synchronize_myanimelist(
             let mut result = SynchronizedAnimeList::default();
 
             for entry in entries {
-                let status_key =
-                    UserStatusKey::from_mal(MyAnimeListListType::Anime, entry.list_status.status.as_deref());
+                let status_key = UserStatusKey::from_mal(
+                    MyAnimeListListType::Anime,
+                    entry.list_status.status.as_deref(),
+                );
                 let item = map_anime_entry_to_domain(entry, status_key);
                 status_key.push_anime(&mut result, item);
             }
@@ -275,13 +313,329 @@ pub async fn synchronize_myanimelist(
             let mut result = SynchronizedMangaList::default();
 
             for entry in entries {
-                let status_key =
-                    UserStatusKey::from_mal(MyAnimeListListType::Manga, entry.list_status.status.as_deref());
+                let status_key = UserStatusKey::from_mal(
+                    MyAnimeListListType::Manga,
+                    entry.list_status.status.as_deref(),
+                );
                 let item = map_manga_entry_to_domain(entry, status_key);
                 status_key.push_manga(&mut result, item);
             }
 
             Ok(SynchronizedListResult::Manga(result))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+
+    #[test]
+    fn build_user_list_url_uses_expected_path_and_query_values() {
+        let url = build_user_list_url("robert", MyAnimeListListType::Anime, 300)
+            .expect("url should build");
+        let parsed = reqwest::Url::parse(&url).expect("built url should parse");
+        let segments = parsed
+            .path_segments()
+            .expect("path segments should exist")
+            .collect::<Vec<_>>();
+        let query = parsed
+            .query_pairs()
+            .map(|(key, value)| (key.to_string(), value.to_string()))
+            .collect::<HashMap<_, _>>();
+
+        assert_eq!(parsed.domain(), Some("api.myanimelist.net"));
+        assert_eq!(segments, vec!["v2", "users", "robert", "animelist"]);
+        assert_eq!(
+            query.get("fields"),
+            Some(&MyAnimeListListType::Anime.fields().to_string())
+        );
+        assert_eq!(query.get("nsfw"), Some(&"true".to_string()));
+        assert_eq!(query.get("limit"), Some(&LIMIT.to_string()));
+        assert_eq!(query.get("offset"), Some(&"300".to_string()));
+    }
+
+    #[test]
+    fn build_user_list_url_keeps_username_in_a_single_encoded_path_segment() {
+        let username = "../evil?admin=true";
+        let url =
+            build_user_list_url(username, MyAnimeListListType::Manga, 0).expect("url should build");
+        let parsed = reqwest::Url::parse(&url).expect("built url should parse");
+        let segments = parsed
+            .path_segments()
+            .expect("path segments should exist")
+            .collect::<Vec<_>>();
+
+        assert_eq!(parsed.domain(), Some("api.myanimelist.net"));
+        assert_eq!(
+            segments,
+            vec!["v2", "users", "..%2Fevil%3Fadmin=true", "mangalist"]
+        );
+    }
+
+    #[test]
+    fn build_user_info_url_uses_expected_path_and_query_values() {
+        let url = build_user_info_url().expect("url should build");
+        let parsed = reqwest::Url::parse(&url).expect("built url should parse");
+        let segments = parsed
+            .path_segments()
+            .expect("path segments should exist")
+            .collect::<Vec<_>>();
+        let query = parsed
+            .query_pairs()
+            .map(|(key, value)| (key.to_string(), value.to_string()))
+            .collect::<HashMap<_, _>>();
+
+        assert_eq!(parsed.domain(), Some("api.myanimelist.net"));
+        assert_eq!(segments, vec!["v2", "users", "@me"]);
+        assert_eq!(query.get("fields"), Some(&USER_INFO_FIELDS.to_string()));
+    }
+
+    #[test]
+    fn parse_next_offset_extracts_numeric_offsets_only() {
+        assert_eq!(
+            parse_next_offset("https://api.myanimelist.net/v2/users/@me/animelist?offset=2000"),
+            Some(2000)
+        );
+        assert_eq!(
+            parse_next_offset("https://api.myanimelist.net/v2/users/@me/animelist?offset=abc"),
+            None
+        );
+        assert_eq!(parse_next_offset("javascript:alert(1)"), None);
+        assert_eq!(
+            parse_next_offset("https://api.myanimelist.net/v2/users/@me/animelist"),
+            None
+        );
+    }
+
+    fn base_update() -> AnimeListUpdateRequest {
+        AnimeListUpdateRequest {
+            provider_id: MAL_PROVIDER_ID.to_string(),
+            list_type: Some(crate::services::anime_list_updates::ListType::Anime),
+            entry_id: Some(10),
+            media_id: None,
+            user_status: None,
+            user_score: None,
+            user_episodes_watched: None,
+            user_volumes_read: None,
+            user_chapters_read: None,
+            is_rewatching: None,
+            is_rereading: None,
+            user_comments: None,
+            user_num_times_rewatched: None,
+            user_num_times_reread: None,
+            user_start_date: None,
+            user_finish_date: None,
+        }
+    }
+
+    #[test]
+    fn build_mal_update_payload_for_anime_maps_and_clamps_fields() {
+        let mut update = base_update();
+        update.user_status = Some("planToWatch".to_string());
+        update.user_score = Some(9);
+        update.user_episodes_watched = Some(12);
+        update.is_rewatching = Some(true);
+        update.user_num_times_rewatched = Some(9);
+        update.user_comments = Some(" note ".to_string());
+        update.user_start_date = Some(" 2024-01-01 ".to_string());
+        update.user_finish_date = Some("   ".to_string());
+
+        let payload = build_mal_update_payload(&update).expect("payload should build");
+
+        assert!(matches!(payload.list_type, MyAnimeListListType::Anime));
+        assert_eq!(payload.entry_id, 10);
+        assert_eq!(
+            payload.params,
+            vec![
+                ("status".to_string(), "plan_to_watch".to_string()),
+                ("score".to_string(), "9".to_string()),
+                ("num_watched_episodes".to_string(), "12".to_string()),
+                ("is_rewatching".to_string(), "true".to_string()),
+                ("num_times_rewatched".to_string(), "5".to_string()),
+                ("comments".to_string(), " note ".to_string()),
+                ("start_date".to_string(), "2024-01-01".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn build_mal_update_payload_for_manga_uses_reading_fields() {
+        let mut update = base_update();
+        update.list_type = Some(crate::services::anime_list_updates::ListType::Manga);
+        update.user_status = Some("plan_to_read".to_string());
+        update.user_volumes_read = Some(7);
+        update.user_chapters_read = Some(42);
+        update.is_rereading = Some(false);
+        update.user_num_times_reread = Some(2);
+
+        let payload = build_mal_update_payload(&update).expect("payload should build");
+
+        assert!(matches!(payload.list_type, MyAnimeListListType::Manga));
+        assert_eq!(
+            payload.params,
+            vec![
+                ("status".to_string(), "plan_to_read".to_string()),
+                ("num_volumes_read".to_string(), "7".to_string()),
+                ("num_chapters_read".to_string(), "42".to_string()),
+                ("is_rereading".to_string(), "false".to_string()),
+                ("num_times_reread".to_string(), "2".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn build_mal_update_payload_rejects_missing_entry_id_no_fields_and_invalid_status() {
+        let missing_entry = AnimeListUpdateRequest {
+            entry_id: None,
+            user_score: Some(8),
+            ..base_update()
+        };
+        assert_eq!(
+            build_mal_update_payload(&missing_entry).err().as_deref(),
+            Some("Missing entryId for MyAnimeList update")
+        );
+
+        let no_fields = base_update();
+        assert_eq!(
+            build_mal_update_payload(&no_fields).err().as_deref(),
+            Some("No update fields provided")
+        );
+
+        let invalid_status = AnimeListUpdateRequest {
+            user_status: Some("reading".to_string()),
+            ..base_update()
+        };
+        assert_eq!(
+            build_mal_update_payload(&invalid_status).err().as_deref(),
+            Some("Invalid MyAnimeList status: reading")
+        );
+    }
+
+    #[test]
+    fn parse_list_response_accepts_valid_payloads_and_preserves_paging() {
+        let parsed = parse_list_response(
+            reqwest::StatusCode::OK,
+            r#"{
+                "data": [
+                    {
+                        "node": {
+                            "id": 1,
+                            "title": "Frieren"
+                        },
+                        "list_status": {
+                            "status": "watching"
+                        }
+                    }
+                ],
+                "paging": {
+                    "next": "https://api.myanimelist.net/v2/users/@me/animelist?offset=1000"
+                }
+            }"#,
+        )
+        .expect("list response should parse");
+
+        assert_eq!(parsed.data.len(), 1);
+        assert_eq!(parsed.data[0].node.id, 1);
+        assert_eq!(parsed.data[0].node.title, "Frieren");
+        assert_eq!(
+            parsed.paging.and_then(|paging| paging.next),
+            Some("https://api.myanimelist.net/v2/users/@me/animelist?offset=1000".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_list_response_rejects_http_errors_and_invalid_payloads() {
+        assert_eq!(
+            parse_list_response(reqwest::StatusCode::TOO_MANY_REQUESTS, "slow down")
+                .err()
+                .as_deref(),
+            Some("MyAnimeList request failed: 429 Too Many Requests - slow down")
+        );
+
+        assert!(parse_list_response(reqwest::StatusCode::OK, "{")
+            .err()
+            .expect("invalid json should fail")
+            .starts_with("Failed to parse MyAnimeList list response:"));
+
+        assert!(
+            parse_list_response(reqwest::StatusCode::OK, r#"{"data":[{}]}"#)
+                .err()
+                .expect("missing node should fail")
+                .starts_with("Failed to parse MyAnimeList list response:")
+        );
+    }
+
+    #[test]
+    fn parse_user_info_response_maps_statistics() {
+        let parsed = parse_user_info_response(
+            reqwest::StatusCode::OK,
+            r#"{
+                "id": 99,
+                "name": "robert",
+                "picture": "https://img.example/avatar.png",
+                "anime_statistics": {
+                    "num_items_watching": 1,
+                    "num_items_completed": 2,
+                    "num_items_on_hold": 3,
+                    "num_items_dropped": 4,
+                    "num_items_plan_to_watch": 5,
+                    "num_items": 15,
+                    "num_days_watched": 10.5,
+                    "num_days_watching": 1.5,
+                    "num_days_completed": 2.5,
+                    "num_days_on_hold": 3.5,
+                    "num_days_dropped": 4.5,
+                    "num_days": 10.5,
+                    "num_episodes": 24,
+                    "num_times_rewatched": 7,
+                    "mean_score": 8.9
+                }
+            }"#,
+        )
+        .expect("user info should parse");
+
+        let statistics = parsed.statistics.expect("statistics should be present");
+
+        assert_eq!(parsed.id, 99);
+        assert_eq!(parsed.name, "robert");
+        assert_eq!(
+            parsed.picture.as_deref(),
+            Some("https://img.example/avatar.png")
+        );
+        assert_eq!(statistics.num_items, 15);
+        assert_eq!(statistics.num_items_watching, 1);
+        assert_eq!(statistics.num_times_rewatched, 7);
+        assert_eq!(statistics.mean_score, 8.9);
+    }
+
+    #[test]
+    fn parse_user_info_response_rejects_http_errors_and_invalid_json() {
+        assert_eq!(
+            parse_user_info_response(reqwest::StatusCode::UNAUTHORIZED, "expired")
+                .err()
+                .as_deref(),
+            Some("MyAnimeList user info request failed: 401 Unauthorized - expired")
+        );
+
+        assert!(parse_user_info_response(reqwest::StatusCode::OK, "{")
+            .err()
+            .expect("invalid json should fail")
+            .starts_with("Failed to parse MyAnimeList user info response:"));
+    }
+
+    #[test]
+    fn validate_update_response_accepts_success_and_rejects_failures() {
+        validate_update_response(reqwest::StatusCode::NO_CONTENT, "")
+            .expect("successful update should be accepted");
+
+        assert_eq!(
+            validate_update_response(reqwest::StatusCode::BAD_REQUEST, "invalid")
+                .err()
+                .as_deref(),
+            Some("MyAnimeList update failed: 400 Bad Request - invalid")
+        );
     }
 }

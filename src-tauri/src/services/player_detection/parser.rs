@@ -60,7 +60,7 @@ pub(crate) fn parse_anime_from_source(source: &str) -> Option<ParsedAnime> {
 }
 
 pub(crate) fn normalize_source_arg(value: &str) -> Option<String> {
-    let trimmed = value.trim_matches('"').trim_matches('\'').trim();
+    let trimmed = value.trim().trim_matches('"').trim_matches('\'').trim();
     if trimmed.is_empty() {
         return None;
     }
@@ -346,4 +346,67 @@ fn fallback_numeric_regex() -> &'static Regex {
     static REGEX: OnceLock<Regex> = OnceLock::new();
     REGEX
         .get_or_init(|| Regex::new(r"(?P<episode>\d{1,4})(?:v\d+)?").expect("valid fallback regex"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_percent_encoded_urls_and_strips_release_noise() {
+        let parsed = parse_anime_from_source(
+            "https://cdn.example.com/%5BSubsPlease%5D%20Sousou_no_Frieren_-_03_%281080p%29_%5BABCD1234%5D.mkv?download=1#fragment",
+        )
+        .expect("source should parse");
+
+        assert_eq!(parsed.anime_title, "Sousou no Frieren");
+        assert_eq!(parsed.episode, Some(3));
+    }
+
+    #[test]
+    fn parses_japanese_episode_markers() {
+        let parsed =
+            parse_anime_from_source("[Erai-raws] Kusuriya no Hitorigoto 第12話 [1080p].mkv")
+                .expect("source should parse");
+
+        assert_eq!(parsed.anime_title, "Kusuriya no Hitorigoto");
+        assert_eq!(parsed.episode, Some(12));
+    }
+
+    #[test]
+    fn fallback_numeric_episode_ignores_years_and_resolution_tokens() {
+        let parsed = parse_anime_from_source("Anime.Name.2024.12.1080p.WEB-DL.mkv")
+            .expect("source should parse");
+
+        assert_eq!(parsed.episode, Some(12));
+        assert_eq!(parsed.anime_title, "Anime Name 2024");
+    }
+
+    #[test]
+    fn returns_none_when_source_only_contains_noise_tokens() {
+        assert!(parse_anime_from_source("[SubsPlease] [1080p] [AAC] [1234ABCD].mkv").is_none());
+    }
+
+    #[test]
+    fn normalize_source_arg_accepts_video_sources_and_rejects_unsafe_or_irrelevant_values() {
+        assert_eq!(
+            normalize_source_arg("  \"C:\\Anime\\Frieren - 01.MKV\"  "),
+            Some("C:\\Anime\\Frieren - 01.MKV".to_string())
+        );
+        assert_eq!(
+            normalize_source_arg("https://example.com/watch?id=1#frag"),
+            Some("https://example.com/watch?id=1#frag".to_string())
+        );
+        assert_eq!(normalize_source_arg("/fullscreen"), None);
+        assert_eq!(normalize_source_arg("javascript:alert(1)"), None);
+        assert_eq!(normalize_source_arg("C:\\Anime\\readme.txt"), None);
+    }
+
+    #[test]
+    fn url_and_windows_path_detection_distinguish_sources_from_switches() {
+        assert!(is_url_source("HTTPS://example.com/video.mkv"));
+        assert!(!is_url_source("javascript:alert(1)"));
+        assert!(looks_like_windows_path(r"C:\Anime\Frieren - 01.mkv"));
+        assert!(!looks_like_windows_path("/play"));
+    }
 }
