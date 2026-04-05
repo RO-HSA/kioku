@@ -50,6 +50,8 @@ const SearchButton = () => {
 
   const handleEnterKey = useCallback(
     async (searchValue: string) => {
+      if (searchValue.trim().length === 0) return;
+
       if (!isSearchPage) {
         setRemoteSearchValue(searchValue);
         navigate('/search');
