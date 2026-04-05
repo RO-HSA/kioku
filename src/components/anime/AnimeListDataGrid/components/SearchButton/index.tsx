@@ -1,7 +1,7 @@
 import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
 import { IconButton, Menu, Tooltip } from '@mui/material';
 import { Search } from 'lucide-react';
-import { type MouseEvent, useState } from 'react';
+import { type MouseEvent, useCallback, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 
 import SearchInput from '@/components/ui/SearchInput';
@@ -15,9 +15,17 @@ const SearchButton = () => {
 
   const isSearchPage = location.pathname === PathName.SEARCH;
 
-  const searchValue = useAnimeListDataGridStore((state) => state.searchValue);
-  const setSearchValue = useAnimeListDataGridStore(
-    (state) => state.setSearchValue
+  const localSearchValue = useAnimeListDataGridStore(
+    (state) => state.localSearchValue
+  );
+  const remoteSearchValue = useAnimeListDataGridStore(
+    (state) => state.remoteSearchValue
+  );
+  const setLocalSearchValue = useAnimeListDataGridStore(
+    (state) => state.setLocalSearchValue
+  );
+  const setRemoteSearchValue = useAnimeListDataGridStore(
+    (state) => state.setRemoteSearchValue
   );
 
   const open = Boolean(anchorEl);
@@ -30,6 +38,13 @@ const SearchButton = () => {
     setAnchorEl(null);
   };
 
+  const handleEnterKey = useCallback(() => {
+    if (isSearchPage) return;
+
+    setRemoteSearchValue(localSearchValue);
+    navigate('/search');
+  }, [isSearchPage, localSearchValue, navigate, setRemoteSearchValue]);
+
   return (
     <>
       <Tooltip title="Search">
@@ -41,9 +56,9 @@ const SearchButton = () => {
       <Menu anchorEl={anchorEl} open={open} onClose={handleClose}>
         <div className="px-2">
           <SearchInput
-            value={searchValue}
-            onChange={setSearchValue}
-            onEnterKey={() => !isSearchPage && navigate('/search')}
+            value={isSearchPage ? remoteSearchValue : localSearchValue}
+            onChange={isSearchPage ? setRemoteSearchValue : setLocalSearchValue}
+            onEnterKey={handleEnterKey}
           />
         </div>
       </Menu>

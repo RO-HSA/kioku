@@ -10,13 +10,15 @@ import {
 } from 'material-react-table';
 
 type AnimeListDataGridStore = {
-  searchValue: string;
+  localSearchValue: string;
+  remoteSearchValue: string;
   selectedStatus: AnimeListUserStatus;
   sorting: MRT_SortingState;
   columnVisibility: MRT_VisibilityState;
   columnSizing: MRT_ColumnSizingState;
   setSelectedStatus: (selectedStatus: AnimeListUserStatus) => void;
-  setSearchValue: (searchValue: string) => void;
+  setLocalSearchValue: (searchValue: string) => void;
+  setRemoteSearchValue: (searchValue: string) => void;
   onSortingChange: OnChangeFn<MRT_SortingState>;
   onColumnVisibilityChange: OnChangeFn<MRT_VisibilityState>;
   onColumnSizingChange: OnChangeFn<MRT_ColumnSizingState>;
@@ -24,12 +26,16 @@ type AnimeListDataGridStore = {
 
 export const useAnimeListDataGridStore = create<AnimeListDataGridStore>(
   (set) => ({
-    searchValue: '',
+    localSearchValue: '',
+    remoteSearchValue: '',
     selectedStatus: 'watching',
     sorting: [],
     columnVisibility: { userStatus: false, genres: false },
     columnSizing: {},
-    setSearchValue: (searchValue) => set(() => ({ searchValue })),
+    setLocalSearchValue: (searchValue) =>
+      set(() => ({ localSearchValue: searchValue })),
+    setRemoteSearchValue: (searchValue) =>
+      set(() => ({ remoteSearchValue: searchValue })),
     setSelectedStatus: (selectedStatus) => set(() => ({ selectedStatus })),
     onSortingChange: (updaterOrValue) =>
       set((state) => {
@@ -67,7 +73,7 @@ export const tauriHandler = createTauriStore(
   {
     autoStart: true,
     saveOnChange: true,
-    filterKeys: ['searchValue'],
+    filterKeys: ['localSearchValue', 'remoteSearchValue'],
     filterKeysStrategy: 'omit'
   }
 );

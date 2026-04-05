@@ -2,9 +2,11 @@ import { Box, SelectChangeEvent, Tooltip } from '@mui/material';
 import { SquareCheck, SquarePlay, SquareStop } from 'lucide-react';
 import { MRT_ColumnDef, useMaterialReactTable } from 'material-react-table';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router';
 
 import ProgressStatus from '@/components/anime/AnimeListDataGrid/components/ProgressStatus';
 import useMaterialTableTheme from '@/hooks/useMaterialTableTheme';
+import { PathName } from '@/routes';
 import { SynchronizedAnimeList } from '@/services/backend/types';
 import { useAnimeDetailsStore } from '@/stores/animeDetails';
 import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
@@ -29,10 +31,16 @@ interface UseAnimeListDataGridProps {
 const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
   const [isLoading, setIsLoading] = useState(true);
 
+  const location = useLocation();
+
+  const isSearchPage = location.pathname === PathName.SEARCH;
+
   const selectedUserStatus = useAnimeListDataGridStore(
     (state) => state.selectedStatus
   );
-  const searchValue = useAnimeListDataGridStore((state) => state.searchValue);
+  const localSearchValue = useAnimeListDataGridStore(
+    (state) => state.localSearchValue
+  );
   const sorting = useAnimeListDataGridStore((state) => state.sorting);
   const columnVisibility = useAnimeListDataGridStore(
     (state) => state.columnVisibility
@@ -209,6 +217,7 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
         header: 'Progress',
         size: 200,
         enableGlobalFilter: false,
+        visibleInShowHideMenu: !isSearchPage,
         Cell: ({ cell, row }) => {
           const watched = cell.getValue<number>();
           return (
@@ -283,7 +292,7 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
         }
       }
     ],
-    [handleProgressChange, setScore]
+    [isSearchPage, handleProgressChange, setScore]
   );
 
   const allData = useMemo(() => {
@@ -300,7 +309,7 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     ];
   }, [listData]);
 
-  const shouldGroupByStatus = searchValue.trim().length > 0;
+  const shouldGroupByStatus = localSearchValue.trim().length > 0;
 
   const data = useMemo(() => {
     if (shouldGroupByStatus) {
@@ -386,10 +395,13 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     groupedColumnMode: 'remove',
     state: {
       isLoading,
-      globalFilter: searchValue,
+      globalFilter: localSearchValue,
       grouping,
       sorting,
-      columnVisibility,
+      columnVisibility: {
+        ...columnVisibility,
+        ...(isSearchPage && { userEpisodesWatched: false })
+      },
       columnSizing
     },
     onSortingChange,
