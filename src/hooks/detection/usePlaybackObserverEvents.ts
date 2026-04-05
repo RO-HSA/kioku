@@ -166,11 +166,7 @@ const usePlaybackObserverEvents = () => {
 
           useMyAnimeListStore
             .getState()
-            .updateAnimeList(
-              anime.id,
-              { type: 'anime', value: anime.userStatus },
-              updatePayload
-            );
+            .updateAnimeList(anime.id, anime.userStatus, updatePayload);
         }
       );
     };
