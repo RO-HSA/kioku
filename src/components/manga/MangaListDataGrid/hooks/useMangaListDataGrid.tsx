@@ -519,7 +519,11 @@ const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
       columnVisibility: {
         ...columnVisibility,
         ...(isSearchPage
-          ? { userEpisodesWatched: false, userScore: false }
+          ? {
+              userChaptersRead: false,
+              userVolumesRead: false,
+              userScore: false
+            }
           : { score: false })
       },
       columnSizing
