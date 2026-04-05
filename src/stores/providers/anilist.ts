@@ -106,18 +106,21 @@ export const useAniListStore = create<AniListStore>((set) => ({
             data: { userEpisodesWatched: newProgress }
           });
 
+          const { updatedAnimeList, updatedAnime } = updatedAnimeListData || {};
+
           if (anime?.entryId === undefined) {
-            return { animeListData: updatedAnimeListData };
+            return { animeListData: updatedAnimeList || null };
           }
 
           AnimeListService.enqueueListUpdate({
             providerId: Provider.ANILIST,
             listType: 'anime',
             entryId: anime.entryId,
-            userEpisodesWatched: newProgress
+            userEpisodesWatched: newProgress,
+            userStatus: updatedAnime ? updatedAnime.userStatus : undefined
           });
 
-          return { animeListData: updatedAnimeListData };
+          return { animeListData: updatedAnimeList || null };
         case 'manga':
           if (!state.mangaListData) return {};
 
@@ -137,8 +140,10 @@ export const useAniListStore = create<AniListStore>((set) => ({
             data: progressData
           });
 
+          const { updatedMangaList } = updatedMangaListData || {};
+
           if (manga?.entryId === undefined) {
-            return { mangaListData: updatedMangaListData };
+            return { mangaListData: updatedMangaList || null };
           }
 
           AnimeListService.enqueueListUpdate({
@@ -148,7 +153,7 @@ export const useAniListStore = create<AniListStore>((set) => ({
             ...progressData
           });
 
-          return { mangaListData: updatedMangaListData };
+          return { mangaListData: updatedMangaList || null };
         default:
           return {};
       }
@@ -170,8 +175,10 @@ export const useAniListStore = create<AniListStore>((set) => ({
             data: { userScore: newScore }
           });
 
+          const { updatedAnimeList } = updatedAnimeListData || {};
+
           if (anime?.entryId === undefined) {
-            return { animeListData: updatedAnimeListData };
+            return { animeListData: updatedAnimeList || null };
           }
 
           AnimeListService.enqueueListUpdate({
@@ -181,7 +188,7 @@ export const useAniListStore = create<AniListStore>((set) => ({
             userScore: newScore
           });
 
-          return { animeListData: updatedAnimeListData };
+          return { animeListData: updatedAnimeList || null };
         case 'manga':
           if (!state.mangaListData) return {};
 
@@ -196,8 +203,10 @@ export const useAniListStore = create<AniListStore>((set) => ({
             data: { userScore: newScore }
           });
 
+          const { updatedMangaList } = updatedMangaListData || {};
+
           if (manga?.entryId === undefined) {
-            return { mangaListData: updatedMangaListData };
+            return { mangaListData: updatedMangaList || null };
           }
 
           AnimeListService.enqueueListUpdate({
@@ -207,7 +216,7 @@ export const useAniListStore = create<AniListStore>((set) => ({
             userScore: newScore
           });
 
-          return { mangaListData: updatedMangaListData };
+          return { mangaListData: updatedMangaList || null };
         default:
           return {};
       }
@@ -232,8 +241,10 @@ export const useAniListStore = create<AniListStore>((set) => ({
         isSingleUpdate: false
       });
 
+      const { updatedAnimeList } = updatedAnimeListData || {};
+
       if (anime?.entryId === undefined) {
-        return { animeListData: updatedAnimeListData };
+        return { animeListData: updatedAnimeList || null };
       }
 
       AnimeListService.enqueueListUpdate({
@@ -243,7 +254,7 @@ export const useAniListStore = create<AniListStore>((set) => ({
         ...data
       });
 
-      return { animeListData: updatedAnimeListData };
+      return { animeListData: updatedAnimeList || null };
     }),
   updateMangaList: (
     entryId: number,
@@ -265,8 +276,10 @@ export const useAniListStore = create<AniListStore>((set) => ({
         isSingleUpdate: false
       });
 
+      const { updatedMangaList } = updatedMangaListData || {};
+
       if (manga?.entryId === undefined) {
-        return { mangaListData: updatedMangaListData };
+        return { mangaListData: updatedMangaList || null };
       }
 
       AnimeListService.enqueueListUpdate({
@@ -276,7 +289,7 @@ export const useAniListStore = create<AniListStore>((set) => ({
         ...data
       });
 
-      return { mangaListData: updatedMangaListData };
+      return { mangaListData: updatedMangaList || null };
     })
 }));
 
