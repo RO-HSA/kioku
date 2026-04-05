@@ -6,10 +6,13 @@ import { useLocation, useNavigate } from 'react-router';
 
 import SearchInput from '@/components/ui/SearchInput';
 import { PathName } from '@/routes';
+import { MyAnimeListService } from '@/services/backend/MyAnimeList';
+import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
+import { useProviderStore } from '@/stores/providers/provider';
+import { Provider } from '@/types/List';
 
 const SearchButton = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -28,6 +31,15 @@ const SearchButton = () => {
     (state) => state.setRemoteSearchValue
   );
 
+  const activeProvider = useProviderStore((state) => state.activeProvider);
+
+  const setAnimeSearchResults = useMyAnimeListStore(
+    (state) => state.setAnimeSearchResults
+  );
+  const setMangaSearchResults = useMyAnimeListStore(
+    (state) => state.setMangaSearchResults
+  );
+
   const open = Boolean(anchorEl);
 
   const handleClick = (event: MouseEvent<HTMLElement>) => {
@@ -38,12 +50,36 @@ const SearchButton = () => {
     setAnchorEl(null);
   };
 
-  const handleEnterKey = useCallback(() => {
-    if (isSearchPage) return;
+  const handleEnterKey = useCallback(
+    async (searchValue: string) => {
+      if (!isSearchPage) {
+        setRemoteSearchValue(searchValue);
+        navigate('/search');
+      }
 
-    setRemoteSearchValue(localSearchValue);
-    navigate('/search');
-  }, [isSearchPage, localSearchValue, navigate, setRemoteSearchValue]);
+      switch (activeProvider) {
+        case Provider.MY_ANIME_LIST:
+          const results = await MyAnimeListService.searchMedia(
+            searchValue,
+            'anime'
+          );
+          setAnimeSearchResults(results);
+          break;
+        case Provider.ANILIST:
+          break;
+        default:
+          break;
+      }
+    },
+    [
+      isSearchPage,
+      activeProvider,
+      navigate,
+      setRemoteSearchValue,
+      setAnimeSearchResults,
+      setMangaSearchResults
+    ]
+  );
 
   return (
     <>

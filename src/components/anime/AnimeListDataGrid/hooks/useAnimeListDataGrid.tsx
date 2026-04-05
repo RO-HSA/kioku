@@ -63,6 +63,9 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
 
   const activeProvider = useProviderStore((state) => state.activeProvider);
 
+  const animeSearchResults = useMyAnimeListStore(
+    (state) => state.animeSearchResults
+  );
   const setMyAnimeListScore = useMyAnimeListStore((state) => state.setScore);
   const setMyAnimeListProgress = useMyAnimeListStore(
     (state) => state.setProgress
@@ -332,6 +335,18 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     }
   }, [allData, listData, selectedUserStatus, shouldGroupByStatus]);
 
+  const searchResults = useMemo(() => {
+    switch (activeProvider) {
+      case Provider.MY_ANIME_LIST:
+        return animeSearchResults || [];
+
+      case Provider.ANILIST:
+        return animeSearchResults || [];
+      default:
+        return [];
+    }
+  }, [activeProvider, animeSearchResults]);
+
   const grouping = useMemo(
     () => (shouldGroupByStatus ? ['userStatus'] : []),
     [shouldGroupByStatus]
@@ -353,7 +368,7 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
 
   const table = useMaterialReactTable({
     columns,
-    data,
+    data: isSearchPage ? searchResults : data,
     initialState: {
       density: 'compact',
       expanded: true

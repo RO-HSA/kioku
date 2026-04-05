@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 
-import { ListType } from '@/types/List';
 import { IAnimeList } from '@/types/AnimeList';
+import { ListType } from '@/types/List';
 import { IMangaList } from '@/types/MangaList';
 import { SynchronizedAnimeList, SynchronizedMangaList } from '../types';
 import { MyAnimeListUserInfo } from './types';
