@@ -33,8 +33,8 @@ enum CallbackPayload {
 
 fn emit_auth_failed<R: Runtime>(app: &tauri::AppHandle<R>, provider_id: &str) {
     let failed_event_name = format!("{provider_id}-auth-failed");
-    if let Err(err) = app.emit(failed_event_name.as_str(), ()) {
-        eprintln!("Failed to emit {failed_event_name}: {err}");
+    if app.emit(failed_event_name.as_str(), ()).is_err() {
+        eprintln!("Failed to emit auth failure event");
     }
 }
 
@@ -224,14 +224,17 @@ pub async fn authorize_anilist(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 pub async fn handle_oauth_callback(app: tauri::AppHandle, url: String) {
-    if let Err(err) = handle_oauth_callback_impl(&app, &url, None).await {
-        eprintln!("OAuth callback error: {}", err);
+    if handle_oauth_callback_impl(&app, &url, None).await.is_err() {
+        eprintln!("OAuth callback handling failed");
     }
 }
 
 pub async fn handle_myanimelist_callback(app: tauri::AppHandle, url: String) {
-    if let Err(err) = handle_oauth_callback_impl(&app, &url, Some(MAL_PROVIDER_ID)).await {
-        eprintln!("MyAnimeList callback error: {}", err);
+    if handle_oauth_callback_impl(&app, &url, Some(MAL_PROVIDER_ID))
+        .await
+        .is_err()
+    {
+        eprintln!("MyAnimeList callback handling failed");
     }
 }
 
@@ -328,17 +331,22 @@ async fn handle_oauth_callback_impl(
 
     if let Err(err) = callback_result {
         if provider.use_pkce && !provider.uses_state {
-            if let Err(cleanup_err) = app
+            if app
                 .state::<TokenManagerState>()
                 .take_pkce_verifier(&provider_id)
+                .is_err()
             {
-                eprintln!("PKCE cleanup failed for {provider_id}: {cleanup_err}");
+                eprintln!("PKCE cleanup failed");
             }
         }
         if provider.uses_state {
             if let Some(state) = callback_state.as_ref() {
-                if let Err(cleanup_err) = app.state::<TokenManagerState>().take_oauth_state(state) {
-                    eprintln!("OAuth state cleanup failed for {provider_id}: {cleanup_err}");
+                if app
+                    .state::<TokenManagerState>()
+                    .take_oauth_state(state)
+                    .is_err()
+                {
+                    eprintln!("OAuth state cleanup failed");
                 }
             }
         }
