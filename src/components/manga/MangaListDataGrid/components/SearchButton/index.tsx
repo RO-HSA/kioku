@@ -5,8 +5,10 @@ import { useLocation, useNavigate } from 'react-router';
 
 import SearchInput from '@/components/ui/SearchInput';
 import { PathName } from '@/routes';
+import { AniListService } from '@/services/backend/AniList';
 import { MyAnimeListService } from '@/services/backend/MyAnimeList';
 import { useMangaListDataGridStore } from '@/stores/mangaListDataGrid';
+import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { useProviderStore } from '@/stores/providers/provider';
 import { Provider } from '@/types/List';
@@ -37,6 +39,9 @@ const SearchButton = () => {
   const setMangaSearchResults = useMyAnimeListStore(
     (state) => state.setMangaSearchResults
   );
+  const setAniListMangaSearchResults = useAniListStore(
+    (state) => state.setMangaSearchResults
+  );
 
   const open = Boolean(anchorEl);
 
@@ -58,15 +63,22 @@ const SearchButton = () => {
       }
 
       switch (activeProvider) {
-        case Provider.MY_ANIME_LIST:
+        case Provider.MY_ANIME_LIST: {
           const results = await MyAnimeListService.searchMedia(
             searchValue,
             'manga'
           );
           setMangaSearchResults(results);
           break;
-        case Provider.ANILIST:
+        }
+        case Provider.ANILIST: {
+          const results = await AniListService.searchMedia(
+            searchValue,
+            'manga'
+          );
+          setAniListMangaSearchResults(results);
           break;
+        }
         default:
           break;
       }
@@ -76,6 +88,7 @@ const SearchButton = () => {
       activeProvider,
       navigate,
       setRemoteSearchValue,
+      setAniListMangaSearchResults,
       setMangaSearchResults
     ]
   );

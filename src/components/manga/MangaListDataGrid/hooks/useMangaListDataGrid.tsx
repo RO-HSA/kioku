@@ -66,6 +66,9 @@ const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
   const mangaSearchResults = useMyAnimeListStore(
     (state) => state.mangaSearchResults
   );
+  const aniListMangaSearchResults = useAniListStore(
+    (state) => state.mangaSearchResults
+  );
   const setMyAnimeListScore = useMyAnimeListStore((state) => state.setScore);
   const setMyAnimeListProgress = useMyAnimeListStore(
     (state) => state.setProgress
@@ -421,7 +424,7 @@ const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
           return mangaSearchResults || [];
 
         case Provider.ANILIST:
-          return mangaSearchResults || [];
+          return aniListMangaSearchResults || [];
         default:
           return [];
       }
@@ -434,7 +437,12 @@ const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
           Number(mangaListDataById.has(a.id)) -
           Number(mangaListDataById.has(b.id))
       );
-  }, [activeProvider, mangaListDataById, mangaSearchResults]);
+  }, [
+    activeProvider,
+    aniListMangaSearchResults,
+    mangaListDataById,
+    mangaSearchResults
+  ]);
 
   const grouping = useMemo(
     () =>

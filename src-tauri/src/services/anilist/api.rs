@@ -13,12 +13,13 @@ use super::mapping::{
     parse_fuzzy_date_input,
 };
 use super::{
-    AniListCollection, AniListUserInfo, GraphQlError, GraphQlRequest, GraphQlResponse,
-    GraphQlVariables, SaveMediaListEntryMutationResponse, SaveMediaListEntryRequest,
-    SaveMediaListEntryVariables, SynchronizedAnimeList, SynchronizedListResult,
+    AniListCollection, AniListSearchPage, AniListSearchResult, AniListUserInfo, GraphQlError,
+    GraphQlRequest, GraphQlResponse, GraphQlVariables, SaveMediaListEntryMutationResponse,
+    SaveMediaListEntryRequest, SaveMediaListEntryVariables, SearchMediaRequest,
+    SearchMediaResponse, SearchMediaVariables, SynchronizedAnimeList, SynchronizedListResult,
     SynchronizedMangaList, UserStatusKey, ViewerRequest, ViewerResponse, GRAPHQL_URL,
     MEDIA_LIST_COLLECTION_QUERY, MEDIA_TYPE_ANIME, MEDIA_TYPE_MANGA, REQUEST_TIMEOUT_SECS,
-    SAVE_MEDIA_LIST_ENTRY_MUTATION, VIEWER_QUERY,
+    SAVE_MEDIA_LIST_ENTRY_MUTATION, SEARCH_LIMIT_MAX, SEARCH_MEDIA_QUERY, VIEWER_QUERY,
 };
 
 fn map_graphql_errors(errors: Option<Vec<GraphQlError>>) -> Result<(), String> {
@@ -34,6 +35,37 @@ fn map_graphql_errors(errors: Option<Vec<GraphQlError>>) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn normalize_search_query(query: &str) -> Result<String, String> {
+    let trimmed = query.trim();
+    if trimmed.is_empty() {
+        return Err("Search query cannot be empty".to_string());
+    }
+
+    Ok(trimmed.to_string())
+}
+
+fn normalize_search_limit(limit: Option<u32>) -> u32 {
+    limit.unwrap_or(SEARCH_LIMIT_MAX).clamp(1, SEARCH_LIMIT_MAX)
+}
+
+fn format_transport_error(operation: &str, error: &reqwest::Error) -> String {
+    let hint = if error.is_timeout() {
+        "request timed out"
+    } else if error.is_connect() {
+        "connection failed"
+    } else if error.is_body() {
+        "response body read failed"
+    } else if error.is_decode() {
+        "response decode failed"
+    } else if error.is_request() {
+        "request failed before a response was received"
+    } else {
+        "request failed"
+    };
+
+    format!("{operation}: {hint} ({error})")
 }
 
 fn build_save_media_list_entry_variables(
@@ -167,6 +199,25 @@ fn parse_viewer_response(
     })
 }
 
+fn parse_search_response(
+    status: reqwest::StatusCode,
+    body: &str,
+) -> Result<AniListSearchPage, String> {
+    if !status.is_success() {
+        return Err(format!("AniList request failed: {} - {}", status, body));
+    }
+
+    let parsed: SearchMediaResponse =
+        serde_json::from_str(body).map_err(|e| format!("Failed to parse AniList response: {e}"))?;
+
+    map_graphql_errors(parsed.errors)?;
+
+    parsed
+        .data
+        .and_then(|data| data.page)
+        .ok_or_else(|| "AniList response missing Page".to_string())
+}
+
 fn parse_save_media_list_entry_response(
     status: reqwest::StatusCode,
     body: &str,
@@ -219,10 +270,13 @@ async fn fetch_collection(
         .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| format_transport_error("AniList sync request failed", &e))?;
     let status = response.status();
 
-    let body = response.text().await.map_err(|e| e.to_string())?;
+    let body = response
+        .text()
+        .await
+        .map_err(|e| format_transport_error("AniList sync response read failed", &e))?;
     parse_collection_response(status, &body)
 }
 
@@ -238,11 +292,51 @@ async fn fetch_viewer(client: &reqwest::Client, token: &str) -> Result<AniListUs
         .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| format_transport_error("AniList user info request failed", &e))?;
     let status = response.status();
 
-    let body = response.text().await.map_err(|e| e.to_string())?;
+    let body = response
+        .text()
+        .await
+        .map_err(|e| format_transport_error("AniList user info response read failed", &e))?;
     parse_viewer_response(status, &body)
+}
+
+async fn fetch_search_media(
+    client: &reqwest::Client,
+    token: &str,
+    query: &str,
+    list_type: ListType,
+    limit: Option<u32>,
+) -> Result<AniListSearchPage, String> {
+    let query = normalize_search_query(query)?;
+    let request = SearchMediaRequest {
+        query: SEARCH_MEDIA_QUERY,
+        variables: SearchMediaVariables {
+            search: &query,
+            r#type: match list_type {
+                ListType::Anime => MEDIA_TYPE_ANIME,
+                ListType::Manga => MEDIA_TYPE_MANGA,
+            },
+            per_page: normalize_search_limit(limit),
+        },
+    };
+
+    let response = client
+        .post(GRAPHQL_URL)
+        .bearer_auth(token)
+        .json(&request)
+        .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
+        .send()
+        .await
+        .map_err(|e| format_transport_error("AniList search request failed", &e))?;
+    let status = response.status();
+
+    let body = response
+        .text()
+        .await
+        .map_err(|e| format_transport_error("AniList search response read failed", &e))?;
+    parse_search_response(status, &body)
 }
 
 #[tauri::command]
@@ -250,6 +344,56 @@ pub async fn fetch_anilist_user_info(app: tauri::AppHandle) -> Result<AniListUse
     let token = get_access_token(&app, ANILIST_PROVIDER_ID).await?;
     let client = reqwest::Client::new();
     fetch_viewer(&client, &token).await
+}
+
+#[tauri::command]
+pub async fn search_anilist_media(
+    app: tauri::AppHandle,
+    query: String,
+    list_type: Option<ListType>,
+    limit: Option<u32>,
+) -> Result<AniListSearchResult, String> {
+    let token = get_access_token(&app, ANILIST_PROVIDER_ID).await?;
+    let list_type = list_type.unwrap_or_default();
+    let client = reqwest::Client::new();
+    let page = fetch_search_media(&client, &token, &query, list_type, limit).await?;
+
+    match list_type {
+        ListType::Anime => Ok(AniListSearchResult::Anime(
+            page.media
+                .into_iter()
+                .flatten()
+                .map(|mut media| {
+                    let status_key = media
+                        .media_list_entry
+                        .as_ref()
+                        .and_then(|entry| entry.status.as_deref())
+                        .map(|status| UserStatusKey::from_anilist(ListType::Anime, Some(status)))
+                        .unwrap_or_else(|| UserStatusKey::default_search(ListType::Anime));
+                    let media_list_entry = media.media_list_entry.take().unwrap_or_default();
+
+                    map_anime_to_domain(media, media_list_entry, status_key)
+                })
+                .collect(),
+        )),
+        ListType::Manga => Ok(AniListSearchResult::Manga(
+            page.media
+                .into_iter()
+                .flatten()
+                .map(|mut media| {
+                    let status_key = media
+                        .media_list_entry
+                        .as_ref()
+                        .and_then(|entry| entry.status.as_deref())
+                        .map(|status| UserStatusKey::from_anilist(ListType::Manga, Some(status)))
+                        .unwrap_or_else(|| UserStatusKey::default_search(ListType::Manga));
+                    let media_list_entry = media.media_list_entry.take().unwrap_or_default();
+
+                    map_manga_to_domain(media, media_list_entry, status_key)
+                })
+                .collect(),
+        )),
+    }
 }
 
 #[tauri::command]
@@ -344,9 +488,12 @@ pub async fn update_anilist_list_entry(
         .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| format_transport_error("AniList update request failed", &e))?;
     let status_code = response.status();
-    let body = response.text().await.map_err(|e| e.to_string())?;
+    let body = response
+        .text()
+        .await
+        .map_err(|e| format_transport_error("AniList update response read failed", &e))?;
     parse_save_media_list_entry_response(status_code, &body)
 }
 

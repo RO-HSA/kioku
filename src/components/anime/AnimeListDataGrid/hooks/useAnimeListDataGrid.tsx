@@ -67,6 +67,9 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
   const animeSearchResults = useMyAnimeListStore(
     (state) => state.animeSearchResults
   );
+  const aniListAnimeSearchResults = useAniListStore(
+    (state) => state.animeSearchResults
+  );
   const setMyAnimeListScore = useMyAnimeListStore((state) => state.setScore);
   const setMyAnimeListProgress = useMyAnimeListStore(
     (state) => state.setProgress
@@ -283,6 +286,8 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
             <Box display="flex" justifyContent="center" width="100%">
               {score === 0 ? (
                 <span className="text-gray-500">{'N/A'}</span>
+              ) : score > 10 ? (
+                `${score}%`
               ) : (
                 score
               )}
@@ -378,7 +383,7 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
           return animeSearchResults || [];
 
         case Provider.ANILIST:
-          return animeSearchResults || [];
+          return aniListAnimeSearchResults || [];
         default:
           return [];
       }
@@ -391,7 +396,12 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
           Number(animeListDataById.has(a.id)) -
           Number(animeListDataById.has(b.id))
       );
-  }, [activeProvider, animeListDataById, animeSearchResults]);
+  }, [
+    activeProvider,
+    aniListAnimeSearchResults,
+    animeListDataById,
+    animeSearchResults
+  ]);
 
   const grouping = useMemo(
     () =>
