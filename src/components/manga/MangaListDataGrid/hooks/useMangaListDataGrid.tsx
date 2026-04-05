@@ -3,6 +3,7 @@ import { SquareCheck, SquarePlay, SquareStop } from 'lucide-react';
 import { MRT_ColumnDef, useMaterialReactTable } from 'material-react-table';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import GroupedExpandCell from '@/components/ui/GroupedExpandCell';
 import useMaterialTableTheme from '@/hooks/useMaterialTableTheme';
 import { PathName } from '@/routes';
 import { SynchronizedMangaList } from '@/services/backend/types';
@@ -183,6 +184,31 @@ const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
     }
   };
 
+  const allData = useMemo(() => {
+    if (!listData) {
+      return [];
+    }
+
+    return [
+      ...listData.reading,
+      ...listData.completed,
+      ...listData.onHold,
+      ...listData.dropped,
+      ...listData.planToRead
+    ];
+  }, [listData]);
+
+  const mangaListDataById = useMemo(
+    () => new Map(allData.map((manga) => [manga.id, manga])),
+    [allData]
+  );
+
+  const getSearchMembershipLabel = useCallback(
+    (manga: IMangaList) =>
+      mangaListDataById.has(manga.id) ? 'In list' : 'Not in list',
+    [mangaListDataById]
+  );
+
   const columns = useMemo<MRT_ColumnDef<IMangaList>[]>(
     () => [
       {
@@ -192,7 +218,10 @@ const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
         enableSorting: false,
         enableGlobalFilter: false,
         visibleInShowHideMenu: false,
-        getGroupingValue: (row) => getUserStatusLabel(row.userStatus),
+        getGroupingValue: (row) =>
+          isSearchPage
+            ? getSearchMembershipLabel(row)
+            : getUserStatusLabel(row.userStatus),
         Cell: ({ cell }) => {
           const value = cell.getValue<MangaListUserStatus>();
           return value ? getUserStatusLabel(value) : '';
@@ -333,26 +362,13 @@ const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
       }
     ],
     [
+      getSearchMembershipLabel,
       isSearchPage,
       handleVolumesProgressChange,
       handleChaptersProgressChange,
       setScore
     ]
   );
-
-  const allData = useMemo(() => {
-    if (!listData) {
-      return [];
-    }
-
-    return [
-      ...listData.reading,
-      ...listData.completed,
-      ...listData.onHold,
-      ...listData.dropped,
-      ...listData.planToRead
-    ];
-  }, [listData]);
 
   const shouldGroupByStatus = localSearchValue.trim().length > 0;
 
@@ -378,20 +394,31 @@ const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
   }, [allData, listData, selectedUserStatus, shouldGroupByStatus]);
 
   const searchResults = useMemo(() => {
-    switch (activeProvider) {
-      case Provider.MY_ANIME_LIST:
-        return mangaSearchResults || [];
+    const results = (() => {
+      switch (activeProvider) {
+        case Provider.MY_ANIME_LIST:
+          return mangaSearchResults || [];
 
-      case Provider.ANILIST:
-        return mangaSearchResults || [];
-      default:
-        return [];
-    }
-  }, [activeProvider, mangaSearchResults]);
+        case Provider.ANILIST:
+          return mangaSearchResults || [];
+        default:
+          return [];
+      }
+    })();
+
+    return results
+      .map((manga) => mangaListDataById.get(manga.id) || manga)
+      .sort(
+        (a, b) =>
+          Number(mangaListDataById.has(a.id)) -
+          Number(mangaListDataById.has(b.id))
+      );
+  }, [activeProvider, mangaListDataById, mangaSearchResults]);
 
   const grouping = useMemo(
-    () => (shouldGroupByStatus ? ['userStatus'] : []),
-    [shouldGroupByStatus]
+    () =>
+      isSearchPage ? ['userStatus'] : shouldGroupByStatus ? ['userStatus'] : [],
+    [isSearchPage, shouldGroupByStatus]
   );
 
   const handleOpenMangaDetails = useCallback(
@@ -450,6 +477,19 @@ const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
     enableColumnDragging: false,
     globalFilterFn: 'includesString',
     groupedColumnMode: 'remove',
+    displayColumnDefOptions: {
+      'mrt-row-expand': {
+        grow: false,
+        size: 140,
+        Cell: ({ row, staticRowIndex, table }) => (
+          <GroupedExpandCell
+            row={row}
+            staticRowIndex={staticRowIndex}
+            table={table}
+          />
+        )
+      }
+    },
     state: {
       isLoading,
       globalFilter: localSearchValue,

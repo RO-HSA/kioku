@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router';
 
 import ProgressStatus from '@/components/anime/AnimeListDataGrid/components/ProgressStatus';
+import GroupedExpandCell from '@/components/ui/GroupedExpandCell';
 import useMaterialTableTheme from '@/hooks/useMaterialTableTheme';
 import { PathName } from '@/routes';
 import { SynchronizedAnimeList } from '@/services/backend/types';
@@ -158,6 +159,31 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     }
   };
 
+  const allData = useMemo(() => {
+    if (!listData) {
+      return [];
+    }
+
+    return [
+      ...listData.watching,
+      ...listData.completed,
+      ...listData.onHold,
+      ...listData.dropped,
+      ...listData.planToWatch
+    ];
+  }, [listData]);
+
+  const animeListDataById = useMemo(
+    () => new Map(allData.map((anime) => [anime.id, anime])),
+    [allData]
+  );
+
+  const getSearchMembershipLabel = useCallback(
+    (anime: IAnimeList) =>
+      animeListDataById.has(anime.id) ? 'In list' : 'Not in list',
+    [animeListDataById]
+  );
+
   const columns = useMemo<MRT_ColumnDef<IAnimeList>[]>(
     () => [
       {
@@ -167,7 +193,10 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
         enableSorting: false,
         enableGlobalFilter: false,
         visibleInShowHideMenu: false,
-        getGroupingValue: (row) => getUserStatusLabel(row.userStatus),
+        getGroupingValue: (row) =>
+          isSearchPage
+            ? getSearchMembershipLabel(row)
+            : getUserStatusLabel(row.userStatus),
         Cell: ({ cell }) => {
           const value = cell.getValue<AnimeListUserStatus>();
           return value ? getUserStatusLabel(value) : '';
@@ -295,22 +324,8 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
         }
       }
     ],
-    [isSearchPage, handleProgressChange, setScore]
+    [getSearchMembershipLabel, isSearchPage, handleProgressChange, setScore]
   );
-
-  const allData = useMemo(() => {
-    if (!listData) {
-      return [];
-    }
-
-    return [
-      ...listData.watching,
-      ...listData.completed,
-      ...listData.onHold,
-      ...listData.dropped,
-      ...listData.planToWatch
-    ];
-  }, [listData]);
 
   const shouldGroupByStatus = localSearchValue.trim().length > 0;
 
@@ -336,20 +351,31 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
   }, [allData, listData, selectedUserStatus, shouldGroupByStatus]);
 
   const searchResults = useMemo(() => {
-    switch (activeProvider) {
-      case Provider.MY_ANIME_LIST:
-        return animeSearchResults || [];
+    const results = (() => {
+      switch (activeProvider) {
+        case Provider.MY_ANIME_LIST:
+          return animeSearchResults || [];
 
-      case Provider.ANILIST:
-        return animeSearchResults || [];
-      default:
-        return [];
-    }
-  }, [activeProvider, animeSearchResults]);
+        case Provider.ANILIST:
+          return animeSearchResults || [];
+        default:
+          return [];
+      }
+    })();
+
+    return results
+      .map((anime) => animeListDataById.get(anime.id) || anime)
+      .sort(
+        (a, b) =>
+          Number(animeListDataById.has(a.id)) -
+          Number(animeListDataById.has(b.id))
+      );
+  }, [activeProvider, animeListDataById, animeSearchResults]);
 
   const grouping = useMemo(
-    () => (shouldGroupByStatus ? ['userStatus'] : []),
-    [shouldGroupByStatus]
+    () =>
+      isSearchPage ? ['userStatus'] : shouldGroupByStatus ? ['userStatus'] : [],
+    [isSearchPage, shouldGroupByStatus]
   );
 
   const handleOpenAnimeDetails = useCallback(
@@ -408,6 +434,19 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     enableColumnDragging: false,
     globalFilterFn: 'includesString',
     groupedColumnMode: 'remove',
+    displayColumnDefOptions: {
+      'mrt-row-expand': {
+        grow: false,
+        size: 140,
+        Cell: ({ row, staticRowIndex, table }) => (
+          <GroupedExpandCell
+            row={row}
+            staticRowIndex={staticRowIndex}
+            table={table}
+          />
+        )
+      }
+    },
     state: {
       isLoading,
       globalFilter: localSearchValue,
