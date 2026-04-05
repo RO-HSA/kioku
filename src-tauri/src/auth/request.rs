@@ -14,6 +14,16 @@ enum OAuthRequestBody {
     Empty,
 }
 
+#[derive(Debug, PartialEq)]
+struct PreparedOAuthRequest {
+    provider_id: String,
+    method: reqwest::Method,
+    url: String,
+    headers: Vec<(String, String)>,
+    body: OAuthRequestBody,
+    timeout: Option<Duration>,
+}
+
 fn parse_http_method(method: &str) -> Result<reqwest::Method, String> {
     reqwest::Method::from_bytes(method.to_uppercase().as_bytes()).map_err(|e| e.to_string())
 }
@@ -35,6 +45,17 @@ fn select_request_body(
     }
 }
 
+fn prepare_oauth_request(request: OAuthRequest) -> Result<PreparedOAuthRequest, String> {
+    Ok(PreparedOAuthRequest {
+        provider_id: request.provider_id,
+        method: parse_http_method(&request.method)?,
+        url: request.url,
+        headers: request.headers.unwrap_or_default().into_iter().collect(),
+        body: select_request_body(request.json_body, request.body),
+        timeout: request_timeout(request.timeout_ms),
+    })
+}
+
 #[derive(Deserialize)]
 pub struct OAuthRequest {
     pub provider_id: String,
@@ -54,24 +75,22 @@ pub struct OAuthResponse {
 
 #[tauri::command]
 pub async fn oauth_request(app: AppHandle, request: OAuthRequest) -> Result<OAuthResponse, String> {
+    let request = prepare_oauth_request(request)?;
     let token = get_access_token(&app, &request.provider_id).await?;
-    let method = parse_http_method(&request.method)?;
 
     let mut builder = reqwest::Client::new()
-        .request(method, &request.url)
+        .request(request.method, &request.url)
         .bearer_auth(token);
 
-    if let Some(timeout) = request_timeout(request.timeout_ms) {
+    if let Some(timeout) = request.timeout {
         builder = builder.timeout(timeout);
     }
 
-    if let Some(headers) = request.headers {
-        for (key, value) in headers {
-            builder = builder.header(key, value);
-        }
+    for (key, value) in request.headers {
+        builder = builder.header(key, value);
     }
 
-    match select_request_body(request.json_body, request.body) {
+    match request.body {
         OAuthRequestBody::Json(json_body) => {
             builder = builder.json(&json_body);
         }
@@ -120,5 +139,67 @@ mod tests {
             OAuthRequestBody::Text("body".to_string())
         );
         assert_eq!(select_request_body(None, None), OAuthRequestBody::Empty);
+    }
+
+    #[test]
+    fn prepare_oauth_request_normalizes_method_headers_timeout_and_body() {
+        let request = OAuthRequest {
+            provider_id: "anilist".to_string(),
+            method: "pAtCh".to_string(),
+            url: "https://example.com/graphql".to_string(),
+            headers: Some(HashMap::from([
+                ("X-Test".to_string(), "1".to_string()),
+                ("Content-Type".to_string(), "application/json".to_string()),
+            ])),
+            body: Some("ignored".to_string()),
+            json_body: Some(json!({"ok": true})),
+            timeout_ms: Some(2500),
+        };
+
+        let prepared = prepare_oauth_request(request).expect("request should prepare");
+
+        assert_eq!(prepared.provider_id, "anilist");
+        assert_eq!(prepared.method, reqwest::Method::PATCH);
+        assert_eq!(prepared.url, "https://example.com/graphql");
+        assert_eq!(prepared.timeout, Some(Duration::from_millis(2500)));
+        assert_eq!(prepared.body, OAuthRequestBody::Json(json!({"ok": true})));
+        assert_eq!(prepared.headers.len(), 2);
+        assert!(prepared
+            .headers
+            .contains(&("X-Test".to_string(), "1".to_string())));
+        assert!(prepared
+            .headers
+            .contains(&("Content-Type".to_string(), "application/json".to_string())));
+    }
+
+    #[test]
+    fn prepare_oauth_request_rejects_invalid_methods_and_handles_missing_optionals() {
+        let invalid = OAuthRequest {
+            provider_id: "mal".to_string(),
+            method: "not a method".to_string(),
+            url: "https://example.com".to_string(),
+            headers: None,
+            body: None,
+            json_body: None,
+            timeout_ms: None,
+        };
+        assert!(prepare_oauth_request(invalid).is_err());
+
+        let request = OAuthRequest {
+            provider_id: "mal".to_string(),
+            method: "get".to_string(),
+            url: "https://example.com".to_string(),
+            headers: None,
+            body: Some("body".to_string()),
+            json_body: None,
+            timeout_ms: None,
+        };
+        let prepared = prepare_oauth_request(request).expect("request should prepare");
+
+        assert_eq!(prepared.provider_id, "mal");
+        assert_eq!(prepared.method, reqwest::Method::GET);
+        assert!(prepared.headers.is_empty());
+        assert_eq!(prepared.timeout, None);
+        assert_eq!(prepared.body, OAuthRequestBody::Text("body".to_string()));
     }
 }

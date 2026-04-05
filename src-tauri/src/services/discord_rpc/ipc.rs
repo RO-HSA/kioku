@@ -29,6 +29,41 @@ pub(crate) struct DiscordIpcConnection {
     stream: DiscordIpcStream,
 }
 
+fn connect_over_endpoints<T, Connect, Handshake>(
+    client_id: &str,
+    endpoints: Vec<String>,
+    mut connect: Connect,
+    mut send_handshake: Handshake,
+) -> Result<T, String>
+where
+    Connect: FnMut(&str) -> Result<T, String>,
+    Handshake: FnMut(&mut T, &str) -> Result<(), String>,
+{
+    if endpoints.is_empty() {
+        return Err("Current platform does not support Discord IPC".to_string());
+    }
+
+    let mut last_error: Option<String> = None;
+    for endpoint in endpoints {
+        let mut connection = match connect(&endpoint) {
+            Ok(connection) => connection,
+            Err(error) => {
+                last_error = Some(format!("{endpoint}: {error}"));
+                continue;
+            }
+        };
+
+        if let Err(error) = send_handshake(&mut connection, client_id) {
+            last_error = Some(format!("{endpoint}: {error}"));
+            continue;
+        }
+
+        return Ok(connection);
+    }
+
+    Err(last_error.unwrap_or_else(|| "Unable to connect to Discord IPC".to_string()))
+}
+
 fn encode_packet_bytes<T: Serialize>(opcode: i32, payload: &T) -> Result<Vec<u8>, String> {
     let body = serde_json::to_vec(payload)
         .map_err(|error| format!("Failed to encode Discord IPC payload: {error}"))?;
@@ -42,72 +77,73 @@ fn encode_packet_bytes<T: Serialize>(opcode: i32, payload: &T) -> Result<Vec<u8>
     Ok(packet)
 }
 
+fn write_packet<W: Write, T: Serialize>(
+    writer: &mut W,
+    opcode: i32,
+    payload: &T,
+) -> Result<(), String> {
+    let packet = encode_packet_bytes(opcode, payload)?;
+
+    writer
+        .write_all(&packet)
+        .map_err(|error| format!("Failed to write Discord IPC payload: {error}"))?;
+    writer
+        .flush()
+        .map_err(|error| format!("Failed to flush Discord IPC stream: {error}"))?;
+
+    Ok(())
+}
+
+fn build_activity_command(
+    pid: u32,
+    activity: Option<DiscordActivity>,
+    nonce: String,
+) -> DiscordIpcCommand {
+    DiscordIpcCommand {
+        cmd: DISCORD_COMMAND_SET_ACTIVITY,
+        args: DiscordIpcCommandArgs { pid, activity },
+        nonce,
+    }
+}
+
+fn build_handshake_payload(client_id: &str) -> serde_json::Value {
+    serde_json::json!({
+        "v": DISCORD_HANDSHAKE_VERSION,
+        "client_id": client_id
+    })
+}
+
 impl DiscordIpcConnection {
     pub(crate) fn connect(client_id: &str) -> Result<Self, String> {
-        let endpoints = discord_ipc_endpoints();
-
-        if endpoints.is_empty() {
-            return Err("Current platform does not support Discord IPC".to_string());
-        }
-
-        let mut last_error: Option<String> = None;
-        for endpoint in endpoints {
-            let stream = match DiscordIpcStream::connect(&endpoint) {
-                Ok(stream) => stream,
-                Err(error) => {
-                    last_error = Some(format!("{endpoint}: {error}"));
-                    continue;
-                }
-            };
-
-            let mut connection = Self { stream };
-            if let Err(error) = connection.send_handshake(client_id) {
-                last_error = Some(format!("{endpoint}: {error}"));
-                continue;
-            }
-
-            return Ok(connection);
-        }
-
-        Err(last_error.unwrap_or_else(|| "Unable to connect to Discord IPC".to_string()))
+        connect_over_endpoints(
+            client_id,
+            discord_ipc_endpoints(),
+            |endpoint| {
+                DiscordIpcStream::connect(endpoint)
+                    .map(|stream| Self { stream })
+                    .map_err(|error| error.to_string())
+            },
+            |connection, client_id| connection.send_handshake(client_id),
+        )
     }
 
     pub(crate) fn send_activity(
         &mut self,
         activity: Option<DiscordActivity>,
     ) -> Result<(), String> {
-        let command = DiscordIpcCommand {
-            cmd: DISCORD_COMMAND_SET_ACTIVITY,
-            args: DiscordIpcCommandArgs {
-                pid: std::process::id(),
-                activity,
-            },
-            nonce: build_nonce(),
-        };
+        let command = build_activity_command(std::process::id(), activity, build_nonce());
 
         self.send_packet(DISCORD_IPC_OPCODE_FRAME, &command)
     }
 
     fn send_handshake(&mut self, client_id: &str) -> Result<(), String> {
-        let payload = serde_json::json!({
-            "v": DISCORD_HANDSHAKE_VERSION,
-            "client_id": client_id
-        });
+        let payload = build_handshake_payload(client_id);
 
         self.send_packet(DISCORD_IPC_OPCODE_HANDSHAKE, &payload)
     }
 
     fn send_packet<T: Serialize>(&mut self, opcode: i32, payload: &T) -> Result<(), String> {
-        let packet = encode_packet_bytes(opcode, payload)?;
-
-        self.stream
-            .write_all(&packet)
-            .map_err(|error| format!("Failed to write Discord IPC payload: {error}"))?;
-        self.stream
-            .flush()
-            .map_err(|error| format!("Failed to flush Discord IPC stream: {error}"))?;
-
-        Ok(())
+        write_packet(&mut self.stream, opcode, payload)
     }
 }
 
@@ -196,6 +232,35 @@ fn discord_ipc_endpoints() -> Vec<String> {
 mod tests {
     use super::super::model::DiscordPresenceRequest;
     use super::*;
+    use std::io::{Error, ErrorKind};
+
+    #[derive(Default)]
+    struct RecordingWriter {
+        bytes: Vec<u8>,
+        flushed: bool,
+        fail_on_write: bool,
+        fail_on_flush: bool,
+    }
+
+    impl Write for RecordingWriter {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            if self.fail_on_write {
+                return Err(Error::new(ErrorKind::BrokenPipe, "write failed"));
+            }
+
+            self.bytes.extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            if self.fail_on_flush {
+                return Err(Error::new(ErrorKind::Other, "flush failed"));
+            }
+
+            self.flushed = true;
+            Ok(())
+        }
+    }
 
     #[test]
     fn encode_packet_bytes_writes_opcode_length_and_json_body() {
@@ -217,6 +282,49 @@ mod tests {
     }
 
     #[test]
+    fn write_packet_writes_bytes_and_surfaces_writer_errors() {
+        let mut writer = RecordingWriter::default();
+        write_packet(
+            &mut writer,
+            DISCORD_IPC_OPCODE_FRAME,
+            &serde_json::json!({ "cmd": "SET_ACTIVITY" }),
+        )
+        .expect("packet should write");
+        assert!(writer.flushed);
+        assert!(!writer.bytes.is_empty());
+
+        let mut write_error = RecordingWriter {
+            fail_on_write: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            write_packet(
+                &mut write_error,
+                DISCORD_IPC_OPCODE_FRAME,
+                &serde_json::json!({ "cmd": "SET_ACTIVITY" }),
+            )
+            .err()
+            .as_deref(),
+            Some("Failed to write Discord IPC payload: write failed")
+        );
+
+        let mut flush_error = RecordingWriter {
+            fail_on_flush: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            write_packet(
+                &mut flush_error,
+                DISCORD_IPC_OPCODE_FRAME,
+                &serde_json::json!({ "cmd": "SET_ACTIVITY" }),
+            )
+            .err()
+            .as_deref(),
+            Some("Failed to flush Discord IPC stream: flush failed")
+        );
+    }
+
+    #[test]
     fn discord_ipc_endpoints_returns_expected_windows_pipe_names() {
         let endpoints = discord_ipc_endpoints();
 
@@ -232,6 +340,101 @@ mod tests {
                 Some(r"\\?\pipe\discord-ipc-9")
             );
         }
+    }
+
+    #[test]
+    fn connect_over_endpoints_retries_until_handshake_succeeds() {
+        let mut connect_calls = Vec::new();
+        let mut handshakes = Vec::new();
+
+        let connection = connect_over_endpoints(
+            "123",
+            vec![
+                "first".to_string(),
+                "second".to_string(),
+                "third".to_string(),
+            ],
+            |endpoint| {
+                connect_calls.push(endpoint.to_string());
+                if endpoint == "first" {
+                    Err("connect failed".to_string())
+                } else {
+                    Ok(endpoint.to_string())
+                }
+            },
+            |connection, client_id| {
+                handshakes.push((connection.clone(), client_id.to_string()));
+                if connection == "second" {
+                    Err("handshake failed".to_string())
+                } else {
+                    Ok(())
+                }
+            },
+        )
+        .expect("third endpoint should succeed");
+
+        assert_eq!(connection, "third".to_string());
+        assert_eq!(
+            connect_calls,
+            vec![
+                "first".to_string(),
+                "second".to_string(),
+                "third".to_string()
+            ]
+        );
+        assert_eq!(
+            handshakes,
+            vec![
+                ("second".to_string(), "123".to_string()),
+                ("third".to_string(), "123".to_string())
+            ]
+        );
+    }
+
+    #[test]
+    fn connect_over_endpoints_reports_unsupported_and_last_error() {
+        assert_eq!(
+            connect_over_endpoints("123", Vec::<String>::new(), |_| Ok(()), |_, _| Ok(()))
+                .err()
+                .as_deref(),
+            Some("Current platform does not support Discord IPC")
+        );
+
+        assert_eq!(
+            connect_over_endpoints(
+                "123",
+                vec!["first".to_string(), "second".to_string()],
+                |endpoint| Ok(endpoint.to_string()),
+                |connection, _| Err(format!("{connection} handshake failed")),
+            )
+            .err()
+            .as_deref(),
+            Some("second: second handshake failed")
+        );
+    }
+
+    #[test]
+    fn command_builders_produce_expected_shapes() {
+        let activity = DiscordPresenceRequest {
+            details: Some("Watching Frieren".to_string()),
+            ..Default::default()
+        }
+        .sanitize()
+        .into_activity();
+
+        let command = build_activity_command(123, activity, "kioku-test".to_string());
+        let command_json = serde_json::to_value(&command).expect("command should serialize");
+        let handshake_json = build_handshake_payload("456");
+
+        assert_eq!(command_json["cmd"], "SET_ACTIVITY");
+        assert_eq!(command_json["args"]["pid"], 123);
+        assert_eq!(
+            command_json["args"]["activity"]["details"],
+            "Watching Frieren"
+        );
+        assert_eq!(command_json["nonce"], "kioku-test");
+        assert_eq!(handshake_json["v"], DISCORD_HANDSHAKE_VERSION);
+        assert_eq!(handshake_json["client_id"], "456");
     }
 
     #[test]
