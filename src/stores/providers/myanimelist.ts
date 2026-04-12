@@ -10,7 +10,12 @@ import { AnimeListUserStatus, IAnimeList } from '@/types/AnimeList';
 import { Provider } from '@/types/List';
 import { IMangaList, MangaListUserStatus } from '@/types/MangaList';
 import { Statistics } from '@/types/User';
-import { updateAnimeListData, updateMangaListData } from './utils';
+import {
+  addToAnimeList,
+  addToMangaList,
+  updateAnimeListData,
+  updateMangaListData
+} from './utils';
 
 type ListStatus =
   | { type: 'anime'; value: AnimeListUserStatus }
@@ -59,6 +64,8 @@ type MyAnimeListStore = {
     status: MangaListUserStatus,
     data: Partial<IMangaList>
   ) => void;
+  addToAnimeList: (anime: IAnimeList) => void;
+  addToMangaList: (manga: IMangaList) => void;
 };
 
 export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
@@ -253,6 +260,47 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
       });
 
       return { mangaListData: updatedMangaList };
+    }),
+  addToAnimeList: (anime) =>
+    set((state) => {
+      if (!state.animeListData) return {};
+
+      const updatedAnimeListData = addToAnimeList({
+        state: state.animeListData,
+        animeToAdd: anime
+      });
+
+      AnimeListService.enqueueListUpdate({
+        providerId: Provider.MY_ANIME_LIST,
+        listType: 'anime',
+        entryId: anime.entryId || anime.id,
+        userStatus: anime.userStatus,
+        userScore: anime.userScore,
+        userEpisodesWatched: anime.userEpisodesWatched
+      });
+
+      return { animeListData: updatedAnimeListData };
+    }),
+  addToMangaList: (manga) =>
+    set((state) => {
+      if (!state.mangaListData) return {};
+
+      const updatedMangaListData = addToMangaList({
+        state: state.mangaListData,
+        mangaToAdd: manga
+      });
+
+      AnimeListService.enqueueListUpdate({
+        providerId: Provider.MY_ANIME_LIST,
+        listType: 'manga',
+        entryId: manga.entryId || manga.id,
+        userStatus: manga.userStatus,
+        userScore: manga.userScore,
+        userChaptersRead: manga.userChaptersRead,
+        userVolumesRead: manga.userVolumesRead
+      });
+
+      return { mangaListData: updatedMangaListData };
     })
 }));
 

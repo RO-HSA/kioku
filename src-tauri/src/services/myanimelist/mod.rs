@@ -21,7 +21,7 @@ const MANGA_FIELDS: &str = "list_status{comments,num_times_reread},synopsis,alte
 const ANIME_SEARCH_FIELDS: &str = "synopsis,alternative_titles,source,num_episodes,nsfw,start_season,media_type,studios,mean,status,genres,broadcast,start_date";
 const MANGA_SEARCH_FIELDS: &str = "synopsis,alternative_titles,mean,media_type,status,genres,num_volumes,num_chapters,authors{first_name,last_name},serialization{name},start_date,end_date";
 const LIMIT: u32 = 1000;
-const SEARCH_LIMIT_MAX: u32 = 100;
+const SEARCH_LIMIT_MAX: u32 = 50;
 
 #[derive(Copy, Clone, Default, Deserialize)]
 #[serde(rename_all = "lowercase")]

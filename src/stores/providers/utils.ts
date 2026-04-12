@@ -28,6 +28,16 @@ interface UpdateAnimeListDataProps {
   data: Partial<IAnimeUserList>;
 }
 
+interface AddToAnimeListProps {
+  state: SynchronizedAnimeList | null;
+  animeToAdd: IAnimeList;
+}
+
+interface AddToMangaListProps {
+  state: SynchronizedMangaList | null;
+  mangaToAdd: IMangaList;
+}
+
 interface MoveMangaBetweenStatusesProps {
   state: SynchronizedMangaList | null;
   mangaToMove: IMangaList;
@@ -141,6 +151,20 @@ export const updateAnimeListData = ({
   };
 };
 
+export const addToAnimeList = ({
+  state,
+  animeToAdd
+}: AddToAnimeListProps): SynchronizedAnimeList | null => {
+  if (!state) return null;
+
+  const updatedAnimeListData = {
+    ...state,
+    [animeToAdd.userStatus]: [...state[animeToAdd.userStatus], animeToAdd]
+  };
+
+  return updatedAnimeListData;
+};
+
 export const moveMangaBetweenStatuses = ({
   state,
   mangaToMove,
@@ -231,4 +255,18 @@ export const updateMangaListData = ({
   };
 
   return { updatedMangaList: updatedMangaListData, updatedManga: updatedManga };
+};
+
+export const addToMangaList = ({
+  state,
+  mangaToAdd
+}: AddToMangaListProps): SynchronizedMangaList | null => {
+  if (!state) return null;
+
+  const updatedMangaListData = {
+    ...state,
+    [mangaToAdd.userStatus]: [...state[mangaToAdd.userStatus], mangaToAdd]
+  };
+
+  return updatedMangaListData;
 };
