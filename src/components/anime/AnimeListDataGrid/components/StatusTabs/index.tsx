@@ -28,6 +28,8 @@ const StatusTabs: FC<StatusTabsProps> = ({
     (state) => state.setSelectedStatus
   );
 
+  const isLoading = useAnimeListDataGridStore((state) => state.isLoading);
+
   const { tabsRootRef } = useStatusTabs();
 
   const tabs = useMemo(
@@ -97,6 +99,7 @@ const StatusTabs: FC<StatusTabsProps> = ({
             label={tab.label}
             aria-label={tab.ariaLabel}
             value={tab.value}
+            disabled={isLoading}
           />
         ))}
       </Tabs>

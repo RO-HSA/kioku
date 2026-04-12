@@ -27,6 +27,7 @@ const StatusTabs: FC<StatusTabsProps> = ({
   const setSelectedStatus = useMangaListDataGridStore(
     (state) => state.setSelectedStatus
   );
+  const isLoading = useMangaListDataGridStore((state) => state.isLoading);
 
   const { tabsRootRef } = useStatusTabs();
 
@@ -97,6 +98,7 @@ const StatusTabs: FC<StatusTabsProps> = ({
             label={tab.label}
             aria-label={tab.ariaLabel}
             value={tab.value}
+            disabled={isLoading}
           />
         ))}
       </Tabs>
