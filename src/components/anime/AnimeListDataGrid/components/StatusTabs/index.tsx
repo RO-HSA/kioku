@@ -92,6 +92,7 @@ const StatusTabs: FC<StatusTabsProps> = ({
         onChange={(_, value) => setSelectedStatus(value)}>
         {tabs.map((tab) => (
           <Tab
+            key={tab.value}
             className={tabClassNames}
             label={tab.label}
             aria-label={tab.ariaLabel}
