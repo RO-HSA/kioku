@@ -1,5 +1,5 @@
 import { Tab, Tabs } from '@mui/material';
-import { FC } from 'react';
+import { FC, useMemo } from 'react';
 
 import { useMangaListDataGridStore } from '@/stores/mangaListDataGrid';
 import useStatusTabs from './useStatusTabs';
@@ -30,6 +30,37 @@ const StatusTabs: FC<StatusTabsProps> = ({
 
   const { tabsRootRef } = useStatusTabs();
 
+  const tabs = useMemo(
+    () => [
+      {
+        label: `Reading (${readingCount})`,
+        ariaLabel: 'Reading list',
+        value: 'reading'
+      },
+      {
+        label: `Completed (${completedCount})`,
+        ariaLabel: 'Completed list',
+        value: 'completed'
+      },
+      {
+        label: `On Hold (${onHoldCount})`,
+        ariaLabel: 'On Hold list',
+        value: 'onHold'
+      },
+      {
+        label: `Dropped (${droppedCount})`,
+        ariaLabel: 'Dropped list',
+        value: 'dropped'
+      },
+      {
+        label: `Plan To Read (${planToReadCount})`,
+        ariaLabel: 'Plan To Read list',
+        value: 'planToRead'
+      }
+    ],
+    [readingCount, completedCount, onHoldCount, droppedCount, planToReadCount]
+  );
+
   return (
     <div className="w-full overflow-x-hidden">
       <Tabs
@@ -59,36 +90,14 @@ const StatusTabs: FC<StatusTabsProps> = ({
           }
         }}
         onChange={(_, value) => setSelectedStatus(value)}>
-        <Tab
-          className={tabClassNames}
-          label={`Reading (${readingCount})`}
-          aria-label="Reading list"
-          value="reading"
-        />
-        <Tab
-          className={tabClassNames}
-          label={`Completed (${completedCount})`}
-          aria-label="Completed list"
-          value="completed"
-        />
-        <Tab
-          className={tabClassNames}
-          label={`On Hold (${onHoldCount})`}
-          aria-label="On Hold list"
-          value="onHold"
-        />
-        <Tab
-          className={tabClassNames}
-          label={`Dropped (${droppedCount})`}
-          aria-label="Dropped list"
-          value="dropped"
-        />
-        <Tab
-          className={tabClassNames}
-          label={`Plan To Read (${planToReadCount})`}
-          aria-label="Plan To Read list"
-          value="planToRead"
-        />
+        {tabs.map((tab) => (
+          <Tab
+            className={tabClassNames}
+            label={tab.label}
+            aria-label={tab.ariaLabel}
+            value={tab.value}
+          />
+        ))}
       </Tabs>
     </div>
   );

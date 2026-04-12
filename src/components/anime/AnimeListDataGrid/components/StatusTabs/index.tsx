@@ -1,5 +1,5 @@
 import { Tab, Tabs } from '@mui/material';
-import { FC } from 'react';
+import { FC, useMemo } from 'react';
 
 import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
 import useStatusTabs from './useStatusTabs';
@@ -30,6 +30,37 @@ const StatusTabs: FC<StatusTabsProps> = ({
 
   const { tabsRootRef } = useStatusTabs();
 
+  const tabs = useMemo(
+    () => [
+      {
+        label: `Watching (${watchingCount})`,
+        ariaLabel: 'Watching list',
+        value: 'watching'
+      },
+      {
+        label: `Completed (${completedCount})`,
+        ariaLabel: 'Completed list',
+        value: 'completed'
+      },
+      {
+        label: `On Hold (${onHoldCount})`,
+        ariaLabel: 'On Hold list',
+        value: 'onHold'
+      },
+      {
+        label: `Dropped (${droppedCount})`,
+        ariaLabel: 'Dropped list',
+        value: 'dropped'
+      },
+      {
+        label: `Plan To Watch (${planToWatchCount})`,
+        ariaLabel: 'Plan To Watch list',
+        value: 'planToWatch'
+      }
+    ],
+    [watchingCount, completedCount, onHoldCount, droppedCount, planToWatchCount]
+  );
+
   return (
     <div className="w-full overflow-x-hidden">
       <Tabs
@@ -59,36 +90,14 @@ const StatusTabs: FC<StatusTabsProps> = ({
           }
         }}
         onChange={(_, value) => setSelectedStatus(value)}>
-        <Tab
-          className={tabClassNames}
-          label={`Watching (${watchingCount})`}
-          aria-label="Watching list"
-          value="watching"
-        />
-        <Tab
-          className={tabClassNames}
-          label={`Completed (${completedCount})`}
-          aria-label="Completed list"
-          value="completed"
-        />
-        <Tab
-          className={tabClassNames}
-          label={`On Hold (${onHoldCount})`}
-          aria-label="On Hold list"
-          value="onHold"
-        />
-        <Tab
-          className={tabClassNames}
-          label={`Dropped (${droppedCount})`}
-          aria-label="Dropped list"
-          value="dropped"
-        />
-        <Tab
-          className={tabClassNames}
-          label={`Plan To Watch (${planToWatchCount})`}
-          aria-label="Plan To Watch list"
-          value="planToWatch"
-        />
+        {tabs.map((tab) => (
+          <Tab
+            className={tabClassNames}
+            label={tab.label}
+            aria-label={tab.ariaLabel}
+            value={tab.value}
+          />
+        ))}
       </Tabs>
     </div>
   );
