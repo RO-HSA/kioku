@@ -5,10 +5,13 @@ use crate::services::anime_list_updates::ListType;
 mod api;
 mod mapping;
 
-pub use api::{fetch_anilist_user_info, synchronize_anilist, update_anilist_list_entry};
+pub use api::{
+    fetch_anilist_user_info, search_anilist_media, synchronize_anilist, update_anilist_list_entry,
+};
 
 const GRAPHQL_URL: &str = "https://graphql.anilist.co";
 const REQUEST_TIMEOUT_SECS: u64 = 15;
+const SEARCH_LIMIT_MAX: u32 = 50;
 const MEDIA_TYPE_ANIME: &str = "ANIME";
 const MEDIA_TYPE_MANGA: &str = "MANGA";
 const MEDIA_LIST_COLLECTION_QUERY: &str = r#"
@@ -75,16 +78,6 @@ query ($type: MediaType!, $userName: String) {
               name
             }
           }
-          staff {
-            edges {
-              role
-              node {
-                name {
-                  full
-                }
-              }
-            }
-          }
           type
           genres
           format
@@ -124,6 +117,83 @@ query Viewer {
           status
         }
       }
+    }
+  }
+}
+"#;
+const SEARCH_MEDIA_QUERY: &str = r#"
+query ($search: String!, $type: MediaType!, $perPage: Int!) {
+  Page(perPage: $perPage) {
+    media(search: $search, type: $type, sort: SEARCH_MATCH) {
+      id
+      title {
+        romaji
+        native
+        english
+      }
+      coverImage {
+        large
+        extraLarge
+      }
+      endDate {
+        day
+        month
+        year
+      }
+      meanScore
+      mediaListEntry {
+        completedAt {
+          day
+          month
+          year
+        }
+        notes
+        progress
+        progressVolumes
+        repeat
+        startedAt {
+          day
+          month
+          year
+        }
+        status
+        score
+        id
+      }
+      startDate {
+        year
+        month
+        day
+      }
+      source
+      seasonYear
+      season
+      episodes
+      chapters
+      volumes
+      description
+      nextAiringEpisode {
+        episode
+      }
+      status
+      studios {
+        nodes {
+          name
+        }
+      }
+      staff {
+        edges {
+          role
+          node {
+            name {
+              full
+            }
+          }
+        }
+      }
+      type
+      genres
+      format
     }
   }
 }
@@ -174,6 +244,20 @@ struct GraphQlVariables<'a> {
 #[derive(Serialize)]
 struct ViewerRequest<'a> {
     query: &'a str,
+}
+
+#[derive(Serialize)]
+struct SearchMediaRequest<'a> {
+    query: &'a str,
+    variables: SearchMediaVariables<'a>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SearchMediaVariables<'a> {
+    search: &'a str,
+    r#type: &'a str,
+    per_page: u32,
 }
 
 #[derive(Serialize)]
@@ -236,6 +320,25 @@ struct ViewerResponse {
 struct ViewerData {
     #[serde(rename = "Viewer")]
     viewer: Option<AniListViewer>,
+}
+
+#[derive(Deserialize)]
+struct SearchMediaResponse {
+    data: Option<SearchMediaData>,
+    errors: Option<Vec<GraphQlError>>,
+}
+
+#[derive(Deserialize)]
+struct SearchMediaData {
+    #[serde(rename = "Page")]
+    page: Option<AniListSearchPage>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct AniListSearchPage {
+    #[serde(default)]
+    media: Vec<Option<AniListMedia>>,
 }
 
 #[derive(Deserialize)]
@@ -391,10 +494,10 @@ struct AniListTitle {
     english: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct AniListMediaListEntry {
-    id: u64,
+    id: Option<u64>,
     completed_at: Option<AniListFuzzyDate>,
     notes: Option<String>,
     progress: Option<u32>,
@@ -463,7 +566,8 @@ struct AnimeListBroadcast {
 #[serde(rename_all = "camelCase")]
 pub struct AnimeListItem {
     id: u64,
-    entry_id: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    entry_id: Option<u64>,
     title: String,
     image_url: String,
     synopsis: String,
@@ -503,7 +607,8 @@ pub struct SynchronizedAnimeList {
 #[serde(rename_all = "camelCase")]
 pub struct MangaListItem {
     id: u64,
-    entry_id: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    entry_id: Option<u64>,
     title: String,
     image_url: String,
     synopsis: String,
@@ -545,6 +650,13 @@ pub struct SynchronizedMangaList {
 pub enum SynchronizedListResult {
     Anime(SynchronizedAnimeList),
     Manga(SynchronizedMangaList),
+}
+
+#[derive(Serialize)]
+#[serde(untagged)]
+pub enum AniListSearchResult {
+    Anime(Vec<AnimeListItem>),
+    Manga(Vec<MangaListItem>),
 }
 
 #[derive(Copy, Clone)]
@@ -592,6 +704,13 @@ impl UserStatusKey {
         }
     }
 
+    fn default_search(list_type: ListType) -> Self {
+        match list_type {
+            ListType::Anime => Self::PlanToWatch,
+            ListType::Manga => Self::PlanToRead,
+        }
+    }
+
     fn push_anime(self, result: &mut SynchronizedAnimeList, item: AnimeListItem) {
         match self {
             Self::Watching => result.watching.push(item),
@@ -624,7 +743,7 @@ mod tests {
     fn anime_item(id: u64) -> AnimeListItem {
         AnimeListItem {
             id,
-            entry_id: id,
+            entry_id: Some(id),
             title: format!("Anime {id}"),
             image_url: String::new(),
             synopsis: String::new(),
@@ -658,7 +777,7 @@ mod tests {
     fn manga_item(id: u64) -> MangaListItem {
         MangaListItem {
             id,
-            entry_id: id,
+            entry_id: Some(id),
             title: format!("Manga {id}"),
             image_url: String::new(),
             synopsis: String::new(),

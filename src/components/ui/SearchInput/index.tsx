@@ -5,9 +5,10 @@ import { ChangeEvent, FC, KeyboardEvent } from 'react';
 interface SearchInputProps {
   value: string;
   onChange: (value: string) => void;
+  onEnterKey?: (value: string) => void;
 }
 
-const SearchInput: FC<SearchInputProps> = ({ value, onChange }) => {
+const SearchInput: FC<SearchInputProps> = ({ value, onChange, onEnterKey }) => {
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
 
@@ -17,6 +18,10 @@ const SearchInput: FC<SearchInputProps> = ({ value, onChange }) => {
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== 'Escape') {
       event.stopPropagation();
+    }
+
+    if (event.key === 'Enter' && onEnterKey) {
+      onEnterKey(value);
     }
   };
 
@@ -30,7 +35,7 @@ const SearchInput: FC<SearchInputProps> = ({ value, onChange }) => {
       fullWidth
       size="small"
       sx={{
-        '& .MuiInputAdornment-root': {
+        '& .MuiInputAdornment-positionEnd': {
           visibility: value.length > 0 ? 'visible' : 'hidden'
         }
       }}

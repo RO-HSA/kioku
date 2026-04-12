@@ -501,7 +501,7 @@ mod tests {
 
     fn sample_media_list_entry() -> AniListMediaListEntry {
         AniListMediaListEntry {
-            id: 10,
+            id: Some(10),
             completed_at: Some(AniListFuzzyDate {
                 year: Some(2024),
                 month: Some(3),
@@ -858,7 +858,7 @@ mod tests {
         );
 
         assert_eq!(mapped.id, 1);
-        assert_eq!(mapped.entry_id, 10);
+        assert_eq!(mapped.entry_id, Some(10));
         assert_eq!(mapped.title, "Sousou no Frieren");
         assert_eq!(mapped.image_url, "https://img.example/extra-large.jpg");
         assert_eq!(
@@ -896,7 +896,7 @@ mod tests {
         let mapped = map_manga_to_domain(sample_manga_media(), entry, UserStatusKey::Reading);
 
         assert_eq!(mapped.id, 2);
-        assert_eq!(mapped.entry_id, 10);
+        assert_eq!(mapped.entry_id, Some(10));
         assert_eq!(mapped.title, "Vagabond");
         assert_eq!(mapped.image_url, "https://img.example/vagabond.jpg");
         assert_eq!(mapped.synopsis, "No synopsis available.");

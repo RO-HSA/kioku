@@ -28,6 +28,8 @@ type AniListStore = {
   isReauthenticating: boolean;
   animeListData: SynchronizedAnimeList | null;
   mangaListData: SynchronizedMangaList | null;
+  animeSearchResults: IAnimeList[] | null;
+  mangaSearchResults: IMangaList[] | null;
   setId: (id: number | null) => void;
   setUsername: (username: string | null) => void;
   setProfilePictureUrl: (url: string | null) => void;
@@ -37,6 +39,8 @@ type AniListStore = {
   setIsReauthenticating: (isReauthenticating: boolean) => void;
   setAnimeListData: (animeListData: SynchronizedAnimeList | null) => void;
   setMangaListData: (mangaListData: SynchronizedMangaList | null) => void;
+  setAnimeSearchResults: (results: IAnimeList[] | null) => void;
+  setMangaSearchResults: (results: IMangaList[] | null) => void;
   signOut: () => void;
   setProgress: (
     animeId: number,
@@ -67,6 +71,8 @@ export const useAniListStore = create<AniListStore>((set) => ({
   isReauthenticating: false,
   animeListData: null,
   mangaListData: null,
+  animeSearchResults: null,
+  mangaSearchResults: null,
   setId: (id) => set(() => ({ id })),
   setUsername: (username) => set(() => ({ username })),
   setProfilePictureUrl: (url) => set(() => ({ profilePictureUrl: url })),
@@ -77,6 +83,10 @@ export const useAniListStore = create<AniListStore>((set) => ({
     set(() => ({ isReauthenticating })),
   setAnimeListData: (animeListData) => set(() => ({ animeListData })),
   setMangaListData: (mangaListData) => set(() => ({ mangaListData })),
+  setAnimeSearchResults: (animeSearchResults) =>
+    set(() => ({ animeSearchResults })),
+  setMangaSearchResults: (mangaSearchResults) =>
+    set(() => ({ mangaSearchResults })),
   signOut: () =>
     set(() => ({
       id: null,
@@ -87,7 +97,9 @@ export const useAniListStore = create<AniListStore>((set) => ({
       isAuthenticating: false,
       isReauthenticating: false,
       animeListData: null,
-      mangaListData: null
+      mangaListData: null,
+      animeSearchResults: null,
+      mangaSearchResults: null
     })),
   setProgress: (animeId, status, newProgress, progressType = 'chapters') =>
     set((state) => {
@@ -295,5 +307,7 @@ export const useAniListStore = create<AniListStore>((set) => ({
 
 export const tauriHandler = createTauriStore('anilist', useAniListStore, {
   autoStart: true,
-  saveOnChange: true
+  saveOnChange: true,
+  filterKeys: ['animeSearchResults', 'mangaSearchResults'],
+  filterKeysStrategy: 'omit'
 });

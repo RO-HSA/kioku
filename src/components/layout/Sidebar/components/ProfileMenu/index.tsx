@@ -73,10 +73,10 @@ const ProfileMenu = () => {
               {username}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              <div className="flex gap-2 items-center">
+              <span className="flex gap-2 items-center">
                 <span>{providerName}</span>
                 <span>{currentListTypeIcon}</span>
-              </div>
+              </span>
             </Typography>
           </Box>
         </div>

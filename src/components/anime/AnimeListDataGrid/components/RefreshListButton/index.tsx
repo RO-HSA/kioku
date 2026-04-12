@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 
 import { AniListService } from '@/services/backend/AniList';
 import { MyAnimeListService } from '@/services/backend/MyAnimeList';
+import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
 import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { useProviderStore } from '@/stores/providers/provider';
@@ -13,6 +14,8 @@ const RefreshListButton = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const activeProvider = useProviderStore((state) => state.activeProvider);
+
+  const setIsLoading = useAnimeListDataGridStore((state) => state.setIsLoading);
 
   const setMyAnimeListData = useMyAnimeListStore(
     (state) => state.setAnimeListData
@@ -26,22 +29,28 @@ const RefreshListButton = () => {
     switch (activeProvider) {
       case Provider.MY_ANIME_LIST:
         try {
+          setIsLoading(true);
           const result = await MyAnimeListService.synchronizeList();
           setMyAnimeListData(result);
         } finally {
           setIsRefreshing(false);
+          setIsLoading(false);
         }
         break;
       case Provider.ANILIST:
         try {
+          setIsLoading(true);
           const result = await AniListService.synchronizeList();
           setAniListData(result);
         } finally {
           setIsRefreshing(false);
+          setIsLoading(false);
         }
         break;
       default:
         setIsRefreshing(false);
+        setIsLoading(false);
+        break;
     }
   }, [activeProvider, setMyAnimeListData, setAniListData, setIsRefreshing]);
 

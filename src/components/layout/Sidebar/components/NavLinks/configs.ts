@@ -1,4 +1,4 @@
-import { Film, List } from 'lucide-react';
+import { Film, List, Search } from 'lucide-react';
 
 import { INavLink } from '@/types/Navigation';
 
@@ -12,5 +12,10 @@ export const navLinks: INavLink[] = [
     label: 'Anime List',
     icon: List,
     link: '/'
+  },
+  {
+    label: 'Search',
+    icon: Search,
+    link: '/search'
   }
 ];

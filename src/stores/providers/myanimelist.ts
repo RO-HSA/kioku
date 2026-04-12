@@ -28,6 +28,8 @@ type MyAnimeListStore = {
   isReauthenticating: boolean;
   animeListData: SynchronizedAnimeList | null;
   mangaListData: SynchronizedMangaList | null;
+  animeSearchResults: IAnimeList[] | null;
+  mangaSearchResults: IMangaList[] | null;
   setId: (id: number | null) => void;
   setUsername: (username: string | null) => void;
   setProfilePictureUrl: (url: string | null) => void;
@@ -37,6 +39,8 @@ type MyAnimeListStore = {
   setIsReauthenticating: (isReauthenticating: boolean) => void;
   setAnimeListData: (animeListData: SynchronizedAnimeList | null) => void;
   setMangaListData: (mangaListData: SynchronizedMangaList | null) => void;
+  setAnimeSearchResults: (results: IAnimeList[] | null) => void;
+  setMangaSearchResults: (results: IMangaList[] | null) => void;
   signOut: () => void;
   setProgress: (
     entryId: number,
@@ -67,6 +71,8 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
   isReauthenticating: false,
   animeListData: null,
   mangaListData: null,
+  animeSearchResults: null,
+  mangaSearchResults: null,
   setId: (id) => set(() => ({ id })),
   setUsername: (username) => set(() => ({ username })),
   setProfilePictureUrl: (url) => set(() => ({ profilePictureUrl: url })),
@@ -77,6 +83,10 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
     set(() => ({ isReauthenticating })),
   setAnimeListData: (animeListData) => set(() => ({ animeListData })),
   setMangaListData: (mangaListData) => set(() => ({ mangaListData })),
+  setAnimeSearchResults: (animeSearchResults) =>
+    set(() => ({ animeSearchResults })),
+  setMangaSearchResults: (mangaSearchResults) =>
+    set(() => ({ mangaSearchResults })),
   signOut: () =>
     set(() => ({
       id: null,
@@ -249,5 +259,10 @@ export const useMyAnimeListStore = create<MyAnimeListStore>((set) => ({
 export const tauriHandler = createTauriStore(
   'myanimelist',
   useMyAnimeListStore,
-  { autoStart: true, saveOnChange: true }
+  {
+    autoStart: true,
+    saveOnChange: true,
+    filterKeys: ['animeSearchResults', 'mangaSearchResults'],
+    filterKeysStrategy: 'omit'
+  }
 );

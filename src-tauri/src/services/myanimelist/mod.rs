@@ -6,16 +6,22 @@ mod api;
 mod mapping;
 
 pub use api::{
-    fetch_myanimelist_user_info, synchronize_myanimelist, update_myanimelist_list_entry,
+    fetch_myanimelist_user_info, search_myanimelist_media, synchronize_myanimelist,
+    update_myanimelist_list_entry,
 };
 
 const BASE_URL: &str = "https://api.myanimelist.net/v2/users";
+const ANIME_SEARCH_BASE_URL: &str = "https://api.myanimelist.net/v2/anime";
+const MANGA_SEARCH_BASE_URL: &str = "https://api.myanimelist.net/v2/manga";
 const ANIME_UPDATE_BASE_URL: &str = "https://api.myanimelist.net/v2/anime/";
 const MANGA_UPDATE_BASE_URL: &str = "https://api.myanimelist.net/v2/manga/";
 const USER_INFO_FIELDS: &str = "anime_statistics";
 const ANIME_FIELDS: &str = "list_status{comments,num_times_rewatched},synopsis,alternative_titles,source,num_episodes,nsfw,start_season,media_type,studios,mean,status,genres,broadcast,start_date";
 const MANGA_FIELDS: &str = "list_status{comments,num_times_reread},synopsis,alternative_titles,mean,media_type,status,genres,num_volumes,num_chapters,authors{first_name,last_name},serialization{name},start_date,end_date";
+const ANIME_SEARCH_FIELDS: &str = "synopsis,alternative_titles,source,num_episodes,nsfw,start_season,media_type,studios,mean,status,genres,broadcast,start_date";
+const MANGA_SEARCH_FIELDS: &str = "synopsis,alternative_titles,mean,media_type,status,genres,num_volumes,num_chapters,authors{first_name,last_name},serialization{name},start_date,end_date";
 const LIMIT: u32 = 1000;
+const SEARCH_LIMIT_MAX: u32 = 100;
 
 #[derive(Copy, Clone, Default, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -231,6 +237,13 @@ pub enum SynchronizedListResult {
     Manga(SynchronizedMangaList),
 }
 
+#[derive(Serialize)]
+#[serde(untagged)]
+pub enum MyAnimeListSearchResult {
+    Anime(Vec<AnimeListItem>),
+    Manga(Vec<MangaListItem>),
+}
+
 #[derive(Deserialize)]
 struct MalUserInfoResponse {
     id: u64,
@@ -371,6 +384,27 @@ impl MyAnimeListListType {
             Self::Manga => MANGA_FIELDS,
         }
     }
+
+    fn search_endpoint(self) -> &'static str {
+        match self {
+            Self::Anime => ANIME_SEARCH_BASE_URL,
+            Self::Manga => MANGA_SEARCH_BASE_URL,
+        }
+    }
+
+    fn search_fields(self) -> &'static str {
+        match self {
+            Self::Anime => ANIME_SEARCH_FIELDS,
+            Self::Manga => MANGA_SEARCH_FIELDS,
+        }
+    }
+
+    fn default_search_status_key(self) -> UserStatusKey {
+        match self {
+            Self::Anime => UserStatusKey::PlanToWatch,
+            Self::Manga => UserStatusKey::PlanToRead,
+        }
+    }
 }
 
 impl From<ListType> for MyAnimeListListType {
@@ -454,6 +488,30 @@ mod tests {
         assert_eq!(MyAnimeListListType::Manga.path_segment(), "mangalist");
         assert_eq!(MyAnimeListListType::Anime.fields(), ANIME_FIELDS);
         assert_eq!(MyAnimeListListType::Manga.fields(), MANGA_FIELDS);
+        assert_eq!(
+            MyAnimeListListType::Anime.search_endpoint(),
+            ANIME_SEARCH_BASE_URL
+        );
+        assert_eq!(
+            MyAnimeListListType::Manga.search_endpoint(),
+            MANGA_SEARCH_BASE_URL
+        );
+        assert_eq!(
+            MyAnimeListListType::Anime.search_fields(),
+            ANIME_SEARCH_FIELDS
+        );
+        assert_eq!(
+            MyAnimeListListType::Manga.search_fields(),
+            MANGA_SEARCH_FIELDS
+        );
+        assert!(matches!(
+            MyAnimeListListType::Anime.default_search_status_key(),
+            UserStatusKey::PlanToWatch
+        ));
+        assert!(matches!(
+            MyAnimeListListType::Manga.default_search_status_key(),
+            UserStatusKey::PlanToRead
+        ));
     }
 
     #[test]

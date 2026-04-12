@@ -1,10 +1,13 @@
 import { Box, SelectChangeEvent, Tooltip } from '@mui/material';
 import { SquareCheck, SquarePlay, SquareStop } from 'lucide-react';
 import { MRT_ColumnDef, useMaterialReactTable } from 'material-react-table';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
+import { useLocation } from 'react-router';
 
 import ProgressStatus from '@/components/anime/AnimeListDataGrid/components/ProgressStatus';
+import GroupedExpandCell from '@/components/ui/GroupedExpandCell';
 import useMaterialTableTheme from '@/hooks/useMaterialTableTheme';
+import { PathName } from '@/routes';
 import { SynchronizedAnimeList } from '@/services/backend/types';
 import { useAnimeDetailsStore } from '@/stores/animeDetails';
 import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
@@ -27,17 +30,23 @@ interface UseAnimeListDataGridProps {
 }
 
 const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
-  const [isLoading, setIsLoading] = useState(true);
+  const location = useLocation();
+
+  const isSearchPage = location.pathname === PathName.SEARCH;
 
   const selectedUserStatus = useAnimeListDataGridStore(
     (state) => state.selectedStatus
   );
-  const searchValue = useAnimeListDataGridStore((state) => state.searchValue);
+  const localSearchValue = useAnimeListDataGridStore(
+    (state) => state.localSearchValue
+  );
   const sorting = useAnimeListDataGridStore((state) => state.sorting);
   const columnVisibility = useAnimeListDataGridStore(
     (state) => state.columnVisibility
   );
   const columnSizing = useAnimeListDataGridStore((state) => state.columnSizing);
+  const isLoading = useAnimeListDataGridStore((state) => state.isLoading);
+  const setIsLoading = useAnimeListDataGridStore((state) => state.setIsLoading);
   const onSortingChange = useAnimeListDataGridStore(
     (state) => state.onSortingChange
   );
@@ -55,6 +64,12 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
 
   const activeProvider = useProviderStore((state) => state.activeProvider);
 
+  const animeSearchResults = useMyAnimeListStore(
+    (state) => state.animeSearchResults
+  );
+  const aniListAnimeSearchResults = useAniListStore(
+    (state) => state.animeSearchResults
+  );
   const setMyAnimeListScore = useMyAnimeListStore((state) => state.setScore);
   const setMyAnimeListProgress = useMyAnimeListStore(
     (state) => state.setProgress
@@ -147,6 +162,31 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     }
   };
 
+  const allData = useMemo(() => {
+    if (!listData) {
+      return [];
+    }
+
+    return [
+      ...listData.watching,
+      ...listData.completed,
+      ...listData.onHold,
+      ...listData.dropped,
+      ...listData.planToWatch
+    ];
+  }, [listData]);
+
+  const animeListDataById = useMemo(
+    () => new Map(allData.map((anime) => [anime.id, anime])),
+    [allData]
+  );
+
+  const getSearchMembershipLabel = useCallback(
+    (anime: IAnimeList) =>
+      animeListDataById.has(anime.id) ? 'In list' : 'Not in list',
+    [animeListDataById]
+  );
+
   const columns = useMemo<MRT_ColumnDef<IAnimeList>[]>(
     () => [
       {
@@ -156,7 +196,10 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
         enableSorting: false,
         enableGlobalFilter: false,
         visibleInShowHideMenu: false,
-        getGroupingValue: (row) => getUserStatusLabel(row.userStatus),
+        getGroupingValue: (row) =>
+          isSearchPage
+            ? getSearchMembershipLabel(row)
+            : getUserStatusLabel(row.userStatus),
         Cell: ({ cell }) => {
           const value = cell.getValue<AnimeListUserStatus>();
           return value ? getUserStatusLabel(value) : '';
@@ -209,6 +252,7 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
         header: 'Progress',
         size: 200,
         enableGlobalFilter: false,
+        visibleInShowHideMenu: !isSearchPage,
         Cell: ({ cell, row }) => {
           const watched = cell.getValue<number>();
           return (
@@ -230,10 +274,33 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
         }
       },
       {
+        accessorKey: 'score',
+        header: 'Score',
+        size: 85,
+        enableGlobalFilter: false,
+        visibleInShowHideMenu: isSearchPage,
+        Cell: ({ cell }) => {
+          const score = cell.getValue<number>();
+
+          return (
+            <Box display="flex" justifyContent="center" width="100%">
+              {score === 0 ? (
+                <span className="text-gray-500">{'N/A'}</span>
+              ) : score > 10 ? (
+                `${score}%`
+              ) : (
+                score
+              )}
+            </Box>
+          );
+        }
+      },
+      {
         accessorKey: 'userScore',
         header: 'Score',
         size: 85,
         enableGlobalFilter: false,
+        visibleInShowHideMenu: !isSearchPage,
         Cell: ({ cell, row }) => {
           const score = cell.getValue<number>();
 
@@ -283,24 +350,10 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
         }
       }
     ],
-    [handleProgressChange, setScore]
+    [getSearchMembershipLabel, isSearchPage, handleProgressChange, setScore]
   );
 
-  const allData = useMemo(() => {
-    if (!listData) {
-      return [];
-    }
-
-    return [
-      ...listData.watching,
-      ...listData.completed,
-      ...listData.onHold,
-      ...listData.dropped,
-      ...listData.planToWatch
-    ];
-  }, [listData]);
-
-  const shouldGroupByStatus = searchValue.trim().length > 0;
+  const shouldGroupByStatus = localSearchValue.trim().length > 0;
 
   const data = useMemo(() => {
     if (shouldGroupByStatus) {
@@ -323,9 +376,37 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     }
   }, [allData, listData, selectedUserStatus, shouldGroupByStatus]);
 
+  const searchResults = useMemo(() => {
+    const results = (() => {
+      switch (activeProvider) {
+        case Provider.MY_ANIME_LIST:
+          return animeSearchResults || [];
+
+        case Provider.ANILIST:
+          return aniListAnimeSearchResults || [];
+        default:
+          return [];
+      }
+    })();
+
+    return results
+      .map((anime) => animeListDataById.get(anime.id) || anime)
+      .sort(
+        (a, b) =>
+          Number(animeListDataById.has(a.id)) -
+          Number(animeListDataById.has(b.id))
+      );
+  }, [
+    activeProvider,
+    aniListAnimeSearchResults,
+    animeListDataById,
+    animeSearchResults
+  ]);
+
   const grouping = useMemo(
-    () => (shouldGroupByStatus ? ['userStatus'] : []),
-    [shouldGroupByStatus]
+    () =>
+      isSearchPage ? ['userStatus'] : shouldGroupByStatus ? ['userStatus'] : [],
+    [isSearchPage, shouldGroupByStatus]
   );
 
   const handleOpenAnimeDetails = useCallback(
@@ -344,7 +425,7 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
 
   const table = useMaterialReactTable({
     columns,
-    data,
+    data: isSearchPage ? searchResults : data,
     initialState: {
       density: 'compact',
       expanded: true
@@ -384,12 +465,30 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     enableColumnDragging: false,
     globalFilterFn: 'includesString',
     groupedColumnMode: 'remove',
+    displayColumnDefOptions: {
+      'mrt-row-expand': {
+        grow: false,
+        size: 140,
+        Cell: ({ row, staticRowIndex, table }) => (
+          <GroupedExpandCell
+            row={row}
+            staticRowIndex={staticRowIndex}
+            table={table}
+          />
+        )
+      }
+    },
     state: {
       isLoading,
-      globalFilter: searchValue,
+      globalFilter: localSearchValue,
       grouping,
       sorting,
-      columnVisibility,
+      columnVisibility: {
+        ...columnVisibility,
+        ...(isSearchPage
+          ? { userEpisodesWatched: false, userScore: false }
+          : { score: false })
+      },
       columnSizing
     },
     onSortingChange,

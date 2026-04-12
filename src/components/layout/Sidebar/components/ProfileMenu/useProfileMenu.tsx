@@ -19,9 +19,11 @@ import {
 import { calculatePlaybackMatches } from '@/hooks/detection/utils';
 import { AniListService } from '@/services/backend/AniList';
 import { MyAnimeListService } from '@/services/backend/MyAnimeList';
+import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
 import { useConfigMenuStore } from '@/stores/config/configMenu';
 import { useNowPlayingAliasesStore } from '@/stores/detection/nowPlayingAliases';
 import { usePlayerDetectionStore } from '@/stores/detection/playerDetection';
+import { useMangaListDataGridStore } from '@/stores/mangaListDataGrid';
 import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { useProviderStore } from '@/stores/providers/provider';
@@ -108,6 +110,13 @@ const useProfileMenu = () => {
   const setStep = useConfigMenuStore((state) => state.setStep);
   const setSelectedTab = useConfigMenuStore((state) => state.setSelectedTab);
   const openConfigMenu = useConfigMenuStore((state) => state.openConfigMenu);
+
+  const setAnimeRemoteSearchValue = useAnimeListDataGridStore(
+    (state) => state.setRemoteSearchValue
+  );
+  const setMangaRemoteSearchValue = useMangaListDataGridStore(
+    (state) => state.setRemoteSearchValue
+  );
 
   const mainPopoverOpen = Boolean(mainPopoverEl);
   const switchListOpen = Boolean(switchListEl);
@@ -231,6 +240,8 @@ const useProfileMenu = () => {
       }
 
       setActiveProvider(provider);
+      setAnimeRemoteSearchValue('');
+      setMangaRemoteSearchValue('');
       handleCloseSwitchAccountPopover();
       handleCloseMainPopover();
 
@@ -272,7 +283,9 @@ const useProfileMenu = () => {
       handleCloseSwitchAccountPopover,
       handleCloseMainPopover,
       setMatchingResult,
-      getAliasesByProvider
+      getAliasesByProvider,
+      setAnimeRemoteSearchValue,
+      setMangaRemoteSearchValue
     ]
   );
 
