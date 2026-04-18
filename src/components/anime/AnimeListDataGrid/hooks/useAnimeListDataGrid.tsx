@@ -1,7 +1,7 @@
 import { Box, SelectChangeEvent, Tooltip } from '@mui/material';
 import { SquareCheck, SquarePlay, SquareStop } from 'lucide-react';
 import { MRT_ColumnDef, useMaterialReactTable } from 'material-react-table';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, type MouseEvent } from 'react';
 import { useLocation } from 'react-router';
 
 import ProgressStatus from '@/components/anime/AnimeListDataGrid/components/ProgressStatus';
@@ -11,6 +11,7 @@ import { PathName } from '@/routes';
 import { SynchronizedAnimeList } from '@/services/backend/types';
 import { useAnimeDetailsStore } from '@/stores/animeDetails';
 import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
+import { useContextMenuStore } from '@/stores/contextMenu';
 import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { useProviderStore } from '@/stores/providers/provider';
@@ -77,6 +78,8 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
 
   const setAniListScore = useAniListStore((state) => state.setScore);
   const setAniListProgress = useAniListStore((state) => state.setProgress);
+
+  const openContextMenu = useContextMenuStore((state) => state.openContextMenu);
 
   const setScore = useCallback(
     (animeId: number, status: AnimeListUserStatus, newScore: number) => {
@@ -417,6 +420,20 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
     [openAnimeDetails, setSelectedAnime]
   );
 
+  const handleOpenContextMenu = useCallback(
+    (event: MouseEvent<HTMLTableCellElement>, state: IAnimeList | null) => {
+      event.preventDefault();
+      openContextMenu(
+        {
+          top: event.clientY + 2,
+          left: event.clientX + 2
+        },
+        state
+      );
+    },
+    [openContextMenu]
+  );
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setIsLoading(false);
@@ -444,6 +461,9 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
         }
 
         handleOpenAnimeDetails(cell.row.original);
+      },
+      onContextMenu: (event: MouseEvent<HTMLTableCellElement>) => {
+        handleOpenContextMenu(event, cell.row.original);
       }
     }),
     renderTopToolbar: () => (

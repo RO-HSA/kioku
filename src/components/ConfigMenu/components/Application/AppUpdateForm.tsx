@@ -1,6 +1,7 @@
 import { Alert, Divider, LinearProgress, Typography } from '@mui/material';
 
 import Button from '@/components/ui/Button';
+import SafeRichText from '@/components/ui/SafeRichText';
 import { useAppUpdaterStore } from '@/stores/appUpdater';
 import { formatDate } from '@/utils/date';
 import Section from '../Section';
@@ -192,9 +193,11 @@ const AppUpdateForm = () => {
             <Divider />
             <div className="flex flex-col gap-1">
               <Typography variant="overline">Release notes</Typography>
-              <pre className="max-h-36 overflow-y-auto whitespace-pre-wrap rounded-sm border border-primary/25 bg-background-default p-2 text-xs">
-                {releaseNotes}
-              </pre>
+
+              <SafeRichText
+                className="max-h-36! overflow-y-auto! whitespace-wrap! rounded-sm! border! border-primary/25! bg-background-default! p-2! text-xs!"
+                content={releaseNotes}
+              />
             </div>
           </>
         )}

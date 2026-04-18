@@ -10,9 +10,11 @@ import {
   Typography
 } from '@mui/material';
 import { X } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { useAnimeDetailsStore } from '@/stores/animeDetails';
+import { useAniListStore } from '@/stores/providers/anilist';
+import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { useProviderStore } from '@/stores/providers/provider';
 import { Provider } from '@/types/List';
 import { buildEntityUrl } from '@/utils/url';
@@ -35,13 +37,75 @@ const AnimeInformations = () => {
     (state) => state.setSelectedAnime
   );
 
+  const myAnimeListAnimeData = useMyAnimeListStore(
+    (state) => state.animeListData
+  );
+  const addToMyAnimeList = useMyAnimeListStore((state) => state.addToAnimeList);
+
+  const anilistAnimeData = useAniListStore((state) => state.animeListData);
+  const addToAnilist = useAniListStore((state) => state.addToAnimeList);
+
   const activeProvider = useProviderStore((state) => state.activeProvider);
+
+  const currentAnimeList = useMemo(() => {
+    if (!selectedAnime) return [];
+
+    switch (activeProvider) {
+      case Provider.MY_ANIME_LIST:
+        if (!myAnimeListAnimeData) return [];
+
+        return [
+          ...myAnimeListAnimeData.watching,
+          ...myAnimeListAnimeData.completed,
+          ...myAnimeListAnimeData.onHold,
+          ...myAnimeListAnimeData.dropped,
+          ...myAnimeListAnimeData.planToWatch
+        ];
+      case Provider.ANILIST:
+        if (!anilistAnimeData) return [];
+
+        return [
+          ...anilistAnimeData.watching,
+          ...anilistAnimeData.completed,
+          ...anilistAnimeData.onHold,
+          ...anilistAnimeData.dropped,
+          ...anilistAnimeData.planToWatch
+        ];
+      default:
+        return [];
+    }
+  }, [myAnimeListAnimeData, anilistAnimeData, activeProvider, selectedAnime]);
+
+  const addToList = useCallback(() => {
+    if (!selectedAnime) return;
+
+    switch (activeProvider) {
+      case Provider.MY_ANIME_LIST:
+        addToMyAnimeList(selectedAnime);
+        break;
+      case Provider.ANILIST:
+        addToAnilist(selectedAnime);
+        break;
+      default:
+        break;
+    }
+  }, [activeProvider, selectedAnime, addToMyAnimeList, addToAnilist]);
 
   const handleSubmit = useCallback(() => {
     if (!formRef?.current) return;
 
     formRef.current.requestSubmit();
   }, [formRef]);
+
+  const isAdded = useMemo(() => {
+    if (!selectedAnime) return false;
+
+    return !!currentAnimeList.find((anime) =>
+      anime.entryId !== undefined
+        ? anime.entryId === selectedAnime.entryId
+        : anime.id === selectedAnime.id
+    );
+  }, [currentAnimeList, selectedAnime]);
 
   if (!selectedAnime) return null;
 
@@ -95,28 +159,48 @@ const AnimeInformations = () => {
               </AnimeTitle>
 
               <div className="flex flex-col gap-2 self-start w-full">
-                <Tabs
-                  value={selectedTab}
-                  onChange={(_, newValue) => setSelectedTab(newValue)}>
-                  {tabs.map((tab) => (
-                    <Tab
-                      key={tab}
-                      label={tab}
-                      className="p-1! text-sm!"
+                {isAdded ? (
+                  <>
+                    <Tabs
+                      value={selectedTab}
+                      onChange={(_, newValue) => setSelectedTab(newValue)}>
+                      {tabs.map((tab) => (
+                        <Tab
+                          key={tab}
+                          label={tab}
+                          className="p-1! text-sm!"
+                          sx={{
+                            textTransform: 'none',
+                            '&:hover': { color: 'GrayText' }
+                          }}
+                        />
+                      ))}
+                    </Tabs>
+
+                    {selectedTab === 0 && (
+                      <MainInformation anime={selectedAnime} />
+                    )}
+
+                    {selectedTab === 1 && (
+                      <div className="pt-2">
+                        <AnimeListForm />
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Typography
+                      variant="body2"
+                      color="success"
                       sx={{
-                        textTransform: 'none',
-                        '&:hover': { color: 'GrayText' }
+                        cursor: 'pointer',
+                        '&:hover': { opacity: 0.8 }
                       }}
-                    />
-                  ))}
-                </Tabs>
-
-                {selectedTab === 0 && <MainInformation anime={selectedAnime} />}
-
-                {selectedTab === 1 && (
-                  <div className="pt-2">
-                    <AnimeListForm />
-                  </div>
+                      onClick={addToList}>
+                      Add to list
+                    </Typography>
+                    <MainInformation anime={selectedAnime} />
+                  </>
                 )}
               </div>
             </div>
@@ -124,15 +208,17 @@ const AnimeInformations = () => {
         </Grid>
       </DialogContent>
 
-      <DialogActions>
-        <Button type="submit" variant="primary" onClick={handleSubmit}>
-          Confirm
-        </Button>
+      {isAdded && (
+        <DialogActions>
+          <Button type="submit" variant="primary" onClick={handleSubmit}>
+            Confirm
+          </Button>
 
-        <Button onClick={handleClose} variant="secondary">
-          Close
-        </Button>
-      </DialogActions>
+          <Button onClick={handleClose} variant="secondary">
+            Close
+          </Button>
+        </DialogActions>
+      )}
     </Dialog>
   );
 };
