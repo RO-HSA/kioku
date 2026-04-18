@@ -112,6 +112,7 @@ const AddToList: FC<AddToListProps> = ({ anchorEl, open, onClose }) => {
       }
     ];
   }, [selectedListType]);
+
   return (
     <Menu
       anchorEl={anchorEl}
