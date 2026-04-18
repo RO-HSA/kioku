@@ -115,4 +115,5 @@ jobs:
           releaseBody: ${{ needs.generate-changelog.outputs.notes }}
           releaseDraft: true
           prerelease: false
+          updaterJsonPreferNsis: true
           args: ${{ matrix.args }}
