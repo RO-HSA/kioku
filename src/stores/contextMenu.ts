@@ -22,8 +22,10 @@ type ContextMenuStore = {
 export const useContextMenuStore = create<ContextMenuStore>((set) => ({
   popoverPosition: null,
   state: null,
-  openContextMenu: (position, state) =>
-    set(() => ({ popoverPosition: position, state })),
+  openContextMenu: (position, state) => {
+    set({ popoverPosition: position });
+    set({ state });
+  },
   closeContextMenu: () => set(() => ({ popoverPosition: null, state: null }))
 }));
 
