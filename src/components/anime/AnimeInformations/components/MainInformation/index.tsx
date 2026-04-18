@@ -1,6 +1,8 @@
-import { IAnimeList } from '@/types/AnimeList';
 import { Typography } from '@mui/material';
 import { FC } from 'react';
+
+import SafeRichText from '@/components/ui/SafeRichText';
+import { IAnimeList } from '@/types/AnimeList';
 import Details from '../Details';
 import InfoHeader from '../InfoHeader';
 
@@ -43,12 +45,7 @@ const MainInformation: FC<MainInformationProps> = ({ anime }) => {
 
       <InfoHeader label="Synopsis" />
 
-      <Typography
-        className="py-2!"
-        variant="body2"
-        sx={{ whiteSpace: 'pre-line' }}>
-        {synopsis}
-      </Typography>
+      <SafeRichText className="py-2!" content={synopsis} />
     </div>
   );
 };

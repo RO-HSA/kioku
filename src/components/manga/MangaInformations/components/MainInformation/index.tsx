@@ -1,6 +1,7 @@
 import { Typography } from '@mui/material';
 import { FC } from 'react';
 
+import SafeRichText from '@/components/ui/SafeRichText';
 import { IMangaList } from '@/types/MangaList';
 import Details from '../Details';
 import InfoHeader from '../InfoHeader';
@@ -44,12 +45,7 @@ const MainInformation: FC<MainInformationProps> = ({ manga }) => {
 
       <InfoHeader label="Synopsis" />
 
-      <Typography
-        className="py-2!"
-        variant="body2"
-        sx={{ whiteSpace: 'pre-line' }}>
-        {synopsis}
-      </Typography>
+      <SafeRichText className="py-2!" content={synopsis} />
     </div>
   );
 };
