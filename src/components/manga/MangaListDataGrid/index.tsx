@@ -2,6 +2,7 @@ import { Box } from '@mui/material';
 import { MaterialReactTable } from 'material-react-table';
 import { useMemo } from 'react';
 
+import ContextMenu from '@/components/ContextMenu';
 import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { useProviderStore } from '@/stores/providers/provider';
@@ -32,6 +33,8 @@ const MangaListDataGrid = () => {
   return (
     <Box sx={{ height: '100%', width: '100%', minHeight: 0 }}>
       <MaterialReactTable table={table} />
+
+      <ContextMenu />
     </Box>
   );
 };

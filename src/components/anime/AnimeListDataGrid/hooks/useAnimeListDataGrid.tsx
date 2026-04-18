@@ -21,7 +21,6 @@ import {
   IAnimeList
 } from '@/types/AnimeList';
 import { Provider } from '@/types/List';
-import { IMangaList } from '@/types/MangaList';
 import ScoreSelect from '../../../ScoreSelect';
 import CustomTopToolbar from '../components/CustomTopToolbar';
 import MediaType from '../components/MediaType';
@@ -422,10 +421,7 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
   );
 
   const handleOpenContextMenu = useCallback(
-    (
-      event: MouseEvent<HTMLTableCellElement>,
-      state: IAnimeList | IMangaList | null
-    ) => {
+    (event: MouseEvent<HTMLTableCellElement>, state: IAnimeList | null) => {
       event.preventDefault();
       openContextMenu(
         {

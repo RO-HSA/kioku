@@ -1,12 +1,13 @@
 import { Box, SelectChangeEvent, Tooltip } from '@mui/material';
 import { SquareCheck, SquarePlay, SquareStop } from 'lucide-react';
 import { MRT_ColumnDef, useMaterialReactTable } from 'material-react-table';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, type MouseEvent } from 'react';
 
 import GroupedExpandCell from '@/components/ui/GroupedExpandCell';
 import useMaterialTableTheme from '@/hooks/useMaterialTableTheme';
 import { PathName } from '@/routes';
 import { SynchronizedMangaList } from '@/services/backend/types';
+import { useContextMenuStore } from '@/stores/contextMenu';
 import { useMangaDetailsStore } from '@/stores/mangaDetails';
 import { useMangaListDataGridStore } from '@/stores/mangaListDataGrid';
 import { useAniListStore } from '@/stores/providers/anilist';
@@ -76,6 +77,8 @@ const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
 
   const setAniListScore = useAniListStore((state) => state.setScore);
   const setAniListProgress = useAniListStore((state) => state.setProgress);
+
+  const openContextMenu = useContextMenuStore((state) => state.openContextMenu);
 
   const setScore = useCallback(
     (entryId: number, status: MangaListUserStatus, newScore: number) => {
@@ -458,6 +461,20 @@ const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
     [openMangaDetails, setSelectedManga]
   );
 
+  const handleOpenContextMenu = useCallback(
+    (event: MouseEvent<HTMLTableCellElement>, state: IMangaList | null) => {
+      event.preventDefault();
+      openContextMenu(
+        {
+          top: event.clientY + 2,
+          left: event.clientX + 2
+        },
+        state
+      );
+    },
+    [openContextMenu]
+  );
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setIsLoading(false);
@@ -485,6 +502,9 @@ const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
         }
 
         handleOpenMangaDetails(cell.row.original);
+      },
+      onContextMenu: (event: MouseEvent<HTMLTableCellElement>) => {
+        handleOpenContextMenu(event, cell.row.original);
       }
     }),
     renderTopToolbar: () => (
