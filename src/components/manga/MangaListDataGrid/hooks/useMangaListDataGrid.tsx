@@ -488,6 +488,7 @@ const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
       density: 'compact',
       expanded: true
     },
+    autoResetAll: true,
     mrtTheme,
     muiTablePaperProps,
     muiTableContainerProps,
