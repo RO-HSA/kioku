@@ -447,6 +447,7 @@ const useAnimeListDataGrid = ({ listData }: UseAnimeListDataGridProps) => {
       density: 'compact',
       expanded: true
     },
+    autoResetAll: true,
     mrtTheme,
     muiTablePaperProps,
     muiTableContainerProps,
