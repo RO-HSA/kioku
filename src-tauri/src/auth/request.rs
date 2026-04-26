@@ -127,7 +127,9 @@ pub async fn oauth_request(app: AppHandle, request: OAuthRequest) -> Result<OAut
     let token = get_access_token(&app, &request.provider_id).await?;
     let client = build_oauth_http_client()?;
 
-    let mut builder = client.request(request.method, request.url).bearer_auth(token);
+    let mut builder = client
+        .request(request.method, request.url)
+        .bearer_auth(token);
 
     if let Some(timeout) = request.timeout {
         builder = builder.timeout(timeout);
@@ -211,8 +213,8 @@ mod tests {
 
     #[test]
     fn ensure_oauth_request_url_revalidates_prepared_urls() {
-        let secure = reqwest::Url::parse("https://api.myanimelist.net/v2/anime")
-            .expect("url should parse");
+        let secure =
+            reqwest::Url::parse("https://api.myanimelist.net/v2/anime").expect("url should parse");
         ensure_oauth_request_url(MAL_PROVIDER_ID, &secure).expect("known https host should pass");
 
         let insecure =

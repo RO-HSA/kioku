@@ -1,7 +1,11 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use serde::Deserialize;
 use std::time::Duration;
-use tauri::{Manager, WebviewWindowBuilder, WindowEvent};
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Manager, WebviewWindowBuilder, WindowEvent,
+};
 use tauri_plugin_zustand::ManagerExt;
 
 pub mod auth;
@@ -178,6 +182,36 @@ pub fn run() {
                 }
                 _ => {}
             });
+
+            let open_i = MenuItem::with_id(app, "open", "Open Kioku", true, None::<&str>)?;
+            let quit_i = MenuItem::with_id(app, "quit", "Exit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&open_i, &quit_i])?;
+
+            TrayIconBuilder::new()
+                .menu(&menu)
+                .tooltip("Kioku")
+                .icon(app.default_window_icon().unwrap().clone())
+                .show_menu_on_left_click(false)
+                .on_tray_icon_event(|tray, event| match event {
+                    TrayIconEvent::Click {
+                        id: _,
+                        position: _,
+                        rect: _,
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                    } => {
+                        show_main_window(tray.app_handle());
+                    }
+                    _ => {}
+                })
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "open" => {
+                        show_main_window(app);
+                    }
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .build(app)?;
 
             if bootstrap_config.application.start_minimized {
                 if bootstrap_config.application.minimize_to_tray {
