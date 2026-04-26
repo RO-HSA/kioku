@@ -25,7 +25,9 @@ export const defaultConfiguration: ConfigurationState = {
   application: {
     enableAutoStartup: false,
     startMinimized: false,
-    checkForUpdates: true
+    checkForUpdates: true,
+    minimizeToTray: false,
+    closeToTray: false
   },
   sharing: {
     enableRichPresence: false,
