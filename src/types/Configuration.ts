@@ -9,6 +9,8 @@ export interface ApplicationConfig {
   enableAutoStartup: boolean;
   startMinimized: boolean;
   checkForUpdates: boolean;
+  minimizeToTray: boolean;
+  closeToTray: boolean;
 }
 
 export interface SharingConfig {

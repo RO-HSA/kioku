@@ -1,88 +1,67 @@
 import { Checkbox, FormControlLabel, Stack } from '@mui/material';
-import { disable, enable } from '@tauri-apps/plugin-autostart';
 
-import {
-  defaultConfiguration,
-  useConfigMenuStore
-} from '@/stores/config/configMenu';
 import Section from '../Section';
+import useGeneralConfigsForm from './hooks/useGeneralConfigsForm';
 
 const GeneralConfigsForm = () => {
-  const configuration = useConfigMenuStore((state) => state.configuration);
-  const setConfiguration = useConfigMenuStore(
-    (state) => state.setConfiguration
-  );
-
-  const toggleAutoStartup = async (enabled: boolean) => {
-    setConfiguration({
-      ...configuration,
-      application: {
-        ...configuration?.application,
-        enableAutoStartup: enabled
-      }
-    });
-
-    if (enabled) {
-      await enable();
-    } else {
-      await disable();
-    }
-  };
-
-  const toggleStartMinimized = (enabled: boolean) => {
-    setConfiguration({
-      ...configuration,
-      application: {
-        ...configuration?.application,
-        startMinimized: enabled
-      }
-    });
-  };
-
-  const toggleCheckForUpdates = (enabled: boolean) => {
-    setConfiguration({
-      ...configuration,
-      application: {
-        ...configuration?.application,
-        checkForUpdates: enabled
-      }
-    });
-  };
+  const {
+    enableAutoStartup,
+    startMinimized,
+    checkForUpdates,
+    minimizeToTray,
+    closeToTray,
+    toggleAutoStartup,
+    toggleStartMinimized,
+    toggleCheckForUpdates,
+    toggleMinimizeToTray,
+    toggleCloseToTray
+  } = useGeneralConfigsForm();
 
   return (
-    <Section title="Startup">
-      <Stack>
-        <FormControlLabel
-          label="Start automatically on system startup"
-          checked={
-            configuration?.application?.enableAutoStartup ??
-            defaultConfiguration.application.enableAutoStartup
-          }
-          onChange={(_, checked) => toggleAutoStartup(checked)}
-          control={<Checkbox size="small" />}
-        />
+    <>
+      <Section title="Startup">
+        <Stack>
+          <FormControlLabel
+            label="Start automatically on system startup"
+            checked={enableAutoStartup}
+            onChange={(_, checked) => toggleAutoStartup(checked)}
+            control={<Checkbox size="small" />}
+          />
 
-        <FormControlLabel
-          label="Start minimized"
-          checked={
-            configuration?.application?.startMinimized ??
-            defaultConfiguration.application.startMinimized
-          }
-          onChange={(_, checked) => toggleStartMinimized(checked)}
-          control={<Checkbox size="small" />}
-        />
+          <FormControlLabel
+            label="Start minimized"
+            checked={startMinimized}
+            onChange={(_, checked) => toggleStartMinimized(checked)}
+            control={<Checkbox size="small" />}
+          />
 
-        <FormControlLabel
-          label="Check for updates automatically"
-          checked={
-            configuration?.application?.checkForUpdates ??
-            defaultConfiguration.application.checkForUpdates
-          }
-          onChange={(_, checked) => toggleCheckForUpdates(checked)}
-          control={<Checkbox size="small" />}
-        />
-      </Stack>
-    </Section>
+          <FormControlLabel
+            label="Check for updates automatically"
+            checked={checkForUpdates}
+            onChange={(_, checked) => toggleCheckForUpdates(checked)}
+            control={<Checkbox size="small" />}
+          />
+        </Stack>
+      </Section>
+
+      <Section title="System tray">
+        <Stack>
+          <FormControlLabel
+            label="Minimize to tray"
+            checked={minimizeToTray}
+            onChange={(_, checked) => toggleMinimizeToTray(checked)}
+            control={<Checkbox size="small" />}
+          />
+
+          <FormControlLabel
+            label="Close to tray"
+            checked={closeToTray}
+            onChange={(_, checked) => toggleCloseToTray(checked)}
+            control={<Checkbox size="small" />}
+          />
+        </Stack>
+      </Section>
+    </>
   );
 };
 

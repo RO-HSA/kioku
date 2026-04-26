@@ -1,7 +1,7 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use serde::Deserialize;
 use std::time::Duration;
-use tauri::{Manager, WebviewWindowBuilder};
+use tauri::{Manager, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_zustand::ManagerExt;
 
 pub mod auth;
@@ -18,7 +18,9 @@ use crate::auth::{
     authorize_anilist, authorize_myanimelist, authorize_provider, handle_oauth_callback,
     init_stronghold_key, oauth_request, ProviderConfig, StrongholdKeyState, TokenManagerState,
 };
-use crate::services::anilist::{fetch_anilist_user_info, search_anilist_media, synchronize_anilist};
+use crate::services::anilist::{
+    fetch_anilist_user_info, search_anilist_media, synchronize_anilist,
+};
 use crate::services::anime_list_updates::{enqueue_anime_list_update, AnimeListUpdateQueue};
 use crate::services::discord_rpc::{
     clear_discord_presence, configure_discord_rpc, set_discord_presence, DiscordRpcState,
@@ -54,6 +56,10 @@ struct StoredDetectionConfig {
 struct StoredApplicationConfig {
     #[serde(default)]
     start_minimized: bool,
+    #[serde(default)]
+    minimize_to_tray: bool,
+    #[serde(default)]
+    close_to_tray: bool,
 }
 
 fn read_bootstrap_config(app: &tauri::AppHandle) -> StoredConfigurationState {
@@ -69,6 +75,14 @@ fn process_oauth_callback(app: tauri::AppHandle, url: String) {
     });
 }
 
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(main_window) = app.get_webview_window("main") {
+        let _ = main_window.unminimize();
+        let _ = main_window.show();
+        let _ = main_window.set_focus();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -80,11 +94,7 @@ pub fn run() {
             .plugin(tauri_plugin_updater::Builder::new().build())
             .plugin(tauri_plugin_single_instance::init(
                 |app: &tauri::AppHandle<_>, args: Vec<String>, _cwd: String| {
-                    if let Some(main_window) = app.get_webview_window("main") {
-                        let _ = main_window.unminimize();
-                        let _ = main_window.show();
-                        let _ = main_window.set_focus();
-                    }
+                    show_main_window(app);
 
                     let oauth_callback =
                         args.iter().find(|arg| arg.starts_with("kioku://")).cloned();
@@ -143,10 +153,39 @@ pub fn run() {
                 main_window_builder = main_window_builder.visible(false);
             }
             let main_window = main_window_builder.build()?;
+            let main_window_for_events = main_window.clone();
+            let app_handle_for_events = app.handle().clone();
+
+            main_window.on_window_event(move |event| match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    let config = read_bootstrap_config(&app_handle_for_events);
+
+                    if config.application.close_to_tray {
+                        api.prevent_close();
+                        let _ = main_window_for_events.hide();
+                    }
+                }
+                WindowEvent::Resized(_) | WindowEvent::Focused(false) => {
+                    let is_minimized = main_window_for_events.is_minimized().unwrap_or(false);
+
+                    if is_minimized {
+                        let config = read_bootstrap_config(&app_handle_for_events);
+
+                        if config.application.minimize_to_tray {
+                            let _ = main_window_for_events.hide();
+                        }
+                    }
+                }
+                _ => {}
+            });
 
             if bootstrap_config.application.start_minimized {
-                let _ = main_window.minimize();
-                let _ = main_window.show();
+                if bootstrap_config.application.minimize_to_tray {
+                    let _ = main_window.hide();
+                } else {
+                    let _ = main_window.minimize();
+                    let _ = main_window.show();
+                }
             }
 
             if let Err(err) = init_stronghold_key(&app.handle()) {
