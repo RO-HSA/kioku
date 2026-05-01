@@ -221,7 +221,7 @@ pub fn run() {
                 main_window_builder = main_window_builder.visible(false);
             }
             let main_window = main_window_builder.build()?;
-            
+
             register_window_event_listeners(app.handle());
 
             build_tray_icon(app.handle())?;
