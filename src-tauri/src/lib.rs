@@ -87,6 +87,70 @@ fn show_main_window(app: &tauri::AppHandle) {
     }
 }
 
+fn register_window_event_listeners(app: &tauri::AppHandle) {
+    if let Some(main_window) = app.get_webview_window("main") {
+        let main_window_for_events = main_window.clone();
+        let app_handle_for_events = app.clone();
+
+        main_window.on_window_event(move |event| match event {
+            WindowEvent::CloseRequested { api, .. } => {
+                let config = read_bootstrap_config(&app_handle_for_events);
+
+                if config.application.close_to_tray {
+                    api.prevent_close();
+                    let _ = main_window_for_events.hide();
+                }
+            }
+            WindowEvent::Resized(_) | WindowEvent::Focused(false) => {
+                let is_minimized = main_window_for_events.is_minimized().unwrap_or(false);
+
+                if is_minimized {
+                    let config = read_bootstrap_config(&app_handle_for_events);
+
+                    if config.application.minimize_to_tray {
+                        let _ = main_window_for_events.hide();
+                    }
+                }
+            }
+            _ => {}
+        });
+    }
+}
+
+fn build_tray_icon(app: &tauri::AppHandle) -> tauri::Result<()> {
+    let open_i = MenuItem::with_id(app, "open", "Open Kioku", true, None::<&str>)?;
+    let quit_i = MenuItem::with_id(app, "quit", "Exit", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&open_i, &quit_i])?;
+
+    TrayIconBuilder::new()
+        .menu(&menu)
+        .tooltip("Kioku")
+        .icon(app.default_window_icon().unwrap().clone())
+        .show_menu_on_left_click(false)
+        .on_tray_icon_event(|tray, event| match event {
+            TrayIconEvent::Click {
+                id: _,
+                position: _,
+                rect: _,
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+            } => {
+                show_main_window(tray.app_handle());
+            }
+            _ => {}
+        })
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "open" => {
+                show_main_window(app);
+            }
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .build(app)?;
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -157,61 +221,10 @@ pub fn run() {
                 main_window_builder = main_window_builder.visible(false);
             }
             let main_window = main_window_builder.build()?;
-            let main_window_for_events = main_window.clone();
-            let app_handle_for_events = app.handle().clone();
+            
+            register_window_event_listeners(app.handle());
 
-            main_window.on_window_event(move |event| match event {
-                WindowEvent::CloseRequested { api, .. } => {
-                    let config = read_bootstrap_config(&app_handle_for_events);
-
-                    if config.application.close_to_tray {
-                        api.prevent_close();
-                        let _ = main_window_for_events.hide();
-                    }
-                }
-                WindowEvent::Resized(_) | WindowEvent::Focused(false) => {
-                    let is_minimized = main_window_for_events.is_minimized().unwrap_or(false);
-
-                    if is_minimized {
-                        let config = read_bootstrap_config(&app_handle_for_events);
-
-                        if config.application.minimize_to_tray {
-                            let _ = main_window_for_events.hide();
-                        }
-                    }
-                }
-                _ => {}
-            });
-
-            let open_i = MenuItem::with_id(app, "open", "Open Kioku", true, None::<&str>)?;
-            let quit_i = MenuItem::with_id(app, "quit", "Exit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&open_i, &quit_i])?;
-
-            TrayIconBuilder::new()
-                .menu(&menu)
-                .tooltip("Kioku")
-                .icon(app.default_window_icon().unwrap().clone())
-                .show_menu_on_left_click(false)
-                .on_tray_icon_event(|tray, event| match event {
-                    TrayIconEvent::Click {
-                        id: _,
-                        position: _,
-                        rect: _,
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                    } => {
-                        show_main_window(tray.app_handle());
-                    }
-                    _ => {}
-                })
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "open" => {
-                        show_main_window(app);
-                    }
-                    "quit" => app.exit(0),
-                    _ => {}
-                })
-                .build(app)?;
+            build_tray_icon(app.handle())?;
 
             if bootstrap_config.application.start_minimized {
                 if bootstrap_config.application.minimize_to_tray {
