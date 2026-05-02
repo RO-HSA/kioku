@@ -19,6 +19,9 @@ const useDiscordRichPresence = () => {
   const activeMatchedAnimeId = usePlayerDetectionStore(
     (state) => state.activeMatchedAnimeId
   );
+  const activeMatchedProvider = usePlayerDetectionStore(
+    (state) => state.activeMatchedProvider
+  );
 
   const activeProvider = useProviderStore((state) => state.activeProvider);
   const myAnimeListAnimeData = useMyAnimeListStore(
@@ -38,12 +41,17 @@ const useDiscordRichPresence = () => {
   }, [activeProvider, aniListAnimeData, myAnimeListAnimeData]);
 
   const matchedAnime = useMemo(() => {
-    if (!activeMatchedAnimeId) {
+    if (!activeMatchedAnimeId || activeMatchedProvider !== activeProvider) {
       return undefined;
     }
 
     return aggregatedData.find((anime) => anime.id === activeMatchedAnimeId);
-  }, [activeMatchedAnimeId, aggregatedData]);
+  }, [
+    activeMatchedAnimeId,
+    activeMatchedProvider,
+    activeProvider,
+    aggregatedData
+  ]);
 
   const currentSessionRef = useRef<{
     episodeKey: string | null;

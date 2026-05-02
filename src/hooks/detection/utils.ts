@@ -2,6 +2,7 @@ import { SynchronizedAnimeList } from '@/services/backend/types';
 import { NotificationService } from '@/services/Notification';
 import { AliasesByAnimeId } from '@/stores/detection/nowPlayingAliases';
 import { AnimeListUserStatus, IAnimeList } from '@/types/AnimeList';
+import { Provider } from '@/types/List';
 
 const SPLIT_ALTERNATIVE_TITLES_REGEX = /(?:\s\/\s|[,\n;|])+/;
 const COMBINING_MARKS_REGEX = /[\u0300-\u036f]/g;
@@ -12,11 +13,13 @@ const DEFAULT_MAX_SUGGESTIONS = 10;
 const DEFAULT_MINIMUM_SCORE = 35;
 
 type CalculatePlaybackMatchesProps = {
+  provider: Provider;
   animeListData: SynchronizedAnimeList | null;
   animeTitle: string;
   episodeNumber: number | null;
   aliasesByAnimeId: AliasesByAnimeId;
   setMatchingResult: (
+    provider: Provider,
     matchedAnimeId: number | null,
     suggestedAnimeIds: number[]
   ) => void;
@@ -193,6 +196,7 @@ export const resolveNextStatusFromDetectedEpisode = (
 };
 
 export const calculatePlaybackMatches = ({
+  provider,
   animeListData,
   animeTitle,
   episodeNumber,
@@ -214,7 +218,7 @@ export const calculatePlaybackMatches = ({
       title: 'Now Playing',
       body: `${exactMatch.title}\nEpisode ${episodeNumber ?? '?'}`
     });
-    setMatchingResult(exactMatch.id, []);
+    setMatchingResult(provider, exactMatch.id, []);
   } else {
     notification.sendNotification({
       title: 'Media not recognized',
@@ -228,6 +232,7 @@ export const calculatePlaybackMatches = ({
     );
 
     setMatchingResult(
+      provider,
       null,
       suggestions.map((anime) => anime.id)
     );

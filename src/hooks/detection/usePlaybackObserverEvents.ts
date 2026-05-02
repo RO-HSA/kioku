@@ -51,6 +51,7 @@ const usePlaybackObserverEvents = () => {
               }
 
               calculatePlaybackMatches({
+                provider: Provider.MY_ANIME_LIST,
                 animeListData: myAnimeListAnimeData,
                 animeTitle: detection.animeTitle,
                 episodeNumber: detection.episode,
@@ -70,6 +71,7 @@ const usePlaybackObserverEvents = () => {
               }
 
               calculatePlaybackMatches({
+                provider: Provider.ANILIST,
                 animeListData: aniListAnimeData,
                 animeTitle: detection.animeTitle,
                 episodeNumber: detection.episode,
@@ -93,11 +95,18 @@ const usePlaybackObserverEvents = () => {
 
       unlistenClosed = await PlayerDetectionService.listenEpisodeClosed(
         (detection) => {
-          const { activeMatchedAnimeId } = usePlayerDetectionStore.getState();
+          const { activeMatchedAnimeId, activeMatchedProvider } =
+            usePlayerDetectionStore.getState();
+          const activeProvider = useProviderStore.getState().activeProvider;
 
           setEpisodeClosed(detection);
 
-          if (!activeMatchedAnimeId || detection.episode === null) {
+          if (
+            !activeMatchedAnimeId ||
+            detection.episode === null ||
+            !activeProvider ||
+            activeMatchedProvider !== activeProvider
+          ) {
             return;
           }
 
@@ -107,7 +116,7 @@ const usePlaybackObserverEvents = () => {
             useMyAnimeListStore.getState().animeListData;
           const aniListAnimeData = useAniListStore.getState().animeListData;
 
-          switch (useProviderStore.getState().activeProvider) {
+          switch (activeProvider) {
             case Provider.MY_ANIME_LIST:
               if (myAnimeListAnimeData) {
                 aggregatedData = flattenAnimeListData(myAnimeListAnimeData);
@@ -164,9 +173,20 @@ const usePlaybackObserverEvents = () => {
             updatePayload.userFinishDate = getTodayAsYmd();
           }
 
-          useMyAnimeListStore
-            .getState()
-            .updateAnimeList(anime.id, anime.userStatus, updatePayload);
+          switch (activeProvider) {
+            case Provider.MY_ANIME_LIST:
+              useMyAnimeListStore
+                .getState()
+                .updateAnimeList(anime.id, anime.userStatus, updatePayload);
+              break;
+            case Provider.ANILIST:
+              useAniListStore
+                .getState()
+                .updateAnimeList(anime.id, anime.userStatus, updatePayload);
+              break;
+            default:
+              break;
+          }
         }
       );
     };
