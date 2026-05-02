@@ -1,4 +1,5 @@
-use std::path::PathBuf;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use base64::{engine::general_purpose, Engine as _};
@@ -9,6 +10,7 @@ use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_stronghold::stronghold::Stronghold;
 
 const VAULT_FILE_NAME: &str = "stronghold.hold";
+const FALLBACK_KEY_FILE_NAME: &str = "stronghold-master-key";
 const KEYRING_ENTRY: &str = "stronghold-master-key";
 const KEY_LENGTH: usize = 32;
 const CLIENT_ID: &[u8] = b"oauth";
@@ -56,9 +58,13 @@ fn vault_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     Ok(app_data_dir(app)?.join(VAULT_FILE_NAME))
 }
 
-fn keyring_entry<R: Runtime>(app: &AppHandle<R>) -> Result<keyring::Entry, String> {
+fn fallback_master_key_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    Ok(app_data_dir(app)?.join(FALLBACK_KEY_FILE_NAME))
+}
+
+fn keyring_entry<R: Runtime>(app: &AppHandle<R>) -> keyring::Result<keyring::Entry> {
     let service = app.config().identifier.clone();
-    keyring::Entry::new(&service, KEYRING_ENTRY).map_err(|e| e.to_string())
+    keyring::Entry::new(&service, KEYRING_ENTRY)
 }
 
 fn encode_master_key(key: &[u8]) -> String {
@@ -81,20 +87,110 @@ fn generate_master_key() -> Vec<u8> {
     key.to_vec()
 }
 
+fn should_use_file_master_key(err: &keyring::Error) -> bool {
+    matches!(
+        err,
+        keyring::Error::PlatformFailure(_) | keyring::Error::NoStorageAccess(_)
+    )
+}
+
+fn try_read_file_master_key(path: &Path) -> Result<Option<Vec<u8>>, String> {
+    match std::fs::read_to_string(path) {
+        Ok(encoded) => decode_master_key(encoded.trim()).map(Some),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(err) => Err(format!(
+            "Failed to read fallback Stronghold master key: {err}"
+        )),
+    }
+}
+
+fn write_file_master_key(path: &Path, key: &[u8]) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+
+    let mut file = options.open(path).map_err(|e| e.to_string())?;
+    file.write_all(encode_master_key(key).as_bytes())
+        .map_err(|e| e.to_string())
+}
+
+fn load_or_create_file_master_key_at_path(path: &Path) -> Result<Vec<u8>, String> {
+    if let Some(key) = try_read_file_master_key(path)? {
+        return Ok(key);
+    }
+
+    let key = generate_master_key();
+    match write_file_master_key(path, &key) {
+        Ok(()) => Ok(key),
+        Err(err) if path.exists() => try_read_file_master_key(path)?
+            .ok_or_else(|| format!("Fallback Stronghold master key was not created: {err}")),
+        Err(err) => Err(format!(
+            "Failed to create fallback Stronghold master key: {err}"
+        )),
+    }
+}
+
+fn load_or_create_file_master_key<R: Runtime>(app: &AppHandle<R>) -> Result<Vec<u8>, String> {
+    load_or_create_file_master_key_at_path(&fallback_master_key_path(app)?)
+}
+
+fn load_file_master_key_after_keyring_error<R: Runtime>(
+    app: &AppHandle<R>,
+    err: &keyring::Error,
+) -> Result<Vec<u8>, String> {
+    eprintln!("Platform keyring unavailable, using file-based Stronghold master key: {err}");
+    load_or_create_file_master_key(app)
+}
+
 fn load_or_create_master_key<R: Runtime>(app: &AppHandle<R>) -> Result<Vec<u8>, String> {
-    let entry = keyring_entry(app)?;
+    let entry = match keyring_entry(app) {
+        Ok(entry) => entry,
+        Err(err) if should_use_file_master_key(&err) => {
+            return load_file_master_key_after_keyring_error(app, &err);
+        }
+        Err(err) => return Err(err.to_string()),
+    };
+
     match entry.get_password() {
         Ok(encoded) => decode_master_key(&encoded),
-        Err(err) => {
-            if matches!(err, keyring::Error::NoEntry) {
-                let key = generate_master_key();
-                let encoded = encode_master_key(&key);
-                entry.set_password(&encoded).map_err(|e| e.to_string())?;
-                Ok(key)
-            } else {
-                Err(err.to_string())
+        Err(keyring::Error::NoEntry) => {
+            let fallback_key_path = fallback_master_key_path(app)?;
+            if let Some(key) = try_read_file_master_key(&fallback_key_path)? {
+                match entry.set_password(&encode_master_key(&key)) {
+                    Ok(()) => {}
+                    Err(err) if should_use_file_master_key(&err) => {
+                        eprintln!(
+                            "Platform keyring unavailable, keeping file-based Stronghold master key: {err}"
+                        );
+                    }
+                    Err(err) => return Err(err.to_string()),
+                }
+                return Ok(key);
+            }
+
+            let key = generate_master_key();
+            let encoded = encode_master_key(&key);
+            match entry.set_password(&encoded) {
+                Ok(()) => Ok(key),
+                Err(err) if should_use_file_master_key(&err) => {
+                    load_file_master_key_after_keyring_error(app, &err)
+                }
+                Err(err) => Err(err.to_string()),
             }
         }
+        Err(err) if should_use_file_master_key(&err) => {
+            load_file_master_key_after_keyring_error(app, &err)
+        }
+        Err(err) => Err(err.to_string()),
     }
 }
 
@@ -249,6 +345,43 @@ mod tests {
         assert_eq!(first.len(), KEY_LENGTH);
         assert_eq!(second.len(), KEY_LENGTH);
         assert_ne!(first, second);
+    }
+
+    fn temp_key_path(name: &str) -> PathBuf {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time should be valid")
+            .as_nanos();
+        std::env::temp_dir()
+            .join("kioku-secure-store-tests")
+            .join(format!("{}-{}-{nonce}", std::process::id(), name))
+    }
+
+    #[test]
+    fn file_master_key_fallback_creates_and_reuses_key() {
+        let path = temp_key_path("roundtrip");
+        let first =
+            load_or_create_file_master_key_at_path(&path).expect("fallback key should create");
+        let second =
+            load_or_create_file_master_key_at_path(&path).expect("fallback key should load");
+
+        assert_eq!(first.len(), KEY_LENGTH);
+        assert_eq!(first, second);
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn file_master_key_fallback_rejects_invalid_key_file() {
+        let path = temp_key_path("invalid");
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).expect("temp dir should create");
+        }
+        std::fs::write(&path, "invalid").expect("invalid key file should write");
+
+        assert!(load_or_create_file_master_key_at_path(&path).is_err());
+
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]
