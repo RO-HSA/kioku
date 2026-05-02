@@ -1,7 +1,16 @@
 use rand::{distributions::Alphanumeric, Rng};
 use std::collections::HashMap;
+#[cfg(target_os = "linux")]
+use std::{
+    env,
+    ffi::OsString,
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+    thread,
+};
 use tauri::{Emitter, Manager, Runtime};
 use tauri_plugin_http::reqwest;
+#[cfg(not(target_os = "linux"))]
 use tauri_plugin_opener::OpenerExt;
 
 pub mod anilist;
@@ -208,6 +217,117 @@ fn resolve_pkce_verifier(
     token_manager.take_pkce_verifier(provider_id)
 }
 
+#[cfg(target_os = "linux")]
+const DEFAULT_SYSTEM_PATH: &str = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+
+#[cfg(target_os = "linux")]
+const APPIMAGE_ENV_VARS: &[&str] = &[
+    "APPDIR",
+    "APPIMAGE",
+    "ARGV0",
+    "GDK_PIXBUF_MODULE_FILE",
+    "GDK_PIXBUF_MODULEDIR",
+    "GIO_MODULE_DIR",
+    "GTK_DATA_PREFIX",
+    "GTK_EXE_PREFIX",
+    "GTK_PATH",
+    "LD_LIBRARY_PATH",
+    "LD_PRELOAD",
+    "OWD",
+    "XDG_DATA_DIRS",
+];
+
+#[cfg(target_os = "linux")]
+fn cleaned_system_path() -> OsString {
+    let Some(path) = env::var_os("PATH") else {
+        return OsString::from(DEFAULT_SYSTEM_PATH);
+    };
+    let appdir = env::var_os("APPDIR").map(PathBuf::from);
+    let paths = env::split_paths(&path)
+        .filter(|path| match appdir.as_ref() {
+            Some(appdir) => !path.starts_with(appdir),
+            None => true,
+        })
+        .collect::<Vec<_>>();
+
+    if paths.is_empty() {
+        OsString::from(DEFAULT_SYSTEM_PATH)
+    } else {
+        env::join_paths(paths).unwrap_or_else(|_| OsString::from(DEFAULT_SYSTEM_PATH))
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn spawn_detached_with_clean_env(mut command: Command) -> Result<(), String> {
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .env("PATH", cleaned_system_path());
+
+    for key in APPIMAGE_ENV_VARS {
+        command.env_remove(key);
+    }
+
+    let mut child = command.spawn().map_err(|e| e.to_string())?;
+    thread::spawn(move || {
+        let _ = child.wait();
+    });
+
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn system_opener_commands(url: &str) -> Vec<Command> {
+    let mut commands = Vec::new();
+
+    if Path::new("/usr/bin/xdg-open").exists() {
+        let mut command = Command::new("/usr/bin/xdg-open");
+        command.arg(url);
+        commands.push(command);
+    }
+
+    if Path::new("/usr/bin/gio").exists() {
+        let mut command = Command::new("/usr/bin/gio");
+        command.arg("open").arg(url);
+        commands.push(command);
+    }
+
+    let mut xdg_open = Command::new("xdg-open");
+    xdg_open.arg(url);
+    commands.push(xdg_open);
+
+    let mut gio = Command::new("gio");
+    gio.arg("open").arg(url);
+    commands.push(gio);
+
+    commands
+}
+
+#[cfg(target_os = "linux")]
+fn open_authorize_url<R: Runtime>(_app: &tauri::AppHandle<R>, url: &str) -> Result<(), String> {
+    let mut last_error = None;
+
+    for command in system_opener_commands(url) {
+        match spawn_detached_with_clean_env(command) {
+            Ok(()) => return Ok(()),
+            Err(err) => last_error = Some(err),
+        }
+    }
+
+    Err(format!(
+        "Failed to open authorization URL with the system opener: {}",
+        last_error.unwrap_or_else(|| "no opener command available".to_string())
+    ))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn open_authorize_url<R: Runtime>(app: &tauri::AppHandle<R>, url: &str) -> Result<(), String> {
+    app.opener()
+        .open_url(url, None::<String>)
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn authorize_provider(provider_id: String, app: tauri::AppHandle) -> Result<(), String> {
     authorize_provider_impl(&provider_id, app).await
@@ -270,9 +390,7 @@ async fn authorize_provider_impl<R: Runtime>(
             .set_pkce_verifier(provider_id, pkce.code_verifier.clone())?;
     }
 
-    app.opener()
-        .open_url(&authorize_url, None::<String>)
-        .map_err(|e| e.to_string())?;
+    open_authorize_url(&app, &authorize_url)?;
 
     Ok(())
 }

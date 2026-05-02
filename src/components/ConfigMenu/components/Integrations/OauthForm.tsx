@@ -43,7 +43,12 @@ const OauthForm: FC<OauthFormProps> = ({
   const onSubmit = async () => {
     setIsAuthenticating(true);
     setIsReauthenticating(true);
-    await authorizeFn();
+    try {
+      await authorizeFn();
+    } catch {
+      setIsAuthenticating(false);
+      setIsReauthenticating(false);
+    }
   };
 
   const isDisabled =
