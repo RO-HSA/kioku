@@ -1,6 +1,6 @@
 [package]
 name = "kioku"
-version = "0.5.1"
+version = "0.5.2"
 description = "A Tauri App"
 authors = ["Robert Santos"]
 edition = "2021"
