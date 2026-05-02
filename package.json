@@ -24,7 +24,7 @@
     "@mui/material": "^7.3.7",
     "@mui/x-date-pickers": "8.0.0",
     "@tailwindcss/vite": "^4.1.18",
-    "@tauri-apps/api": "^2",
+    "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-autostart": "~2",
     "@tauri-apps/plugin-deep-link": "~2",
     "@tauri-apps/plugin-http": "~2",
@@ -48,7 +48,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
-    "@tauri-apps/cli": "^2",
+    "@tauri-apps/cli": "^2.11.0",
     "@types/node": "^25.0.10",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
