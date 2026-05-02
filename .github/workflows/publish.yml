@@ -172,4 +172,5 @@ jobs:
           releaseDraft: true
           prerelease: false
           updaterJsonPreferNsis: true
+          tauriScript: ${{ matrix.platform == 'ubuntu-22.04' && 'cargo tauri' || '' }}
           args: ${{ matrix.args }}
