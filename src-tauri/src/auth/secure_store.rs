@@ -1,4 +1,5 @@
 use std::io::Write;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -16,6 +17,8 @@ const KEY_LENGTH: usize = 32;
 const CLIENT_ID: &[u8] = b"oauth";
 const REFRESH_TOKEN_KEY: &str = "refresh_token";
 const ACCESS_TOKEN_KEY: &str = "access_token";
+
+static STRONGHOLD_STORE_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Deserialize, Serialize)]
 struct AccessTokenRecord {
@@ -206,6 +209,31 @@ fn open_stronghold<R: Runtime>(app: &AppHandle<R>, key: &[u8]) -> Result<Strongh
     open_stronghold_at_path(vault_path(app)?, key)
 }
 
+fn panic_payload_to_string(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        return message.to_string();
+    }
+
+    if let Some(message) = payload.downcast_ref::<String>() {
+        return message.clone();
+    }
+
+    "unknown panic payload".to_string()
+}
+
+fn with_stronghold_store<T>(operation: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+    let _guard = STRONGHOLD_STORE_LOCK
+        .lock()
+        .map_err(|_| "Stronghold store lock poisoned".to_string())?;
+
+    catch_unwind(AssertUnwindSafe(operation)).map_err(|payload| {
+        format!(
+            "Stronghold store operation panicked: {}",
+            panic_payload_to_string(payload.as_ref())
+        )
+    })?
+}
+
 fn token_record_key(provider_id: &str, token_key: &str) -> String {
     format!("{provider_id}:{token_key}")
 }
@@ -276,12 +304,14 @@ pub fn save_refresh_token<R: Runtime>(
     refresh_token: &str,
 ) -> Result<(), String> {
     let key = app.state::<StrongholdKeyState>().get_key()?;
-    let stronghold = open_stronghold(app, &key)?;
-    save_secret_bytes(
-        &stronghold,
-        &refresh_record_key(provider_id),
-        refresh_token.as_bytes().to_vec(),
-    )
+    with_stronghold_store(|| {
+        let stronghold = open_stronghold(app, &key)?;
+        save_secret_bytes(
+            &stronghold,
+            &refresh_record_key(provider_id),
+            refresh_token.as_bytes().to_vec(),
+        )
+    })
 }
 
 pub fn read_refresh_token<R: Runtime>(
@@ -289,8 +319,10 @@ pub fn read_refresh_token<R: Runtime>(
     provider_id: &str,
 ) -> Result<Option<String>, String> {
     let key = app.state::<StrongholdKeyState>().get_key()?;
-    let stronghold = open_stronghold(app, &key)?;
-    let raw = read_secret_bytes(&stronghold, &refresh_record_key(provider_id))?;
+    let raw = with_stronghold_store(|| {
+        let stronghold = open_stronghold(app, &key)?;
+        read_secret_bytes(&stronghold, &refresh_record_key(provider_id))
+    })?;
     Ok(decode_refresh_token(raw))
 }
 
@@ -301,9 +333,11 @@ pub fn save_access_token<R: Runtime>(
     expires_at_unix_secs: u64,
 ) -> Result<(), String> {
     let key = app.state::<StrongholdKeyState>().get_key()?;
-    let stronghold = open_stronghold(app, &key)?;
     let encoded = encode_access_token_record(access_token, expires_at_unix_secs)?;
-    save_secret_bytes(&stronghold, &access_record_key(provider_id), encoded)
+    with_stronghold_store(|| {
+        let stronghold = open_stronghold(app, &key)?;
+        save_secret_bytes(&stronghold, &access_record_key(provider_id), encoded)
+    })
 }
 
 pub fn read_access_token<R: Runtime>(
@@ -311,8 +345,10 @@ pub fn read_access_token<R: Runtime>(
     provider_id: &str,
 ) -> Result<Option<(String, u64)>, String> {
     let key = app.state::<StrongholdKeyState>().get_key()?;
-    let stronghold = open_stronghold(app, &key)?;
-    let raw = read_secret_bytes(&stronghold, &access_record_key(provider_id))?;
+    let raw = with_stronghold_store(|| {
+        let stronghold = open_stronghold(app, &key)?;
+        read_secret_bytes(&stronghold, &access_record_key(provider_id))
+    })?;
 
     let Some(raw) = raw else {
         return Ok(None);
