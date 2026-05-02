@@ -1,11 +1,8 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { DiscordRpcService } from '@/services/backend/DiscordRpc';
 import { DiscordPresenceRequest } from '@/services/backend/types';
-import {
-  defaultConfiguration,
-  useConfigMenuStore
-} from '@/stores/config/configMenu';
+import { useConfigMenuStore } from '@/stores/config/configMenu';
 import { usePlayerDetectionStore } from '@/stores/detection/playerDetection';
 import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
@@ -13,6 +10,8 @@ import { useProviderStore } from '@/stores/providers/provider';
 import { Provider } from '@/types/List';
 import { buildEntityUrl } from '@/utils/url';
 import { flattenAnimeListData } from './utils';
+
+const DISCORD_PRESENCE_REFRESH_MS = 30_000;
 
 const useDiscordRichPresence = () => {
   const activeEpisode = usePlayerDetectionStore((state) => state.activeEpisode);
@@ -28,6 +27,18 @@ const useDiscordRichPresence = () => {
     (state) => state.animeListData
   );
   const aniListAnimeData = useAniListStore((state) => state.animeListData);
+  const enableRichPresence = useConfigMenuStore(
+    (state) => state.configuration.sharing.enableRichPresence
+  );
+  const displayUsernameInPresence = useConfigMenuStore(
+    (state) => state.configuration.sharing.displayUsernameInPresence
+  );
+  const displayTimeElapsedInPresence = useConfigMenuStore(
+    (state) => state.configuration.sharing.displayTimeElapsedInPresence
+  );
+  const preferAnimeTitleInPresence = useConfigMenuStore(
+    (state) => state.configuration.sharing.preferAnimeTitleInPresence
+  );
 
   const aggregatedData = useMemo(() => {
     switch (activeProvider) {
@@ -53,7 +64,7 @@ const useDiscordRichPresence = () => {
     aggregatedData
   ]);
 
-  const currentSessionRef = useRef<{
+  const [currentSession, setCurrentSession] = useState<{
     episodeKey: string | null;
     startTimestamp: number;
   }>({
@@ -64,36 +75,13 @@ const useDiscordRichPresence = () => {
 
   useEffect(() => {
     if (!activeEpisode) {
-      currentSessionRef.current = { episodeKey: null, startTimestamp: 0 };
-
-      if (lastPayloadRef.current === 'clear') {
-        return;
-      }
-
-      lastPayloadRef.current = 'clear';
-      DiscordRpcService.clearPresence().catch(() => undefined);
+      setCurrentSession((current) =>
+        current.episodeKey === null && current.startTimestamp === 0
+          ? current
+          : { episodeKey: null, startTimestamp: 0 }
+      );
       return;
     }
-
-    const { configuration } = useConfigMenuStore.getState();
-
-    const enableRichPresence =
-      configuration?.sharing?.enableRichPresence ??
-      defaultConfiguration.sharing.enableRichPresence;
-
-    if (!enableRichPresence) return;
-
-    const displayUsernameInPresence =
-      configuration?.sharing?.displayUsernameInPresence ??
-      defaultConfiguration.sharing.displayUsernameInPresence;
-
-    const displayTimeElapsedInPresence =
-      configuration?.sharing?.displayTimeElapsedInPresence ??
-      defaultConfiguration.sharing.displayTimeElapsedInPresence;
-
-    const preferAnimeTitleInPresence =
-      configuration?.sharing?.preferAnimeTitleInPresence ??
-      defaultConfiguration.sharing.preferAnimeTitleInPresence;
 
     const episodeKey = [
       activeEpisode.player,
@@ -101,17 +89,25 @@ const useDiscordRichPresence = () => {
       String(activeEpisode.episode ?? '')
     ].join('|');
 
-    if (currentSessionRef.current.episodeKey !== episodeKey) {
-      currentSessionRef.current = {
-        episodeKey,
-        startTimestamp: Math.floor(Date.now() / 1000)
-      };
+    setCurrentSession((current) =>
+      current.episodeKey === episodeKey
+        ? current
+        : {
+            episodeKey,
+            startTimestamp: Math.floor(Date.now() / 1000)
+          }
+    );
+  }, [activeEpisode]);
+
+  const presenceRequest = useMemo<DiscordPresenceRequest | null>(() => {
+    if (!activeEpisode || !enableRichPresence) {
+      return null;
     }
 
     const request: DiscordPresenceRequest = {
       details: matchedAnime?.title ?? activeEpisode.animeTitle,
       state: `Episode ${activeEpisode.episode ?? '?'}`,
-      startTimestamp: currentSessionRef.current.startTimestamp,
+      startTimestamp: currentSession.startTimestamp,
       type: 3,
       statusDisplayType: 0,
       buttons: [
@@ -124,7 +120,7 @@ const useDiscordRichPresence = () => {
 
     if (!displayTimeElapsedInPresence) {
       request.startTimestamp = undefined;
-      request.endTimestamp = currentSessionRef.current.startTimestamp;
+      request.endTimestamp = currentSession.startTimestamp;
     }
 
     let providerText = '';
@@ -164,16 +160,52 @@ const useDiscordRichPresence = () => {
       }
     }
 
-    const payloadSignature = JSON.stringify(request);
-    if (payloadSignature === lastPayloadRef.current) {
+    return request;
+  }, [
+    activeEpisode,
+    activeProvider,
+    displayTimeElapsedInPresence,
+    displayUsernameInPresence,
+    enableRichPresence,
+    matchedAnime,
+    preferAnimeTitleInPresence,
+    currentSession.startTimestamp
+  ]);
+
+  useEffect(() => {
+    if (!presenceRequest) {
+      if (lastPayloadRef.current === 'clear') {
+        return;
+      }
+
+      lastPayloadRef.current = 'clear';
+      DiscordRpcService.clearPresence().catch(() => {
+        lastPayloadRef.current = '';
+      });
       return;
     }
 
-    lastPayloadRef.current = payloadSignature;
-    DiscordRpcService.setPresence(request).catch(() => {
-      lastPayloadRef.current = '';
-    });
-  }, [activeEpisode, activeProvider, matchedAnime]);
+    const payloadSignature = JSON.stringify(presenceRequest);
+
+    const pushPresence = () => {
+      lastPayloadRef.current = payloadSignature;
+      DiscordRpcService.setPresence(presenceRequest).catch(() => {
+        lastPayloadRef.current = '';
+      });
+    };
+
+    if (payloadSignature !== lastPayloadRef.current) {
+      pushPresence();
+    }
+
+    const refreshInterval = window.setInterval(() => {
+      pushPresence();
+    }, DISCORD_PRESENCE_REFRESH_MS);
+
+    return () => {
+      window.clearInterval(refreshInterval);
+    };
+  }, [presenceRequest]);
 
   useEffect(() => {
     return () => {
