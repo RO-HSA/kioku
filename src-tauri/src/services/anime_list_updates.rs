@@ -13,6 +13,15 @@ use crate::services::myanimelist::update_myanimelist_list_entry;
 const UPDATE_INTERVAL_MS: u64 = 1000;
 const UPDATE_QUEUE_CAPACITY: usize = 256;
 
+macro_rules! update_worker_log {
+    ($($arg:tt)*) => {
+        #[cfg(debug_assertions)]
+        {
+            eprintln!($($arg)*);
+        }
+    };
+}
+
 #[derive(Debug, Copy, Clone, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ListType {
@@ -77,6 +86,16 @@ pub async fn enqueue_anime_list_update(
     app.state::<AnimeListUpdateQueue>().enqueue(update).await
 }
 
+fn update_log_context(update: &AnimeListUpdateRequest) -> String {
+    format!(
+        "provider={}, list_type={:?}, entry_id={:?}, media_id={:?}",
+        update.provider_id,
+        update.list_type.unwrap_or_default(),
+        update.entry_id,
+        update.media_id
+    )
+}
+
 fn spawn_update_worker(
     app: tauri::AppHandle,
     mut receiver: mpsc::Receiver<AnimeListUpdateRequest>,
@@ -85,16 +104,29 @@ fn spawn_update_worker(
         let client = reqwest::Client::new();
         let interval = Duration::from_millis(UPDATE_INTERVAL_MS);
 
+        update_worker_log!(
+            "Anime list update worker started (queue_capacity={}, interval_ms={})",
+            UPDATE_QUEUE_CAPACITY,
+            UPDATE_INTERVAL_MS
+        );
+
         while let Some(update) = receiver.recv().await {
-            if let Err(err) = handle_update(&app, &client, &update).await {
-                eprintln!(
-                    "Anime list update failed (provider={}, entry_id={:?}): {}",
-                    update.provider_id, update.entry_id, err
-                );
+            let context = update_log_context(&update);
+            update_worker_log!("Anime list update received ({context})");
+
+            match handle_update(&app, &client, &update).await {
+                Ok(()) => {
+                    update_worker_log!("Anime list update completed ({context})");
+                }
+                Err(err) => {
+                    update_worker_log!("Anime list update failed ({context}): {err}");
+                }
             }
 
             tokio::time::sleep(interval).await;
         }
+
+        update_worker_log!("Anime list update worker stopped: queue channel closed");
     });
 }
 
