@@ -8,7 +8,7 @@ interface UseCustomEventProps<T> {
 
 const useCustomEvent = <T>(
   eventName: CustomEventName,
-  props: UseCustomEventProps<T>
+  props?: UseCustomEventProps<T>
 ) => {
   const { listen, onEvent } = props || {};
 
