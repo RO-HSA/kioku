@@ -141,6 +141,7 @@ const NowPlaying = () => {
                     exactAnimeMatch.id
                   )}>
                   {exactAnimeMatch.title}
+                  {animePlaying?.episode && ` - ${animePlaying.episode}`}
                 </AnimeTitle>
               </div>
 
