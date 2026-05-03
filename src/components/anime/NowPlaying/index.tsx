@@ -100,7 +100,7 @@ const NowPlaying = () => {
   );
 
   return (
-    <Container className="h-full min-h-0 flex flex-col py-4">
+    <Container className="h-full min-h-0 flex flex-col py-2 pr-0!">
       <Typography variant="h6" component="h1" color="primary" gutterBottom>
         Now Playing
       </Typography>
@@ -141,6 +141,7 @@ const NowPlaying = () => {
                     exactAnimeMatch.id
                   )}>
                   {exactAnimeMatch.title}
+                  {animePlaying?.episode && ` - ${animePlaying.episode}`}
                 </AnimeTitle>
               </div>
 
