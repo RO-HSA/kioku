@@ -19,6 +19,9 @@ const NowPlaying = () => {
   const activeMatchedAnimeId = usePlayerDetectionStore(
     (state) => state.activeMatchedAnimeId
   );
+  const activeMatchedProvider = usePlayerDetectionStore(
+    (state) => state.activeMatchedProvider
+  );
   const suggestedAnimeIds = usePlayerDetectionStore(
     (state) => state.suggestedAnimeIds
   );
@@ -47,15 +50,24 @@ const NowPlaying = () => {
   }, [activeProvider, aniListAnimeData, myAnimeListAnimeData]);
 
   const exactAnimeMatch = useMemo(() => {
-    if (!activeMatchedAnimeId) {
+    if (!activeMatchedAnimeId || activeMatchedProvider !== activeProvider) {
       return undefined;
     }
 
     return aggregatedData.find((anime) => anime.id === activeMatchedAnimeId);
-  }, [activeMatchedAnimeId, aggregatedData]);
+  }, [
+    activeMatchedAnimeId,
+    activeMatchedProvider,
+    activeProvider,
+    aggregatedData
+  ]);
 
   const suggestedMatches = useMemo(() => {
-    if (!animePlaying || exactAnimeMatch) {
+    if (
+      !animePlaying ||
+      exactAnimeMatch ||
+      activeMatchedProvider !== activeProvider
+    ) {
       return [];
     }
 
@@ -66,7 +78,14 @@ const NowPlaying = () => {
       .filter((anime): anime is (typeof aggregatedData)[number] =>
         Boolean(anime)
       );
-  }, [aggregatedData, animePlaying, exactAnimeMatch, suggestedAnimeIds]);
+  }, [
+    activeMatchedProvider,
+    activeProvider,
+    aggregatedData,
+    animePlaying,
+    exactAnimeMatch,
+    suggestedAnimeIds
+  ]);
 
   const handleSuggestionClick = useCallback(
     (animeId: number) => {
@@ -75,7 +94,7 @@ const NowPlaying = () => {
       if (!activeProvider) return;
 
       addAlias(activeProvider, animeId, animePlaying.animeTitle);
-      resolveActiveAnime(animeId);
+      resolveActiveAnime(activeProvider, animeId);
     },
     [activeProvider, addAlias, resolveActiveAnime, animePlaying]
   );
@@ -106,7 +125,7 @@ const NowPlaying = () => {
                 title={exactAnimeMatch.title}
                 imageUrl={exactAnimeMatch.imageUrl}
                 url={buildEntityUrl(
-                  Provider.MY_ANIME_LIST,
+                  activeProvider || Provider.MY_ANIME_LIST,
                   'anime',
                   exactAnimeMatch.id
                 )}
@@ -117,7 +136,7 @@ const NowPlaying = () => {
               <div className="flex flex-col gap-1 pb-2.5">
                 <AnimeTitle
                   url={buildEntityUrl(
-                    Provider.MY_ANIME_LIST,
+                    activeProvider || Provider.MY_ANIME_LIST,
                     'anime',
                     exactAnimeMatch.id
                   )}>

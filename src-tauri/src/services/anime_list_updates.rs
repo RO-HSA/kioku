@@ -1,9 +1,17 @@
-use std::time::Duration;
+use std::{
+    any::Any,
+    collections::VecDeque,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 use serde::Deserialize;
 use tauri::Manager;
 use tauri_plugin_http::reqwest;
-use tokio::sync::mpsc;
+use tokio::sync::{Mutex, Notify};
 
 use crate::auth::anilist::PROVIDER_ID as ANILIST_PROVIDER_ID;
 use crate::auth::mal::PROVIDER_ID as MAL_PROVIDER_ID;
@@ -12,6 +20,17 @@ use crate::services::myanimelist::update_myanimelist_list_entry;
 
 const UPDATE_INTERVAL_MS: u64 = 1000;
 const UPDATE_QUEUE_CAPACITY: usize = 256;
+const WORKER_RESTART_DELAY_MS: u64 = 1000;
+const WORKER_CRASH_RETRY_LIMIT: u8 = 3;
+
+macro_rules! update_worker_log {
+    ($($arg:tt)*) => {
+        #[cfg(debug_assertions)]
+        {
+            eprintln!($($arg)*);
+        }
+    };
+}
 
 #[derive(Debug, Copy, Clone, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
@@ -45,27 +64,164 @@ pub struct AnimeListUpdateRequest {
     pub user_finish_date: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+struct QueuedAnimeListUpdate {
+    request: AnimeListUpdateRequest,
+    crash_retries: u8,
+}
+
+impl QueuedAnimeListUpdate {
+    fn new(request: AnimeListUpdateRequest) -> Self {
+        Self {
+            request,
+            crash_retries: 0,
+        }
+    }
+
+    fn schedule_retry(mut self) -> Option<Self> {
+        if self.crash_retries >= WORKER_CRASH_RETRY_LIMIT {
+            return None;
+        }
+
+        self.crash_retries += 1;
+        Some(self)
+    }
+}
+
+struct PendingAnimeListUpdates {
+    items: Mutex<VecDeque<QueuedAnimeListUpdate>>,
+    notify: Notify,
+    capacity: usize,
+}
+
+impl PendingAnimeListUpdates {
+    fn new(capacity: usize) -> Self {
+        Self {
+            items: Mutex::new(VecDeque::with_capacity(capacity)),
+            notify: Notify::new(),
+            capacity,
+        }
+    }
+
+    async fn enqueue(&self, update: AnimeListUpdateRequest) -> Result<(), String> {
+        self.push_back(QueuedAnimeListUpdate::new(update)).await
+    }
+
+    async fn push_back(&self, update: QueuedAnimeListUpdate) -> Result<(), String> {
+        let mut items = self.items.lock().await;
+        if items.len() >= self.capacity {
+            return Err("Update queue is full".to_string());
+        }
+
+        items.push_back(update);
+        drop(items);
+        self.notify.notify_one();
+        Ok(())
+    }
+
+    async fn requeue_front(&self, update: QueuedAnimeListUpdate) -> Result<(), String> {
+        let mut items = self.items.lock().await;
+        if items.len() >= self.capacity {
+            return Err("Update queue is full while restarting worker".to_string());
+        }
+
+        items.push_front(update);
+        drop(items);
+        self.notify.notify_one();
+        Ok(())
+    }
+
+    async fn pop_front(&self) -> QueuedAnimeListUpdate {
+        loop {
+            let notified = self.notify.notified();
+            if let Some(update) = {
+                let mut items = self.items.lock().await;
+                items.pop_front()
+            } {
+                return update;
+            }
+
+            notified.await;
+        }
+    }
+
+    #[cfg(test)]
+    async fn len(&self) -> usize {
+        self.items.lock().await.len()
+    }
+}
+
+struct AnimeListUpdateQueueState {
+    app: tauri::AppHandle,
+    pending_updates: PendingAnimeListUpdates,
+    supervisor_running: AtomicBool,
+}
+
+impl AnimeListUpdateQueueState {
+    fn new(app: tauri::AppHandle) -> Self {
+        Self {
+            app,
+            pending_updates: PendingAnimeListUpdates::new(UPDATE_QUEUE_CAPACITY),
+            supervisor_running: AtomicBool::new(false),
+        }
+    }
+
+    fn ensure_worker_supervisor(self: &Arc<Self>) {
+        if self
+            .supervisor_running
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
+            return;
+        }
+
+        let state = Arc::clone(self);
+        tauri::async_runtime::spawn(async move {
+            let _supervisor_guard = WorkerSupervisorGuard::new(Arc::clone(&state));
+            run_worker_supervisor(state).await;
+        });
+    }
+}
+
+struct WorkerSupervisorGuard {
+    state: Arc<AnimeListUpdateQueueState>,
+}
+
+impl WorkerSupervisorGuard {
+    fn new(state: Arc<AnimeListUpdateQueueState>) -> Self {
+        Self { state }
+    }
+}
+
+impl Drop for WorkerSupervisorGuard {
+    fn drop(&mut self) {
+        self.state
+            .supervisor_running
+            .store(false, Ordering::Release);
+    }
+}
+
 pub struct AnimeListUpdateQueue {
-    sender: mpsc::Sender<AnimeListUpdateRequest>,
+    state: Arc<AnimeListUpdateQueueState>,
 }
 
 impl AnimeListUpdateQueue {
     pub fn new(app: tauri::AppHandle) -> Self {
-        let (sender, receiver) = mpsc::channel(UPDATE_QUEUE_CAPACITY);
-        spawn_update_worker(app, receiver);
-        Self { sender }
+        let queue = Self {
+            state: Arc::new(AnimeListUpdateQueueState::new(app)),
+        };
+        queue.ensure_worker_supervisor();
+        queue
     }
 
     pub async fn enqueue(&self, update: AnimeListUpdateRequest) -> Result<(), String> {
-        self.sender
-            .send(update)
-            .await
-            .map_err(|_| "Update queue is unavailable".to_string())
+        self.state.pending_updates.enqueue(update).await?;
+        self.ensure_worker_supervisor();
+        Ok(())
     }
 
-    #[cfg(test)]
-    fn from_sender(sender: mpsc::Sender<AnimeListUpdateRequest>) -> Self {
-        Self { sender }
+    fn ensure_worker_supervisor(&self) {
+        self.state.ensure_worker_supervisor();
     }
 }
 
@@ -77,25 +233,90 @@ pub async fn enqueue_anime_list_update(
     app.state::<AnimeListUpdateQueue>().enqueue(update).await
 }
 
-fn spawn_update_worker(
-    app: tauri::AppHandle,
-    mut receiver: mpsc::Receiver<AnimeListUpdateRequest>,
-) {
-    tauri::async_runtime::spawn(async move {
-        let client = reqwest::Client::new();
-        let interval = Duration::from_millis(UPDATE_INTERVAL_MS);
+fn update_log_context(update: &AnimeListUpdateRequest) -> String {
+    format!(
+        "provider={}, list_type={:?}, entry_id={:?}, media_id={:?}",
+        update.provider_id,
+        update.list_type.unwrap_or_default(),
+        update.entry_id,
+        update.media_id
+    )
+}
 
-        while let Some(update) = receiver.recv().await {
-            if let Err(err) = handle_update(&app, &client, &update).await {
-                eprintln!(
-                    "Anime list update failed (provider={}, entry_id={:?}): {}",
-                    update.provider_id, update.entry_id, err
-                );
+async fn run_worker_supervisor(state: Arc<AnimeListUpdateQueueState>) {
+    let client = reqwest::Client::new();
+    let interval = Duration::from_millis(UPDATE_INTERVAL_MS);
+    let restart_delay = Duration::from_millis(WORKER_RESTART_DELAY_MS);
+
+    update_worker_log!(
+        "Anime list update worker supervisor started (queue_capacity={}, interval_ms={}, crash_retry_limit={})",
+        UPDATE_QUEUE_CAPACITY,
+        UPDATE_INTERVAL_MS,
+        WORKER_CRASH_RETRY_LIMIT
+    );
+
+    loop {
+        let queued_update = state.pending_updates.pop_front().await;
+        let context = update_log_context(&queued_update.request);
+        update_worker_log!("Anime list update received ({context})");
+
+        let app = state.app.clone();
+        let client = client.clone();
+        let update = queued_update.request.clone();
+        let worker =
+            tauri::async_runtime::spawn(async move { handle_update(&app, &client, &update).await });
+
+        match worker.await {
+            Ok(Ok(())) => {
+                update_worker_log!("Anime list update completed ({context})");
             }
+            Ok(Err(err)) => {
+                update_worker_log!("Anime list update failed ({context}): {err}");
+            }
+            Err(join_err) => {
+                let failure = join_error_message(join_err);
+                update_worker_log!("Anime list update worker crashed ({context}): {failure}");
 
-            tokio::time::sleep(interval).await;
+                if let Some(retry_update) = queued_update.schedule_retry() {
+                    if let Err(err) = state.pending_updates.requeue_front(retry_update).await {
+                        update_worker_log!(
+                            "Anime list update requeue failed after worker crash ({context}): {err}"
+                        );
+                    }
+                } else {
+                    update_worker_log!(
+                        "Anime list update dropped after worker crash retries exhausted ({context})"
+                    );
+                }
+
+                tokio::time::sleep(restart_delay).await;
+                continue;
+            }
         }
-    });
+
+        tokio::time::sleep(interval).await;
+    }
+}
+
+fn join_error_message(join_err: tauri::Error) -> String {
+    match join_err {
+        tauri::Error::JoinError(join_err) if join_err.is_panic() => {
+            panic_payload_message(join_err.into_panic())
+        }
+        other => other.to_string(),
+    }
+}
+
+fn panic_payload_message(payload: Box<dyn Any + Send>) -> String {
+    if let Some(message) = payload.downcast_ref::<&'static str>() {
+        return (*message).to_string();
+    }
+
+    if let Some(message) = payload.downcast_ref::<String>() {
+        return message.clone();
+    }
+
+    "unknown panic payload".to_string()
 }
 
 fn validate_supported_provider(provider_id: &str) -> Result<(), String> {
@@ -122,6 +343,7 @@ async fn handle_update(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::runtime::Runtime;
 
     fn sample_update() -> AnimeListUpdateRequest {
         AnimeListUpdateRequest {
@@ -175,32 +397,66 @@ mod tests {
     }
 
     #[test]
-    fn enqueue_returns_error_when_receiver_is_gone() {
-        let runtime = tokio::runtime::Runtime::new().expect("runtime should build");
-        let (sender, receiver) = mpsc::channel(1);
-        drop(receiver);
-        let queue = AnimeListUpdateQueue::from_sender(sender);
+    fn pending_updates_accept_items_without_worker() {
+        let runtime = Runtime::new().expect("runtime should build");
+        let pending = PendingAnimeListUpdates::new(2);
 
-        let error = runtime.block_on(async { queue.enqueue(sample_update()).await });
+        runtime
+            .block_on(async { pending.enqueue(sample_update()).await })
+            .expect("enqueue should succeed");
 
-        assert_eq!(error.unwrap_err(), "Update queue is unavailable");
+        assert_eq!(runtime.block_on(async { pending.len().await }), 1);
     }
 
     #[test]
-    fn enqueue_succeeds_when_receiver_exists() {
-        let runtime = tokio::runtime::Runtime::new().expect("runtime should build");
-        let (sender, mut receiver) = mpsc::channel(1);
-        let queue = AnimeListUpdateQueue::from_sender(sender);
-        let update = sample_update();
+    fn pending_updates_requeue_front_preserves_crashed_item() {
+        let runtime = Runtime::new().expect("runtime should build");
+        let pending = PendingAnimeListUpdates::new(3);
+        let first = sample_update();
+        let mut second = sample_update();
+        second.entry_id = Some(2);
 
         runtime
-            .block_on(async { queue.enqueue(update.clone()).await })
-            .expect("enqueue should succeed");
-        let received = runtime
-            .block_on(async { receiver.recv().await })
-            .expect("receiver should get update");
+            .block_on(async { pending.enqueue(first.clone()).await })
+            .expect("first enqueue should succeed");
+        runtime
+            .block_on(async { pending.enqueue(second.clone()).await })
+            .expect("second enqueue should succeed");
 
-        assert_eq!(received.provider_id, update.provider_id);
-        assert_eq!(received.entry_id, update.entry_id);
+        let popped = runtime.block_on(async { pending.pop_front().await });
+        runtime
+            .block_on(async { pending.requeue_front(popped.clone()).await })
+            .expect("requeue should succeed");
+
+        let first_again = runtime.block_on(async { pending.pop_front().await });
+        let second_after = runtime.block_on(async { pending.pop_front().await });
+
+        assert_eq!(first_again.request.entry_id, first.entry_id);
+        assert_eq!(second_after.request.entry_id, second.entry_id);
+    }
+
+    #[test]
+    fn pending_updates_reject_when_queue_is_full() {
+        let runtime = Runtime::new().expect("runtime should build");
+        let pending = PendingAnimeListUpdates::new(1);
+
+        runtime
+            .block_on(async { pending.enqueue(sample_update()).await })
+            .expect("first enqueue should succeed");
+
+        let error = runtime.block_on(async { pending.enqueue(sample_update()).await });
+
+        assert_eq!(error.unwrap_err(), "Update queue is full");
+    }
+
+    #[test]
+    fn queued_update_limits_worker_crash_retries() {
+        let queued = QueuedAnimeListUpdate::new(sample_update());
+
+        let queued = queued.schedule_retry().expect("retry 1 should exist");
+        let queued = queued.schedule_retry().expect("retry 2 should exist");
+        let queued = queued.schedule_retry().expect("retry 3 should exist");
+
+        assert!(queued.schedule_retry().is_none());
     }
 }

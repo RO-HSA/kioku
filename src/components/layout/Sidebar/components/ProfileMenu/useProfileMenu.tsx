@@ -252,6 +252,7 @@ const useProfileMenu = () => {
           if (!myAnimeListAnimeData) return;
 
           calculatePlaybackMatches({
+            provider: Provider.MY_ANIME_LIST,
             animeListData: myAnimeListAnimeData,
             animeTitle: detection.animeTitle,
             episodeNumber: detection.episode,
@@ -263,6 +264,7 @@ const useProfileMenu = () => {
           if (!aniListAnimeData) return;
 
           calculatePlaybackMatches({
+            provider: Provider.ANILIST,
             animeListData: aniListAnimeData,
             animeTitle: detection.animeTitle,
             episodeNumber: detection.episode,
