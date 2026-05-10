@@ -289,7 +289,7 @@ fn noise_token_regex() -> &'static Regex {
     static REGEX: OnceLock<Regex> = OnceLock::new();
     REGEX.get_or_init(|| {
         Regex::new(
-            r"(?i)\b(?:\d{3,4}p|10bit|8bit|x264|x265|h264|h265|hevc|av1|aac(?:2\.0)?|flac|opus|ddp(?:5\.1)?|blu[- ]?ray|bdrip|webrip|web[- ]?dl|dvdrip|remux|proper|repack|vostfr|raw|sub(?:bed|s)?|multi|dual[- ]?audio)\b",
+            r"(?i)\b(?:\d{3,4}p(?:[- ]?main(?:8|10))?|main(?:8|10)|10bit|8bit|x264(?:-[a-z0-9]+)?|x265(?:-[a-z0-9]+)?|h264|h265|hevc|av1|aac(?:[- ]?2[- ]?0)?|flac|opus|ddp?(?:[- ]?(?:2[- ]?0|5[- ]?1|7[- ]?1))?|ac[- ]?3|e[- ]?ac[- ]?3|dts(?:[- ]?hd)?|truehd|atmos|blu[- ]?ray|bdrip|webrip|web[- ]?dl|dvdrip|remux|proper|repack|vostfr|raw|sub(?:bed|s)?|multi|dual[- ]?audio)\b",
         )
         .expect("valid noise token regex")
     })
@@ -380,6 +380,17 @@ mod tests {
 
         assert_eq!(parsed.episode, Some(12));
         assert_eq!(parsed.anime_title, "Anime Name 2024");
+    }
+
+    #[test]
+    fn strips_release_profile_audio_and_group_suffix_from_detected_title() {
+        let parsed = parse_anime_from_source(
+            "Ghost.in.the.Shell.Stand.Alone.Complex.S01E08.1080p-Main10.BluRay.DD5.1.x265-CTR.mkv",
+        )
+        .expect("source should parse");
+
+        assert_eq!(parsed.anime_title, "Ghost in the Shell Stand Alone Complex");
+        assert_eq!(parsed.episode, Some(8));
     }
 
     #[test]

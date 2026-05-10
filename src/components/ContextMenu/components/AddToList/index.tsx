@@ -1,6 +1,7 @@
 import { ListItemText, Menu, MenuItem } from '@mui/material';
 import { FC, useCallback, useMemo } from 'react';
 
+import { refreshActivePlaybackMatch } from '@/hooks/detection/refreshActivePlaybackMatch';
 import { useContextMenuStore } from '@/stores/contextMenu';
 import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
@@ -52,6 +53,7 @@ const AddToList: FC<AddToListProps> = ({ anchorEl, open, onClose }) => {
               ...state,
               userStatus: status
             } as IAnimeList);
+            refreshActivePlaybackMatch(Provider.MY_ANIME_LIST);
           } else {
             addToMyAnimeListMangaList({
               ...state,
@@ -65,6 +67,7 @@ const AddToList: FC<AddToListProps> = ({ anchorEl, open, onClose }) => {
               ...state,
               userStatus: status
             } as IAnimeList);
+            refreshActivePlaybackMatch(Provider.ANILIST);
           } else {
             addToAnilistMangaList({
               ...state,
@@ -80,11 +83,13 @@ const AddToList: FC<AddToListProps> = ({ anchorEl, open, onClose }) => {
     },
     [
       activeProvider,
+      selectedListType,
       state,
       addToMyAnimeListAnimeList,
       addToMyAnimeListMangaList,
       addToAnilistAnimeList,
-      addToAnilistMangaList
+      addToAnilistMangaList,
+      close
     ]
   );
 

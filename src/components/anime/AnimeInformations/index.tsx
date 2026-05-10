@@ -12,6 +12,7 @@ import {
 import { X } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
+import { refreshActivePlaybackMatch } from '@/hooks/detection/refreshActivePlaybackMatch';
 import { useAnimeDetailsStore } from '@/stores/animeDetails';
 import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
@@ -82,9 +83,11 @@ const AnimeInformations = () => {
     switch (activeProvider) {
       case Provider.MY_ANIME_LIST:
         addToMyAnimeList(selectedAnime);
+        refreshActivePlaybackMatch(Provider.MY_ANIME_LIST);
         break;
       case Provider.ANILIST:
         addToAnilist(selectedAnime);
+        refreshActivePlaybackMatch(Provider.ANILIST);
         break;
       default:
         break;

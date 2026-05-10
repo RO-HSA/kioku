@@ -1,6 +1,7 @@
 import { Box, Container, Grid, Typography } from '@mui/material';
 import { useCallback, useMemo } from 'react';
 
+import GoToCompletedSearchLink from '@/components/GoToCompletedSearchLink';
 import Button from '@/components/ui/Button';
 import { flattenAnimeListData } from '@/hooks/detection/utils';
 import { useNowPlayingAliasesStore } from '@/stores/detection/nowPlayingAliases';
@@ -169,6 +170,12 @@ const NowPlaying = () => {
                 </Button>
               ))}
             </Box>
+
+            <Typography variant="subtitle2">
+              Not in the list?{' '}
+              <GoToCompletedSearchLink searchTerm={animePlaying.animeTitle} />{' '}
+              for more
+            </Typography>
           </Box>
         )}
 
