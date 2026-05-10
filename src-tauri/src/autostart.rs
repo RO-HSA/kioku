@@ -8,9 +8,9 @@ use std::fs::OpenOptions;
 use std::io::Write;
 #[cfg(target_os = "linux")]
 use std::path::{Path, PathBuf};
-#[cfg(target_os = "linux")]
-use std::sync::Arc;
 
+#[cfg(target_os = "linux")]
+use tauri::Manager;
 use tauri::{AppHandle, Runtime};
 #[cfg(not(target_os = "linux"))]
 use tauri_plugin_autostart::ManagerExt;
@@ -126,12 +126,11 @@ fn is_linux_autostart_entry_enabled(path: &Path) -> Result<bool, String> {
     let contents = std::fs::read_to_string(path).map_err(|err| err.to_string())?;
     let entry = parse_linux_autostart_entry(&contents);
     let current_desktops = current_desktop_names();
-    let try_exec_exists = Arc::new(|command: &str| command_exists(command));
 
     Ok(evaluate_linux_autostart_entry(
         &entry,
         &current_desktops,
-        &try_exec_exists,
+        command_exists,
     ))
 }
 
@@ -190,11 +189,14 @@ fn parse_linux_autostart_entry(contents: &str) -> LinuxAutostartEntry {
 }
 
 #[cfg(target_os = "linux")]
-fn evaluate_linux_autostart_entry(
+fn evaluate_linux_autostart_entry<F>(
     entry: &LinuxAutostartEntry,
     current_desktops: &[String],
-    try_exec_exists: &Arc<dyn Fn(&str) -> bool + Send + Sync>,
-) -> bool {
+    try_exec_exists: F,
+) -> bool
+where
+    F: Fn(&str) -> bool,
+{
     if entry.hidden {
         return false;
     }
@@ -470,15 +472,13 @@ X-GNOME-Autostart-enabled=false\n",
     #[test]
     fn evaluate_linux_autostart_entry_honors_hidden_only_show_in_not_show_in_and_try_exec() {
         let current_desktops = vec!["GNOME".to_string()];
-        let try_exec_exists = Arc::new(|command: &str| command == "kioku");
-
         assert!(!evaluate_linux_autostart_entry(
             &LinuxAutostartEntry {
                 hidden: true,
                 ..Default::default()
             },
             &current_desktops,
-            &try_exec_exists,
+            |command| command == "kioku",
         ));
 
         assert!(!evaluate_linux_autostart_entry(
@@ -487,7 +487,7 @@ X-GNOME-Autostart-enabled=false\n",
                 ..Default::default()
             },
             &current_desktops,
-            &try_exec_exists,
+            |command| command == "kioku",
         ));
 
         assert!(!evaluate_linux_autostart_entry(
@@ -496,7 +496,7 @@ X-GNOME-Autostart-enabled=false\n",
                 ..Default::default()
             },
             &current_desktops,
-            &try_exec_exists,
+            |command| command == "kioku",
         ));
 
         assert!(!evaluate_linux_autostart_entry(
@@ -505,7 +505,7 @@ X-GNOME-Autostart-enabled=false\n",
                 ..Default::default()
             },
             &current_desktops,
-            &try_exec_exists,
+            |command| command == "kioku",
         ));
 
         assert!(evaluate_linux_autostart_entry(
@@ -515,22 +515,20 @@ X-GNOME-Autostart-enabled=false\n",
                 ..Default::default()
             },
             &current_desktops,
-            &try_exec_exists,
+            |command| command == "kioku",
         ));
     }
 
     #[cfg(target_os = "linux")]
     #[test]
     fn evaluate_linux_autostart_entry_treats_gnome_flag_as_gnome_specific() {
-        let try_exec_exists = Arc::new(|_: &str| true);
-
         assert!(!evaluate_linux_autostart_entry(
             &LinuxAutostartEntry {
                 x_gnome_autostart_enabled: Some(false),
                 ..Default::default()
             },
             &["GNOME".to_string()],
-            &try_exec_exists,
+            |_| true,
         ));
 
         assert!(evaluate_linux_autostart_entry(
@@ -539,7 +537,7 @@ X-GNOME-Autostart-enabled=false\n",
                 ..Default::default()
             },
             &["KDE".to_string()],
-            &try_exec_exists,
+            |_| true,
         ));
     }
 }

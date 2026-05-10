@@ -25,9 +25,16 @@ const WORKER_CRASH_RETRY_LIMIT: u8 = 3;
 
 macro_rules! update_worker_log {
     ($($arg:tt)*) => {
-        #[cfg(debug_assertions)]
         {
-            eprintln!($($arg)*);
+            #[cfg(debug_assertions)]
+            {
+                eprintln!($($arg)*);
+            }
+
+            #[cfg(not(debug_assertions))]
+            {
+                let _ = format_args!($($arg)*);
+            }
         }
     };
 }
