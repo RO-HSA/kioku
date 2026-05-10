@@ -44,13 +44,13 @@ const useAnimeRemoteSearch = () => {
 
       setRemoteSearchValue(searchValue);
 
-      if (navigateToSearch) {
-        navigate(PathName.SEARCH);
-      }
-
       if (!activeProvider) return;
 
       setIsLoadingGrid(true);
+
+      if (navigateToSearch) {
+        navigate(PathName.SEARCH);
+      }
 
       try {
         switch (activeProvider) {

@@ -508,8 +508,8 @@ const useMangaListDataGrid = ({ listData }: UseMangaListDataGridProps) => {
         handleOpenContextMenu(event, cell.row.original);
       }
     }),
-    renderTopToolbar: () => (
-      <CustomTopToolbar listData={listData} table={table} />
+    renderTopToolbar: ({ table: toolbarTable }) => (
+      <CustomTopToolbar listData={listData} table={toolbarTable} />
     ),
     enableStickyHeader: true,
     enableDensityToggle: false,

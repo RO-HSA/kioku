@@ -2,6 +2,7 @@ import { IconButton, Tooltip } from '@mui/material';
 import { LoaderCircle, RefreshCw } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
+import { refreshActivePlaybackMatch } from '@/hooks/detection/refreshActivePlaybackMatch';
 import { AniListService } from '@/services/backend/AniList';
 import { MyAnimeListService } from '@/services/backend/MyAnimeList';
 import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
@@ -32,6 +33,7 @@ const RefreshListButton = () => {
           setIsLoading(true);
           const result = await MyAnimeListService.synchronizeList();
           setMyAnimeListData(result);
+          refreshActivePlaybackMatch(Provider.MY_ANIME_LIST);
         } finally {
           setIsRefreshing(false);
           setIsLoading(false);
@@ -42,6 +44,7 @@ const RefreshListButton = () => {
           setIsLoading(true);
           const result = await AniListService.synchronizeList();
           setAniListData(result);
+          refreshActivePlaybackMatch(Provider.ANILIST);
         } finally {
           setIsRefreshing(false);
           setIsLoading(false);

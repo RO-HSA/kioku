@@ -26,6 +26,7 @@ tauri-plugin-deep-link = "2"
 tauri-plugin-zustand = "1"
 tauri-plugin-http = { version = "2", features = ["json"] }
 tauri-plugin-stronghold = "2"
+iota_stronghold = "2.1.0"
 keyring = "2"
 rand = "0.8"
 sha2 = "0.10"

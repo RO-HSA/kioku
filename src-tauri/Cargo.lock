@@ -2784,6 +2784,7 @@ name = "kioku"
 version = "0.5.5"
 dependencies = [
  "base64 0.22.1",
+ "iota_stronghold",
  "keyring",
  "rand 0.8.6",
  "regex",

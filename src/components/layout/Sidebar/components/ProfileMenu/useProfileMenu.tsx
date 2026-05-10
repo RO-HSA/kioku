@@ -16,13 +16,11 @@ import {
   type MouseEvent
 } from 'react';
 
-import { calculatePlaybackMatches } from '@/hooks/detection/utils';
+import { refreshActivePlaybackMatch } from '@/hooks/detection/refreshActivePlaybackMatch';
 import { AniListService } from '@/services/backend/AniList';
 import { MyAnimeListService } from '@/services/backend/MyAnimeList';
 import { useAnimeListDataGridStore } from '@/stores/animeListDataGrid';
 import { useConfigMenuStore } from '@/stores/config/configMenu';
-import { useNowPlayingAliasesStore } from '@/stores/detection/nowPlayingAliases';
-import { usePlayerDetectionStore } from '@/stores/detection/playerDetection';
 import { useMangaListDataGridStore } from '@/stores/mangaListDataGrid';
 import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
@@ -67,9 +65,6 @@ const useProfileMenu = () => {
   const myAnimeListProfilePictureUrl = useMyAnimeListStore(
     (state) => state.profilePictureUrl
   );
-  const myAnimeListAnimeData = useMyAnimeListStore(
-    (state) => state.animeListData
-  );
   const signOutMyAnimeList = useMyAnimeListStore((state) => state.signOut);
   const setMyAnimeListId = useMyAnimeListStore((state) => state.setId);
   const setMyAnimeListUsername = useMyAnimeListStore(
@@ -89,7 +84,6 @@ const useProfileMenu = () => {
   const anilistProfilePictureUrl = useAniListStore(
     (state) => state.profilePictureUrl
   );
-  const aniListAnimeData = useAniListStore((state) => state.animeListData);
   const signOutAniList = useAniListStore((state) => state.signOut);
   const setAniListId = useAniListStore((state) => state.setId);
   const setAniListUsername = useAniListStore((state) => state.setUsername);
@@ -97,15 +91,6 @@ const useProfileMenu = () => {
     (state) => state.setProfilePictureUrl
   );
   const setAniListStatistics = useAniListStore((state) => state.setStatistics);
-
-  const detection = usePlayerDetectionStore((state) => state.activeEpisode);
-  const setMatchingResult = usePlayerDetectionStore(
-    (state) => state.setMatchingResult
-  );
-
-  const getAliasesByProvider = useNowPlayingAliasesStore(
-    (state) => state.getAliasesByProvider
-  );
 
   const setStep = useConfigMenuStore((state) => state.setStep);
   const setSelectedTab = useConfigMenuStore((state) => state.setSelectedTab);
@@ -244,48 +229,13 @@ const useProfileMenu = () => {
       setMangaRemoteSearchValue('');
       handleCloseSwitchAccountPopover();
       handleCloseMainPopover();
-
-      if (!detection) return;
-
-      switch (provider) {
-        case Provider.MY_ANIME_LIST:
-          if (!myAnimeListAnimeData) return;
-
-          calculatePlaybackMatches({
-            provider: Provider.MY_ANIME_LIST,
-            animeListData: myAnimeListAnimeData,
-            animeTitle: detection.animeTitle,
-            episodeNumber: detection.episode,
-            aliasesByAnimeId: getAliasesByProvider(Provider.MY_ANIME_LIST),
-            setMatchingResult
-          });
-          break;
-        case Provider.ANILIST:
-          if (!aniListAnimeData) return;
-
-          calculatePlaybackMatches({
-            provider: Provider.ANILIST,
-            animeListData: aniListAnimeData,
-            animeTitle: detection.animeTitle,
-            episodeNumber: detection.episode,
-            aliasesByAnimeId: getAliasesByProvider(Provider.ANILIST),
-            setMatchingResult
-          });
-          break;
-        default:
-          return;
-      }
+      refreshActivePlaybackMatch(provider);
     },
     [
       activeProvider,
-      detection,
-      myAnimeListAnimeData,
-      aniListAnimeData,
       setActiveProvider,
       handleCloseSwitchAccountPopover,
       handleCloseMainPopover,
-      setMatchingResult,
-      getAliasesByProvider,
       setAnimeRemoteSearchValue,
       setMangaRemoteSearchValue
     ]

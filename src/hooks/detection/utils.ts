@@ -18,6 +18,7 @@ type CalculatePlaybackMatchesProps = {
   animeTitle: string;
   episodeNumber: number | null;
   aliasesByAnimeId: AliasesByAnimeId;
+  shouldNotify?: boolean;
   setMatchingResult: (
     provider: Provider,
     matchedAnimeId: number | null,
@@ -201,9 +202,10 @@ export const calculatePlaybackMatches = ({
   animeTitle,
   episodeNumber,
   aliasesByAnimeId,
+  shouldNotify = true,
   setMatchingResult
 }: CalculatePlaybackMatchesProps) => {
-  const notification = new NotificationService();
+  const notification = shouldNotify ? new NotificationService() : null;
 
   const aggregatedData = flattenAnimeListData(animeListData);
 
@@ -214,13 +216,13 @@ export const calculatePlaybackMatches = ({
   );
 
   if (exactMatch) {
-    notification.sendNotification({
+    notification?.sendNotification({
       title: 'Now Playing',
       body: `${exactMatch.title}\nEpisode ${episodeNumber ?? '?'}`
     });
     setMatchingResult(provider, exactMatch.id, []);
   } else {
-    notification.sendNotification({
+    notification?.sendNotification({
       title: 'Media not recognized',
       body: `${animeTitle}\nEpisode ${episodeNumber ?? '?'}\nTry selecting the correct anime from the suggestions on Now Playing menu.`
     });

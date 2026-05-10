@@ -60,6 +60,10 @@ const SearchButton = () => {
     async (searchValue: string) => {
       if (searchValue.trim().length === 0) return;
 
+      if (activeProvider) {
+        setIsLoadingGrid(true);
+      }
+
       if (!isSearchPage) {
         setRemoteSearchValue(searchValue);
         navigate('/search');
@@ -67,7 +71,6 @@ const SearchButton = () => {
 
       switch (activeProvider) {
         case Provider.MY_ANIME_LIST: {
-          setIsLoadingGrid(true);
           const results = await MyAnimeListService.searchMedia(
             searchValue,
             'manga'
@@ -77,7 +80,6 @@ const SearchButton = () => {
           break;
         }
         case Provider.ANILIST: {
-          setIsLoadingGrid(true);
           const results = await AniListService.searchMedia(
             searchValue,
             'manga'
@@ -96,6 +98,7 @@ const SearchButton = () => {
       activeProvider,
       navigate,
       setRemoteSearchValue,
+      setIsLoadingGrid,
       setAniListMangaSearchResults,
       setMangaSearchResults
     ]
