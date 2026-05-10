@@ -1,4 +1,4 @@
-import { Checkbox, FormControlLabel, Stack } from '@mui/material';
+import { Alert, Checkbox, FormControlLabel, Stack } from '@mui/material';
 
 import Section from '../Section';
 import useGeneralConfigsForm from './hooks/useGeneralConfigsForm';
@@ -6,6 +6,8 @@ import useGeneralConfigsForm from './hooks/useGeneralConfigsForm';
 const GeneralConfigsForm = () => {
   const {
     enableAutoStartup,
+    autoStartupError,
+    isAutoStartupPending,
     startMinimized,
     checkForUpdates,
     minimizeToTray,
@@ -24,9 +26,16 @@ const GeneralConfigsForm = () => {
           <FormControlLabel
             label="Start automatically on system startup"
             checked={enableAutoStartup}
-            onChange={(_, checked) => toggleAutoStartup(checked)}
+            disabled={isAutoStartupPending}
+            onChange={(_, checked) => {
+              toggleAutoStartup(checked);
+            }}
             control={<Checkbox size="small" />}
           />
+
+          {autoStartupError && (
+            <Alert severity="error">{autoStartupError}</Alert>
+          )}
 
           <FormControlLabel
             label="Start minimized"

@@ -1,5 +1,15 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 
+export type AutoStartSetEnabledResult =
+  | {
+      ok: true;
+      enabled: boolean;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
 export class AutoStartService {
   static isRuntimeSupported(): boolean {
     return isTauri();
@@ -13,11 +23,39 @@ export class AutoStartService {
     return invoke<boolean>('is_auto_start_enabled');
   }
 
-  static async setEnabled(enabled: boolean): Promise<boolean> {
+  static async setEnabled(
+    enabled: boolean
+  ): Promise<AutoStartSetEnabledResult> {
     if (!this.isRuntimeSupported()) {
-      return enabled;
+      return {
+        ok: false,
+        error:
+          'Auto start is available only when running the desktop Tauri app.'
+      };
     }
 
-    return invoke<boolean>('set_auto_start_enabled', { enabled });
+    try {
+      const nextEnabled = await invoke<boolean>('set_auto_start_enabled', {
+        enabled
+      });
+
+      return {
+        ok: true,
+        enabled: nextEnabled
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: this.getErrorMessage(error)
+      };
+    }
+  }
+
+  private static getErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return String(error);
   }
 }
