@@ -1,4 +1,5 @@
-import { disable, enable } from '@tauri-apps/plugin-autostart';
+import { AutoStartService } from '@/services/backend/AutoStart';
+import { useState } from 'react';
 
 import {
   defaultConfiguration,
@@ -10,20 +11,34 @@ const useGeneralConfigsForm = () => {
   const setConfiguration = useConfigMenuStore(
     (state) => state.setConfiguration
   );
+  const [autoStartupError, setAutoStartupError] = useState<string | null>(null);
+  const [isAutoStartupPending, setIsAutoStartupPending] = useState(false);
 
   const toggleAutoStartup = async (enabled: boolean) => {
-    setConfiguration({
-      ...configuration,
-      application: {
-        ...configuration?.application,
-        enableAutoStartup: enabled
-      }
-    });
+    if (isAutoStartupPending) {
+      return;
+    }
 
-    if (enabled) {
-      await enable();
-    } else {
-      await disable();
+    setIsAutoStartupPending(true);
+    setAutoStartupError(null);
+
+    try {
+      const result = await AutoStartService.setEnabled(enabled);
+
+      if (!result.ok) {
+        setAutoStartupError(result.error);
+        return;
+      }
+
+      setConfiguration({
+        ...configuration,
+        application: {
+          ...configuration?.application,
+          enableAutoStartup: result.enabled
+        }
+      });
+    } finally {
+      setIsAutoStartupPending(false);
     }
   };
 
@@ -68,6 +83,8 @@ const useGeneralConfigsForm = () => {
     enableAutoStartup:
       configuration?.application?.enableAutoStartup ??
       defaultConfiguration.application.enableAutoStartup,
+    autoStartupError,
+    isAutoStartupPending,
     startMinimized:
       configuration?.application?.startMinimized ??
       defaultConfiguration.application.startMinimized,
