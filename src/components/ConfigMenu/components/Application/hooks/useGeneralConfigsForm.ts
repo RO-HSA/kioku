@@ -12,6 +12,12 @@ const useGeneralConfigsForm = () => {
   );
 
   const toggleAutoStartup = async (enabled: boolean) => {
+    if (enabled) {
+      await enable();
+    } else {
+      await disable();
+    }
+
     setConfiguration({
       ...configuration,
       application: {
@@ -19,12 +25,6 @@ const useGeneralConfigsForm = () => {
         enableAutoStartup: enabled
       }
     });
-
-    if (enabled) {
-      await enable();
-    } else {
-      await disable();
-    }
   };
 
   const toggleStartMinimized = (enabled: boolean) => {
