@@ -9,6 +9,7 @@ use tauri::{
 use tauri_plugin_zustand::ManagerExt;
 
 pub mod auth;
+pub mod autostart;
 pub mod services;
 use crate::auth::anilist::{
     AUTHORIZE_URL as ANILIST_AUTHORIZE_URL, CLIENT_ID as ANILIST_CLIENT_ID,
@@ -22,6 +23,7 @@ use crate::auth::{
     authorize_anilist, authorize_myanimelist, authorize_provider, handle_oauth_callback,
     init_stronghold_key, oauth_request, ProviderConfig, StrongholdKeyState, TokenManagerState,
 };
+use crate::autostart::{is_auto_start_enabled, set_auto_start_enabled, sync_auto_start};
 use crate::services::anilist::{
     fetch_anilist_user_info, search_anilist_media, synchronize_anilist,
 };
@@ -58,6 +60,8 @@ struct StoredDetectionConfig {
 #[derive(Debug, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct StoredApplicationConfig {
+    #[serde(default)]
+    enable_auto_startup: bool,
     #[serde(default)]
     start_minimized: bool,
     #[serde(default)]
@@ -204,6 +208,13 @@ pub fn run() {
             });
 
             let bootstrap_config = read_bootstrap_config(&app.handle());
+            if let Err(err) = sync_auto_start(
+                &app.handle(),
+                bootstrap_config.application.enable_auto_startup,
+            ) {
+                eprintln!("failed to sync autostart state: {err}");
+            }
+
             let main_window_config = app
                 .config()
                 .app
@@ -285,6 +296,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            is_auto_start_enabled,
+            set_auto_start_enabled,
             authorize_myanimelist,
             authorize_anilist,
             authorize_provider,
