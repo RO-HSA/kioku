@@ -9,7 +9,7 @@ import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { useProviderStore } from '@/stores/providers/provider';
 import { Provider } from '@/types/List';
 import { buildEntityUrl } from '@/utils/url';
-import { flattenAnimeListData } from './utils';
+import { flattenAnimeListData, mergeAnimeCandidates } from './utils';
 
 const DISCORD_PRESENCE_REFRESH_MS = 30_000;
 
@@ -20,6 +20,9 @@ const useDiscordRichPresence = () => {
   );
   const activeMatchedProvider = usePlayerDetectionStore(
     (state) => state.activeMatchedProvider
+  );
+  const remoteAnimeCandidates = usePlayerDetectionStore(
+    (state) => state.remoteAnimeCandidates
   );
 
   const activeProvider = useProviderStore((state) => state.activeProvider);
@@ -41,15 +44,29 @@ const useDiscordRichPresence = () => {
   );
 
   const aggregatedData = useMemo(() => {
-    switch (activeProvider) {
-      case Provider.MY_ANIME_LIST:
-        return flattenAnimeListData(myAnimeListAnimeData);
-      case Provider.ANILIST:
-        return flattenAnimeListData(aniListAnimeData);
-      default:
-        return [];
+    const localAnimeList = (() => {
+      switch (activeProvider) {
+        case Provider.MY_ANIME_LIST:
+          return flattenAnimeListData(myAnimeListAnimeData);
+        case Provider.ANILIST:
+          return flattenAnimeListData(aniListAnimeData);
+        default:
+          return [];
+      }
+    })();
+
+    if (activeMatchedProvider !== activeProvider) {
+      return localAnimeList;
     }
-  }, [activeProvider, aniListAnimeData, myAnimeListAnimeData]);
+
+    return mergeAnimeCandidates(localAnimeList, remoteAnimeCandidates);
+  }, [
+    activeMatchedProvider,
+    activeProvider,
+    aniListAnimeData,
+    myAnimeListAnimeData,
+    remoteAnimeCandidates
+  ]);
 
   const matchedAnime = useMemo(() => {
     if (!activeMatchedAnimeId || activeMatchedProvider !== activeProvider) {

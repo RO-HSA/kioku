@@ -1,4 +1,8 @@
 import { PlayerDetectionService } from '@/services/backend/PlayerDetection';
+import {
+  AnimePlaybackDetection,
+  SynchronizedAnimeList
+} from '@/services/backend/types';
 import { NotificationService } from '@/services/Notification';
 import { useNowPlayingAliasesStore } from '@/stores/detection/nowPlayingAliases';
 import { usePlayerDetectionStore } from '@/stores/detection/playerDetection';
@@ -13,10 +17,23 @@ import { useEffect } from 'react';
 import {
   calculatePlaybackMatches,
   flattenAnimeListData,
-  resolveNextStatusFromDetectedEpisode
+  mergeAnimeCandidates,
+  resolveNextStatusFromDetectedEpisode,
+  searchRemoteAnimeCandidates
 } from './utils';
 
 const notification = new NotificationService();
+
+const isSameDetection = (
+  left: AnimePlaybackDetection | null,
+  right: AnimePlaybackDetection
+) => {
+  return (
+    left?.player === right.player &&
+    left.animeTitle === right.animeTitle &&
+    left.episode === right.episode
+  );
+};
 
 const usePlaybackObserverEvents = () => {
   const setEpisodeDetected = usePlayerDetectionStore(
@@ -32,6 +49,38 @@ const usePlaybackObserverEvents = () => {
   useEffect(() => {
     let unlistenDetected: UnlistenFn | null = null;
     let unlistenClosed: UnlistenFn | null = null;
+
+    const matchDetectedEpisode = async (
+      provider: Provider,
+      animeListData: SynchronizedAnimeList,
+      detection: AnimePlaybackDetection
+    ) => {
+      const remoteAnimeCandidates = await searchRemoteAnimeCandidates(
+        provider,
+        detection.animeTitle
+      );
+
+      const { activeEpisode } = usePlayerDetectionStore.getState();
+
+      if (
+        useProviderStore.getState().activeProvider !== provider ||
+        !isSameDetection(activeEpisode, detection)
+      ) {
+        return;
+      }
+
+      calculatePlaybackMatches({
+        provider,
+        animeListData,
+        animeTitle: detection.animeTitle,
+        episodeNumber: detection.episode,
+        aliasesByAnimeId: useNowPlayingAliasesStore
+          .getState()
+          .getAliasesByProvider(provider),
+        remoteAnimeCandidates,
+        setMatchingResult
+      });
+    };
 
     const setupListeners = async () => {
       unlistenDetected = await PlayerDetectionService.listenEpisodeDetected(
@@ -50,16 +99,12 @@ const usePlaybackObserverEvents = () => {
                 return;
               }
 
-              calculatePlaybackMatches({
-                provider: Provider.MY_ANIME_LIST,
-                animeListData: myAnimeListAnimeData,
-                animeTitle: detection.animeTitle,
-                episodeNumber: detection.episode,
-                aliasesByAnimeId: useNowPlayingAliasesStore
-                  .getState()
-                  .getAliasesByProvider(Provider.MY_ANIME_LIST),
-                setMatchingResult
-              });
+              setEpisodeDetected(detection);
+              void matchDetectedEpisode(
+                Provider.MY_ANIME_LIST,
+                myAnimeListAnimeData,
+                detection
+              );
               break;
             case Provider.ANILIST:
               if (!aniListAnimeData) {
@@ -70,16 +115,12 @@ const usePlaybackObserverEvents = () => {
                 return;
               }
 
-              calculatePlaybackMatches({
-                provider: Provider.ANILIST,
-                animeListData: aniListAnimeData,
-                animeTitle: detection.animeTitle,
-                episodeNumber: detection.episode,
-                aliasesByAnimeId: useNowPlayingAliasesStore
-                  .getState()
-                  .getAliasesByProvider(Provider.ANILIST),
-                setMatchingResult
-              });
+              setEpisodeDetected(detection);
+              void matchDetectedEpisode(
+                Provider.ANILIST,
+                aniListAnimeData,
+                detection
+              );
               break;
             default:
               notification.sendNotification({
@@ -88,15 +129,16 @@ const usePlaybackObserverEvents = () => {
               });
               return;
           }
-
-          setEpisodeDetected(detection);
         }
       );
 
       unlistenClosed = await PlayerDetectionService.listenEpisodeClosed(
         (detection) => {
-          const { activeMatchedAnimeId, activeMatchedProvider } =
-            usePlayerDetectionStore.getState();
+          const {
+            activeMatchedAnimeId,
+            activeMatchedProvider,
+            remoteAnimeCandidates
+          } = usePlayerDetectionStore.getState();
           const activeProvider = useProviderStore.getState().activeProvider;
 
           setEpisodeClosed(detection);
@@ -110,7 +152,7 @@ const usePlaybackObserverEvents = () => {
             return;
           }
 
-          let aggregatedData: IAnimeList[] = [];
+          let localAnimeList: IAnimeList[] = [];
 
           const myAnimeListAnimeData =
             useMyAnimeListStore.getState().animeListData;
@@ -119,19 +161,26 @@ const usePlaybackObserverEvents = () => {
           switch (activeProvider) {
             case Provider.MY_ANIME_LIST:
               if (myAnimeListAnimeData) {
-                aggregatedData = flattenAnimeListData(myAnimeListAnimeData);
+                localAnimeList = flattenAnimeListData(myAnimeListAnimeData);
               }
               break;
             case Provider.ANILIST:
               if (aniListAnimeData) {
-                aggregatedData = flattenAnimeListData(aniListAnimeData);
+                localAnimeList = flattenAnimeListData(aniListAnimeData);
               }
               break;
             default:
               break;
           }
 
+          const aggregatedData = mergeAnimeCandidates(
+            localAnimeList,
+            remoteAnimeCandidates
+          );
           const anime = aggregatedData.find(
+            (item) => item.id === activeMatchedAnimeId
+          );
+          const isAnimeInLocalList = localAnimeList.some(
             (item) => item.id === activeMatchedAnimeId
           );
 
@@ -173,16 +222,30 @@ const usePlaybackObserverEvents = () => {
             updatePayload.userFinishDate = getTodayAsYmd();
           }
 
+          const updatedAnime: IAnimeList = {
+            ...anime,
+            ...updatePayload,
+            userStatus: updatePayload.userStatus ?? anime.userStatus
+          };
+
           switch (activeProvider) {
             case Provider.MY_ANIME_LIST:
-              useMyAnimeListStore
-                .getState()
-                .updateAnimeList(anime.id, anime.userStatus, updatePayload);
+              if (isAnimeInLocalList) {
+                useMyAnimeListStore
+                  .getState()
+                  .updateAnimeList(anime.id, anime.userStatus, updatePayload);
+              } else {
+                useMyAnimeListStore.getState().addToAnimeList(updatedAnime);
+              }
               break;
             case Provider.ANILIST:
-              useAniListStore
-                .getState()
-                .updateAnimeList(anime.id, anime.userStatus, updatePayload);
+              if (isAnimeInLocalList) {
+                useAniListStore
+                  .getState()
+                  .updateAnimeList(anime.id, anime.userStatus, updatePayload);
+              } else {
+                useAniListStore.getState().addToAnimeList(updatedAnime);
+              }
               break;
             default:
               break;

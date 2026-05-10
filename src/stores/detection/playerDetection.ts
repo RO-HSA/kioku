@@ -1,4 +1,5 @@
 import { AnimePlaybackDetection } from '@/services/backend/types';
+import { IAnimeList } from '@/types/AnimeList';
 import { Provider } from '@/types/List';
 import { create } from 'zustand';
 
@@ -8,12 +9,14 @@ type PlayerDetectionStore = {
   activeMatchedAnimeId: number | null;
   activeMatchedProvider: Provider | null;
   suggestedAnimeIds: number[];
+  remoteAnimeCandidates: IAnimeList[];
   setEpisodeDetected: (detection: AnimePlaybackDetection) => void;
   setEpisodeClosed: (detection: AnimePlaybackDetection) => void;
   setMatchingResult: (
     provider: Provider,
     matchedAnimeId: number | null,
-    suggestedAnimeIds: number[]
+    suggestedAnimeIds: number[],
+    remoteAnimeCandidates?: IAnimeList[]
   ) => void;
   resolveActiveAnime: (provider: Provider, animeId: number) => void;
 };
@@ -24,10 +27,15 @@ export const usePlayerDetectionStore = create<PlayerDetectionStore>((set) => ({
   activeMatchedAnimeId: null,
   activeMatchedProvider: null,
   suggestedAnimeIds: [],
+  remoteAnimeCandidates: [],
   setEpisodeDetected: (detection) =>
     set(() => ({
       activeEpisode: detection,
-      lastClosedEpisode: null
+      lastClosedEpisode: null,
+      activeMatchedAnimeId: null,
+      activeMatchedProvider: null,
+      suggestedAnimeIds: [],
+      remoteAnimeCandidates: []
     })),
   setEpisodeClosed: (detection) =>
     set(() => ({
@@ -35,13 +43,20 @@ export const usePlayerDetectionStore = create<PlayerDetectionStore>((set) => ({
       lastClosedEpisode: detection,
       activeMatchedAnimeId: null,
       activeMatchedProvider: null,
-      suggestedAnimeIds: []
+      suggestedAnimeIds: [],
+      remoteAnimeCandidates: []
     })),
-  setMatchingResult: (provider, matchedAnimeId, suggestedAnimeIds) =>
+  setMatchingResult: (
+    provider,
+    matchedAnimeId,
+    suggestedAnimeIds,
+    remoteAnimeCandidates = []
+  ) =>
     set(() => ({
       activeMatchedAnimeId: matchedAnimeId,
       activeMatchedProvider: provider,
-      suggestedAnimeIds
+      suggestedAnimeIds,
+      remoteAnimeCandidates
     })),
   resolveActiveAnime: (provider, animeId) =>
     set(() => ({

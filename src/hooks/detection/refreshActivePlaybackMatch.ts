@@ -4,9 +4,9 @@ import { useAniListStore } from '@/stores/providers/anilist';
 import { useMyAnimeListStore } from '@/stores/providers/myanimelist';
 import { useProviderStore } from '@/stores/providers/provider';
 import { Provider } from '@/types/List';
-import { calculatePlaybackMatches } from './utils';
+import { calculatePlaybackMatches, searchRemoteAnimeCandidates } from './utils';
 
-export const refreshActivePlaybackMatch = (
+export const refreshActivePlaybackMatch = async (
   provider = useProviderStore.getState().activeProvider
 ) => {
   if (!provider) {
@@ -30,6 +30,18 @@ export const refreshActivePlaybackMatch = (
     return;
   }
 
+  const remoteAnimeCandidates = await searchRemoteAnimeCandidates(
+    provider,
+    activeEpisode.animeTitle
+  );
+
+  if (
+    useProviderStore.getState().activeProvider !== provider ||
+    usePlayerDetectionStore.getState().activeEpisode !== activeEpisode
+  ) {
+    return;
+  }
+
   calculatePlaybackMatches({
     provider,
     animeListData,
@@ -38,6 +50,7 @@ export const refreshActivePlaybackMatch = (
     aliasesByAnimeId: useNowPlayingAliasesStore
       .getState()
       .getAliasesByProvider(provider),
+    remoteAnimeCandidates,
     shouldNotify: false,
     setMatchingResult
   });
