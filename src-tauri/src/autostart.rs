@@ -120,9 +120,8 @@ fn canonicalize_fallback(path: &Path) -> PathBuf {
 
 #[cfg(target_os = "linux")]
 fn linux_autostart_entry_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
-    let home_dir = app.path().home_dir().map_err(|err| err.to_string())?;
-    Ok(home_dir
-        .join(".config")
+    let config_dir = app.path().config_dir().map_err(|err| err.to_string())?;
+    Ok(config_dir
         .join("autostart")
         .join(format!("{}.desktop", app.package_info().name)))
 }
