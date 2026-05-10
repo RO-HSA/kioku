@@ -3,7 +3,10 @@ import { useCallback, useMemo } from 'react';
 
 import GoToCompletedSearchLink from '@/components/GoToCompletedSearchLink';
 import Button from '@/components/ui/Button';
-import { flattenAnimeListData } from '@/hooks/detection/utils';
+import {
+  flattenAnimeListData,
+  mergeAnimeCandidates
+} from '@/hooks/detection/utils';
 import { useNowPlayingAliasesStore } from '@/stores/detection/nowPlayingAliases';
 import { usePlayerDetectionStore } from '@/stores/detection/playerDetection';
 import { useAniListStore } from '@/stores/providers/anilist';
@@ -26,6 +29,9 @@ const NowPlaying = () => {
   const suggestedAnimeIds = usePlayerDetectionStore(
     (state) => state.suggestedAnimeIds
   );
+  const remoteAnimeCandidates = usePlayerDetectionStore(
+    (state) => state.remoteAnimeCandidates
+  );
   const resolveActiveAnime = usePlayerDetectionStore(
     (state) => state.resolveActiveAnime
   );
@@ -40,15 +46,29 @@ const NowPlaying = () => {
   const activeProvider = useProviderStore((state) => state.activeProvider);
 
   const aggregatedData = useMemo(() => {
-    switch (activeProvider) {
-      case Provider.MY_ANIME_LIST:
-        return flattenAnimeListData(myAnimeListAnimeData);
-      case Provider.ANILIST:
-        return flattenAnimeListData(aniListAnimeData);
-      default:
-        return [];
+    const localAnimeList = (() => {
+      switch (activeProvider) {
+        case Provider.MY_ANIME_LIST:
+          return flattenAnimeListData(myAnimeListAnimeData);
+        case Provider.ANILIST:
+          return flattenAnimeListData(aniListAnimeData);
+        default:
+          return [];
+      }
+    })();
+
+    if (activeMatchedProvider !== activeProvider) {
+      return localAnimeList;
     }
-  }, [activeProvider, aniListAnimeData, myAnimeListAnimeData]);
+
+    return mergeAnimeCandidates(localAnimeList, remoteAnimeCandidates);
+  }, [
+    activeMatchedProvider,
+    activeProvider,
+    aniListAnimeData,
+    myAnimeListAnimeData,
+    remoteAnimeCandidates
+  ]);
 
   const exactAnimeMatch = useMemo(() => {
     if (!activeMatchedAnimeId || activeMatchedProvider !== activeProvider) {
@@ -181,7 +201,7 @@ const NowPlaying = () => {
 
         {animePlaying && !exactAnimeMatch && suggestedMatches.length === 0 && (
           <Typography variant="body2" color="textSecondary">
-            No close matches found in your list for this detected title.
+            No close matches found for this detected title.
           </Typography>
         )}
       </Box>

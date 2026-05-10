@@ -1,4 +1,6 @@
 import { SynchronizedAnimeList } from '@/services/backend/types';
+import { AniListService } from '@/services/backend/AniList';
+import { MyAnimeListService } from '@/services/backend/MyAnimeList';
 import { NotificationService } from '@/services/Notification';
 import { AliasesByAnimeId } from '@/stores/detection/nowPlayingAliases';
 import { AnimeListUserStatus, IAnimeList } from '@/types/AnimeList';
@@ -11,6 +13,7 @@ const WHITESPACE_REGEX = /\s+/g;
 
 const DEFAULT_MAX_SUGGESTIONS = 10;
 const DEFAULT_MINIMUM_SCORE = 35;
+const PLAYBACK_REMOTE_SEARCH_LIMIT = 10;
 
 type CalculatePlaybackMatchesProps = {
   provider: Provider;
@@ -18,11 +21,13 @@ type CalculatePlaybackMatchesProps = {
   animeTitle: string;
   episodeNumber: number | null;
   aliasesByAnimeId: AliasesByAnimeId;
+  remoteAnimeCandidates?: IAnimeList[];
   shouldNotify?: boolean;
   setMatchingResult: (
     provider: Provider,
     matchedAnimeId: number | null,
-    suggestedAnimeIds: number[]
+    suggestedAnimeIds: number[],
+    remoteAnimeCandidates?: IAnimeList[]
   ) => void;
 };
 
@@ -161,6 +166,30 @@ export const findSuggestedAnimeMatches = (
     .map(({ anime }) => anime);
 };
 
+export const mergeAnimeCandidates = (
+  localAnimeList: IAnimeList[],
+  remoteAnimeCandidates: IAnimeList[]
+): IAnimeList[] => {
+  const knownAnimeIds = new Set<number>();
+  const mergedAnimeList: IAnimeList[] = [];
+
+  localAnimeList.forEach((anime) => {
+    knownAnimeIds.add(anime.id);
+    mergedAnimeList.push(anime);
+  });
+
+  remoteAnimeCandidates.forEach((anime) => {
+    if (knownAnimeIds.has(anime.id)) {
+      return;
+    }
+
+    knownAnimeIds.add(anime.id);
+    mergedAnimeList.push(anime);
+  });
+
+  return mergedAnimeList;
+};
+
 export const flattenAnimeListData = (
   animeListData: SynchronizedAnimeList | null
 ): IAnimeList[] => {
@@ -175,6 +204,38 @@ export const flattenAnimeListData = (
     ...animeListData.dropped,
     ...animeListData.planToWatch
   ];
+};
+
+export const searchRemoteAnimeCandidates = async (
+  provider: Provider,
+  animeTitle: string
+): Promise<IAnimeList[]> => {
+  const query = animeTitle.trim();
+
+  if (!query) {
+    return [];
+  }
+
+  try {
+    switch (provider) {
+      case Provider.MY_ANIME_LIST:
+        return await MyAnimeListService.searchMedia(
+          query,
+          'anime',
+          PLAYBACK_REMOTE_SEARCH_LIMIT
+        );
+      case Provider.ANILIST:
+        return await AniListService.searchMedia(
+          query,
+          'anime',
+          PLAYBACK_REMOTE_SEARCH_LIMIT
+        );
+      default:
+        return [];
+    }
+  } catch {
+    return [];
+  }
 };
 
 export const resolveNextStatusFromDetectedEpisode = (
@@ -202,12 +263,17 @@ export const calculatePlaybackMatches = ({
   animeTitle,
   episodeNumber,
   aliasesByAnimeId,
+  remoteAnimeCandidates = [],
   shouldNotify = true,
   setMatchingResult
 }: CalculatePlaybackMatchesProps) => {
   const notification = shouldNotify ? new NotificationService() : null;
 
-  const aggregatedData = flattenAnimeListData(animeListData);
+  const localAnimeList = flattenAnimeListData(animeListData);
+  const aggregatedData = mergeAnimeCandidates(
+    localAnimeList,
+    remoteAnimeCandidates
+  );
 
   const exactMatch = findExactAnimeMatch(
     aggregatedData,
@@ -220,7 +286,7 @@ export const calculatePlaybackMatches = ({
       title: 'Now Playing',
       body: `${exactMatch.title}\nEpisode ${episodeNumber ?? '?'}`
     });
-    setMatchingResult(provider, exactMatch.id, []);
+    setMatchingResult(provider, exactMatch.id, [], remoteAnimeCandidates);
   } else {
     notification?.sendNotification({
       title: 'Media not recognized',
@@ -236,7 +302,8 @@ export const calculatePlaybackMatches = ({
     setMatchingResult(
       provider,
       null,
-      suggestions.map((anime) => anime.id)
+      suggestions.map((anime) => anime.id),
+      remoteAnimeCandidates
     );
   }
 };
