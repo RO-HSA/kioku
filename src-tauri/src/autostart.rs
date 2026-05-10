@@ -333,7 +333,7 @@ fn is_executable_file(path: &Path) -> bool {
 #[cfg(target_os = "linux")]
 fn resolve_launch_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     if let Some(appimage_path) = app.env().appimage.as_ref() {
-        return Ok(canonicalize_fallback(appimage_path));
+        return Ok(canonicalize_fallback(Path::new(appimage_path)));
     }
 
     current_exe()
