@@ -17,6 +17,7 @@ const KEY_LENGTH: usize = 32;
 const CLIENT_ID: &[u8] = b"oauth";
 const REFRESH_TOKEN_KEY: &str = "refresh_token";
 const ACCESS_TOKEN_KEY: &str = "access_token";
+const STRONGHOLD_SNAPSHOT_WORK_FACTOR: u8 = 0;
 
 static STRONGHOLD_STORE_LOCK: Mutex<()> = Mutex::new(());
 
@@ -201,6 +202,9 @@ fn open_stronghold_at_path(path: PathBuf, key: &[u8]) -> Result<Stronghold, Stri
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
+
+    iota_stronghold::engine::snapshot::try_set_encrypt_work_factor(STRONGHOLD_SNAPSHOT_WORK_FACTOR)
+        .map_err(|e| e.to_string())?;
 
     Stronghold::new(path, key.to_vec()).map_err(|e| e.to_string())
 }
@@ -453,6 +457,30 @@ mod tests {
             ("token".to_string(), 123)
         );
         assert!(decode_access_token_record(br#"{"token":1}"#).is_err());
+    }
+
+    #[test]
+    fn stronghold_store_roundtrips_tokens_on_disk() {
+        let path = temp_key_path("vault").with_extension("hold");
+        let key = generate_master_key();
+
+        with_stronghold_store(|| {
+            let stronghold = open_stronghold_at_path(path.clone(), &key)?;
+            save_secret_bytes(&stronghold, "provider:token", b"stored-token".to_vec())
+        })
+        .expect("token should save");
+
+        assert!(path.exists());
+
+        let restored = with_stronghold_store(|| {
+            let stronghold = open_stronghold_at_path(path.clone(), &key)?;
+            read_secret_bytes(&stronghold, "provider:token")
+        })
+        .expect("token should read");
+
+        assert_eq!(restored, Some(b"stored-token".to_vec()));
+
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]

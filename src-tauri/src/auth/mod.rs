@@ -344,17 +344,14 @@ pub async fn authorize_anilist(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 pub async fn handle_oauth_callback(app: tauri::AppHandle, url: String) {
-    if handle_oauth_callback_impl(&app, &url, None).await.is_err() {
-        eprintln!("OAuth callback handling failed");
+    if let Err(err) = handle_oauth_callback_impl(&app, &url, None).await {
+        eprintln!("OAuth callback handling failed: {err}");
     }
 }
 
 pub async fn handle_myanimelist_callback(app: tauri::AppHandle, url: String) {
-    if handle_oauth_callback_impl(&app, &url, Some(MAL_PROVIDER_ID))
-        .await
-        .is_err()
-    {
-        eprintln!("MyAnimeList callback handling failed");
+    if let Err(err) = handle_oauth_callback_impl(&app, &url, Some(MAL_PROVIDER_ID)).await {
+        eprintln!("MyAnimeList callback handling failed: {err}");
     }
 }
 
