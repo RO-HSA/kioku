@@ -1,5 +1,4 @@
-import { disable, enable } from '@tauri-apps/plugin-autostart';
-
+import { AutoStartService } from '@/services/backend/AutoStart';
 import {
   defaultConfiguration,
   useConfigMenuStore
@@ -12,17 +11,13 @@ const useGeneralConfigsForm = () => {
   );
 
   const toggleAutoStartup = async (enabled: boolean) => {
-    if (enabled) {
-      await enable();
-    } else {
-      await disable();
-    }
+    const nextEnabled = await AutoStartService.setEnabled(enabled);
 
     setConfiguration({
       ...configuration,
       application: {
         ...configuration?.application,
-        enableAutoStartup: enabled
+        enableAutoStartup: nextEnabled
       }
     });
   };
